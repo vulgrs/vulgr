@@ -1,0 +1,113 @@
+@import "@xterm/xterm/css/xterm.css";
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+    color: #e2e8f0;
+    background-color: #07080c;
+    overflow: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Cosmic Ambient Glow & Glassmorphism */
+.ambient-background {
+  background: 
+    radial-gradient(circle at 10% 10%, rgba(168, 85, 247, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 90% 90%, rgba(0, 216, 255, 0.07) 0%, transparent 50%),
+    radial-gradient(circle at 50% 30%, rgba(59, 130, 246, 0.05) 0%, transparent 55%),
+    radial-gradient(circle at 50% 80%, rgba(34, 197, 94, 0.04) 0%, transparent 50%),
+    #07080c;
+}
+
+.glass-surface {
+  background: rgba(13, 15, 23, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-card {
+  background: rgba(18, 21, 33, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-modal {
+  background: rgba(12, 14, 22, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 40px -10px rgba(0, 216, 255, 0.1);
+}
+
+.glass-input {
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+  border-color: rgba(0, 216, 255, 0.5);
+  box-shadow: 0 0 12px -2px rgba(0, 216, 255, 0.25);
+}
+
+/* Glow effects */
+.glow-purple {
+  box-shadow: 0 0 20px -3px rgba(168, 85, 247, 0.25);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 20px -3px rgba(0, 216, 255, 0.25);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 20px -3px rgba(34, 197, 94, 0.25);
+}
+
+.glow-amber {
+  box-shadow: 0 0 20px -3px rgba(245, 158, 11, 0.25);
+}
+
+/* Custom Warp Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/* Micro-animations */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-badge {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.03) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 3s infinite;
+}
+
+/* Active terminal glow border */
+.active-terminal-border {
+  border-color: rgba(0, 216, 255, 0.45);
+  box-shadow: 0 0 20px -4px rgba(0, 216, 255, 0.15), inset 0 0 0 1px rgba(0, 216, 255, 0.1);
+}

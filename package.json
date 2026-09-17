@@ -1,0 +1,67 @@
+{
+  "name": "multi-cli-orchestrator",
+  "version": "1.0.0",
+  "description": "Warp-like AI Native Terminal & Multi-CLI Orchestrator Desktop Application",
+  "type": "module",
+  "main": "dist/electron/main.js",
+  "bin": {
+    "orchestrate": "./dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc && vite build",
+    "build:core": "tsc",
+    "build:ui": "vite build",
+    "type-check": "tsc --noEmit",
+    "start": "node ./dist/src/index.js",
+    "start:app": "electron dist/electron/main.js",
+    "dev:app": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron dist/electron/main.js\"",
+    "dev:ui": "vite",
+    "test": "node --test dist/src/tests/**/*.test.js"
+  },
+  "keywords": [
+    "warp",
+    "terminal",
+    "cli",
+    "orchestrator",
+    "claude",
+    "gemini",
+    "electron",
+    "self-correction",
+    "adversarial-review"
+  ],
+  "author": "Advanced Agentic Coding Team",
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.8.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "commander": "^13.1.0",
+    "node-pty": "^1.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^22.13.9",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.21",
+    "clsx": "^2.1.1",
+    "concurrently": "^9.1.2",
+    "electron": "^35.0.0",
+    "lucide-react": "^0.477.0",
+    "postcss": "^8.5.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.0.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0",
+    "wait-on": "^8.0.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

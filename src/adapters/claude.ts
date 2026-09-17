@@ -1,0 +1,29 @@
+import { BaseCliAdapter } from './base.js';
+import type { CliAdapterConfig, CliExecutionOptions } from '../types/index.js';
+
+export class ClaudeAdapter extends BaseCliAdapter {
+  readonly name = 'claude';
+
+  constructor(config: CliAdapterConfig = {}) {
+    super(config);
+  }
+
+  protected getDefaultBinary(): string {
+    return 'claude';
+  }
+
+  /**
+   * Constructs Claude CLI arguments.
+   * Uses `-p, --print` for non-interactive execution.
+   */
+  protected buildArgs(prompt: string, options?: CliExecutionOptions): string[] {
+    const args: string[] = ['-p', prompt];
+
+    // If non-interactive automated edits are intended, allow auto-permission if flag enabled
+    if (this.extraArgs.length > 0) {
+      args.push(...this.extraArgs);
+    }
+
+    return args;
+  }
+}
