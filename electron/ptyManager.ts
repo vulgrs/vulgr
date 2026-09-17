@@ -1,6 +1,7 @@
 import * as pty from 'node-pty';
 import { BrowserWindow } from 'electron';
 import os from 'node:os';
+import type { ConfigManager } from '../src/engine/configManager.js';
 
 export interface PtyCreateOptions {
   id: string;
@@ -14,24 +15,38 @@ export interface PtyCreateOptions {
 export class PtyManager {
   private terminals = new Map<string, pty.IPty>();
   private window: BrowserWindow | null = null;
+  private configManager: ConfigManager | null = null;
 
   setWindow(win: BrowserWindow) {
     this.window = win;
   }
 
+  setConfigManager(cm: ConfigManager) {
+    this.configManager = cm;
+  }
+
   createTerminal(options: PtyCreateOptions) {
     const isWindows = process.platform === 'win32';
-    const defaultShell = isWindows ? 'powershell.exe' : (process.env.SHELL || 'bash');
+    const shellResolution = this.configManager ? this.configManager.resolveShellBinary() : {
+      shell: isWindows ? 'powershell.exe' : (process.env.SHELL || 'bash'),
+      args: isWindows ? ['-NoLogo'] : [],
+    };
 
-    let file = options.command || defaultShell;
-    let args: string[] = options.args || [];
+    let file = options.command || shellResolution.shell;
+    let args: string[] = options.args || shellResolution.args || [];
 
-    // If launching specific CLI on Windows, handle cmd/powershell invocation
-    if (options.command && options.command !== 'powershell.exe' && options.command !== 'cmd.exe') {
+    // If launching specific CLI on Windows, handle powershell invocation with config flags
+    if (options.command && options.command !== 'powershell.exe' && options.command !== 'cmd.exe' && options.command !== 'wsl.exe') {
       if (isWindows) {
-        // e.g. claude or agy or codex
+        let invocation = options.command;
+        if (options.command === 'claude' && this.configManager) {
+          const claudeFlags = this.configManager.getClaudeCliFlags();
+          if (claudeFlags.length > 0) {
+            invocation = `claude ${claudeFlags.join(' ')}`;
+          }
+        }
         file = 'powershell.exe';
-        args = ['-NoLogo', '-NoExit', '-Command', options.command];
+        args = ['-NoLogo', '-NoExit', '-Command', invocation];
       }
     }
 

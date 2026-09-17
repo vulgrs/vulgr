@@ -14,12 +14,15 @@ import { MemoryStore } from '../src/engine/memoryStore.js';
 import { ContextOptimizer } from '../src/engine/contextOptimizer.js';
 import { WorktreeManager } from '../src/git/worktreeManager.js';
 import { AutoSuggestEngine } from '../src/engine/autoSuggest.js';
+import { ConfigManager } from '../src/engine/configManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+const configManager = new ConfigManager();
 const ptyManager = new PtyManager();
+ptyManager.setConfigManager(configManager);
 const skillsRegistry = new SharedSkillsRegistry();
 const memoryStore = new MemoryStore();
 const worktreeManager = new WorktreeManager();
@@ -213,6 +216,11 @@ function setupIpcHandlers() {
 
   // Smart Ghost Text & Auto-Suggest Handler
   ipcMain.handle('suggest:get', (_, input: string) => autoSuggestEngine.getSuggestion(input));
+
+  // Settings & Configuration Handlers
+  ipcMain.handle('config:get', () => configManager.getConfig());
+  ipcMain.handle('config:update', (_, updates) => configManager.updateConfig(updates));
+  ipcMain.handle('config:reset', () => configManager.resetConfig());
 
   ipcMain.handle('system:getCwd', () => process.cwd());
 }

@@ -11,6 +11,7 @@ import { SquadBar } from './components/SquadBar.js';
 import { LiveSquadModal } from './components/LiveSquadModal.js';
 import { SkillsModal } from './components/SkillsModal.js';
 import { SandboxDrawer } from './components/SandboxDrawer.js';
+import { SettingsModal } from './components/SettingsModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
 import type {
@@ -69,6 +70,7 @@ export const App: React.FC = () => {
   const [skillsModalOpen, setSkillsModalOpen] = useState(false);
   const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('warp.primaryModel', 'claude'));
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
@@ -569,6 +571,14 @@ export const App: React.FC = () => {
         keywords: 'tools status',
         run: refreshDoctor,
       },
+      {
+        id: 'open-settings',
+        label: 'Settings & CLI Flags (Claude, AGY, Codex)',
+        group: 'Settings',
+        shortcut: 'Ctrl+,',
+        keywords: 'settings preferences config dangerously-skip-permissions models shell font theme permissions',
+        run: () => setSettingsModalOpen(true),
+      },
     ],
     [activeSession, tabs, activeTabId, cwd]
   );
@@ -586,6 +596,13 @@ export const App: React.FC = () => {
       if (key === 'tab') {
         e.preventDefault();
         cycleTab(e.shiftKey ? -1 : 1);
+        return;
+      }
+
+      // Ctrl+, for settings
+      if (key === ',' && !e.shiftKey) {
+        e.preventDefault();
+        setSettingsModalOpen((v) => !v);
         return;
       }
 
@@ -662,6 +679,7 @@ export const App: React.FC = () => {
         onOpenMeshModal={() => setMeshModalOpen(true)}
         onOpenSquadModal={() => setSquadModalOpen(true)}
         onOpenSkillsModal={() => setSkillsModalOpen(true)}
+        onOpenSettings={() => setSettingsModalOpen(true)}
       />
 
       {/* Main Content: Sidebar + Terminal Grid */}
@@ -776,6 +794,12 @@ export const App: React.FC = () => {
         onInsertIntoInput={(command) => {
           handleSendInputToActive(command);
         }}
+      />
+
+      {/* CLI Permissions & Settings Modal */}
+      <SettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
       />
     </div>
   );

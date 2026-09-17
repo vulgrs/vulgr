@@ -143,4 +143,40 @@ export interface SandboxMergeResult {
   error?: string;
 }
 
+export type ShellType = 'powershell' | 'cmd' | 'wsl' | 'bash';
+export type CursorStyleType = 'block' | 'underline' | 'bar';
+
+export interface ClaudeConfig {
+  skipPermissions: boolean;
+  model: string;
+  maxRetries: number;
+  additionalFlags: string[];
+}
+
+export interface AgyConfig {
+  model: string;
+  budget: number;
+  temperature: number;
+  additionalFlags: string[];
+}
+
+export interface CodexConfig {
+  model: string;
+  apiKey?: string;
+  endpoint?: string;
+}
+
+export interface WarpConfig {
+  defaultShell: ShellType;
+  fontSize: number;
+  fontFamily: string;
+  cursorStyle: CursorStyleType;
+  claude: ClaudeConfig;
+  agy: AgyConfig;
+  codex: CodexConfig;
+  autoSandbox: boolean;
+  defaultVerifyCmd: string;
+  lastUpdated: string;
+}
+
 

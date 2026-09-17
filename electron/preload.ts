@@ -68,6 +68,11 @@ export interface WarpApi {
 
   // Smart Ghost Text & Auto-Suggest
   getAutoSuggestion: (input: string) => Promise<{ input: string; completion: string; suffix: string; source: 'history' | 'skill' | 'builtin'; description?: string } | null>;
+
+  // Settings & Configuration
+  getConfig: () => Promise<any>;
+  updateConfig: (updates: any) => Promise<any>;
+  resetConfig: () => Promise<any>;
 }
 
 const api: WarpApi = {
@@ -131,6 +136,11 @@ const api: WarpApi = {
 
   // Smart Ghost Text & Auto-Suggest
   getAutoSuggestion: (input) => ipcRenderer.invoke('suggest:get', input),
+
+  // Settings & Configuration
+  getConfig: () => ipcRenderer.invoke('config:get'),
+  updateConfig: (updates) => ipcRenderer.invoke('config:update', updates),
+  resetConfig: () => ipcRenderer.invoke('config:reset'),
 };
 
 contextBridge.exposeInMainWorld('warpApi', api);

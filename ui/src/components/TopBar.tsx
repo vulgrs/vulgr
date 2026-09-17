@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   Zap,
   Users,
+  Settings,
 } from 'lucide-react';
 import type { WorkspaceTab, DoctorStatus, SessionType } from '../types/warp.js';
 
@@ -26,6 +27,7 @@ interface TopBarProps {
   onOpenMeshModal: () => void;
   onOpenSquadModal: () => void;
   onOpenSkillsModal: () => void;
+  onOpenSettings: () => void;
   doctor: DoctorStatus | null;
   hasUncommittedDiff: boolean;
   sidebarOpen: boolean;
@@ -44,6 +46,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenMeshModal,
   onOpenSquadModal,
   onOpenSkillsModal,
+  onOpenSettings,
   doctor,
   hasUncommittedDiff,
   sidebarOpen,
@@ -197,6 +200,15 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <Command size={12} className="text-cyan-400" />
           <span className="text-[10px] font-mono text-slate-400">^⇧P</span>
+        </button>
+
+        {/* Settings Modal Button */}
+        <button
+          onClick={onOpenSettings}
+          className="p-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-400 hover:text-white hover:border-white/[0.15] transition-all"
+          title="CLI Permissions, Models & Settings (Ctrl+,)"
+        >
+          <Settings size={13} className="text-slate-400 hover:text-cyan-400 transition-colors" />
         </button>
 
         {/* Git Diff Inspector Pill */}
