@@ -7,6 +7,9 @@ import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { AgentMeshModal } from './components/AgentMeshModal.js';
+import { SquadBar } from './components/SquadBar.js';
+import { LiveSquadModal } from './components/LiveSquadModal.js';
+import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
 import type {
   WorkspaceTab,
   TerminalSession,
@@ -59,10 +62,13 @@ export const App: React.FC = () => {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => loadPersisted('warp.sidebarOpen', false));
   const [meshModalOpen, setMeshModalOpen] = useState(false);
+  const [squadModalOpen, setSquadModalOpen] = useState(false);
 
   const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('warp.primaryModel', 'claude'));
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
   const [verifyCmd, setVerifyCmd] = useState(() => loadPersisted('warp.verifyCmd', 'npm test'));
+
+  const { squad, startSquad, togglePause, forceHandoff, stopSquad } = useSquadOrchestrator(cwd);
 
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
   const activeSession =
@@ -170,6 +176,58 @@ export const App: React.FC = () => {
         return t;
       })
     );
+  };
+
+  // Launch a 2-way Split Live Autonomous Squad
+  const handleLaunchLiveSquad = (config: {
+    goal: string;
+    builder: SessionType;
+    verifier: SessionType;
+    verifyCmd: string;
+    maxRounds: number;
+  }) => {
+    const newTabId = `tab-squad-${Date.now()}`;
+    const builderSessionId = `sess-b-${Date.now()}`;
+    const verifierSessionId = `sess-v-${Date.now()}`;
+
+    const getCmd = (type: SessionType) => {
+      if (type === 'claude') return 'claude';
+      if (type === 'agy') return 'agy';
+      if (type === 'codex') return 'codex';
+      return '';
+    };
+
+    const builderSession: TerminalSession = {
+      id: builderSessionId,
+      title: `${config.builder.toUpperCase()} (Builder)`,
+      type: config.builder,
+      command: getCmd(config.builder),
+      cwd,
+      createdAt: new Date().toISOString(),
+    };
+
+    const verifierSession: TerminalSession = {
+      id: verifierSessionId,
+      title: `${config.verifier.toUpperCase()} (Verifier)`,
+      type: config.verifier,
+      command: getCmd(config.verifier),
+      cwd,
+      createdAt: new Date().toISOString(),
+    };
+
+    const squadTab: WorkspaceTab = {
+      id: newTabId,
+      title: `👥 Squad: ${config.builder} ⇄ ${config.verifier}`,
+      layout: 'split-h',
+      activeSessionId: builderSessionId,
+      paneSizes: [50, 50],
+      sessions: [builderSession, verifierSession],
+    };
+
+    setTabs((prev) => [...prev, squadTab]);
+    setActiveTabId(newTabId);
+
+    startSquad(config, newTabId, builderSessionId, verifierSessionId);
   };
 
   // Tab management
@@ -370,6 +428,14 @@ export const App: React.FC = () => {
         run: () => handleLaunchAgent('codex'),
       },
       {
+        id: 'launch-live-squad',
+        label: 'Launch Live Autonomous Squad (Split View)',
+        group: 'Autonomous',
+        shortcut: 'Ctrl+Shift+S',
+        keywords: 'squad team pair claude agy split live',
+        run: () => setSquadModalOpen(true),
+      },
+      {
         id: 'split-h',
         label: 'Split Active Pane Horizontally',
         group: 'Panes',
@@ -449,6 +515,10 @@ export const App: React.FC = () => {
           e.preventDefault();
           setPaletteOpen((v) => !v);
           break;
+        case 's':
+          e.preventDefault();
+          setSquadModalOpen((v) => !v);
+          break;
         case 't':
           e.preventDefault();
           handleAddTab();
@@ -501,6 +571,7 @@ export const App: React.FC = () => {
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenMeshModal={() => setMeshModalOpen(true)}
+        onOpenSquadModal={() => setSquadModalOpen(true)}
       />
 
       {/* Main Content: Sidebar + Terminal Grid */}
@@ -519,18 +590,30 @@ export const App: React.FC = () => {
           />
         )}
 
-        <div className="flex-1 min-w-0 min-h-0 flex">
-          {currentTab && (
-            <PaneGrid
-              tab={currentTab}
-              onSetActiveSession={handleSetActiveSession}
-              onCloseSession={handleCloseSession}
-              onSplitSession={handleSplitSession}
-              onPipeErrorToAgent={handlePipeErrorToAgent}
-              onResizePanes={handleResizePanes}
-              onLaunchAgent={handleLaunchAgent}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+          {/* Live Squad Status Banner (if active on current tab) */}
+          {squad && squad.tabId === activeTabId && squad.active && (
+            <SquadBar
+              squad={squad}
+              onPauseToggle={togglePause}
+              onForceHandoff={forceHandoff}
+              onStopSquad={stopSquad}
             />
           )}
+
+          <div className="flex-1 min-w-0 min-h-0 flex">
+            {currentTab && (
+              <PaneGrid
+                tab={currentTab}
+                onSetActiveSession={handleSetActiveSession}
+                onCloseSession={handleCloseSession}
+                onSplitSession={handleSplitSession}
+                onPipeErrorToAgent={handlePipeErrorToAgent}
+                onResizePanes={handleResizePanes}
+                onLaunchAgent={handleLaunchAgent}
+              />
+            )}
+          </div>
         </div>
 
         {/* Git Diff Drawer */}
@@ -572,6 +655,13 @@ export const App: React.FC = () => {
       <AgentMeshModal
         isOpen={meshModalOpen}
         onClose={() => setMeshModalOpen(false)}
+      />
+
+      {/* Live Autonomous Squad Modal */}
+      <LiveSquadModal
+        isOpen={squadModalOpen}
+        onClose={() => setSquadModalOpen(false)}
+        onLaunchSquad={handleLaunchLiveSquad}
       />
     </div>
   );

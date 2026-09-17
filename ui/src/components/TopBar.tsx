@@ -11,6 +11,7 @@ import {
   PanelLeft,
   PanelLeftClose,
   Zap,
+  Users,
 } from 'lucide-react';
 import type { WorkspaceTab, DoctorStatus, SessionType } from '../types/warp.js';
 
@@ -23,6 +24,7 @@ interface TopBarProps {
   onLaunchAgent: (type: SessionType) => void;
   onToggleDiff: () => void;
   onOpenMeshModal: () => void;
+  onOpenSquadModal: () => void;
   doctor: DoctorStatus | null;
   hasUncommittedDiff: boolean;
   sidebarOpen: boolean;
@@ -39,6 +41,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onLaunchAgent,
   onToggleDiff,
   onOpenMeshModal,
+  onOpenSquadModal,
   doctor,
   hasUncommittedDiff,
   sidebarOpen,
@@ -153,6 +156,16 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span>Codex</span>
           </button>
         </div>
+
+        {/* Live Squad Trigger */}
+        <button
+          onClick={onOpenSquadModal}
+          className="relative group flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-500/50 text-cyan-200 text-xs font-semibold shadow-[0_0_12px_rgba(0,216,255,0.2)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+          title="Launch Live 2-Way Split Autonomous Squad (Claude + AGY)"
+        >
+          <Users size={12} className="text-cyan-400" />
+          <span>👥 Live Squad</span>
+        </button>
 
         {/* Autonomous Mesh Trigger */}
         <button

@@ -43,3 +43,28 @@ export interface DoctorStatus {
   git: { ok: boolean; isRepo: boolean };
   cwd: string;
 }
+
+export type SquadPhase =
+  | 'idle'
+  | 'building'
+  | 'handing_off'
+  | 'verifying'
+  | 'repairing'
+  | 'consensus'
+  | 'paused';
+
+export interface SquadSession {
+  active: boolean;
+  tabId: string;
+  builderSessionId: string;
+  verifierSessionId: string;
+  builderType: SessionType;
+  verifierType: SessionType;
+  goal: string;
+  verifyCmd: string;
+  phase: SquadPhase;
+  round: number;
+  maxRounds: number;
+  lastErrorSnippet?: string;
+}
+
