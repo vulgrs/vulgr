@@ -13,6 +13,7 @@ import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sha
 import { MemoryStore } from '../src/engine/memoryStore.js';
 import { ContextOptimizer } from '../src/engine/contextOptimizer.js';
 import { WorktreeManager } from '../src/git/worktreeManager.js';
+import { AutoSuggestEngine } from '../src/engine/autoSuggest.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,6 +23,7 @@ const ptyManager = new PtyManager();
 const skillsRegistry = new SharedSkillsRegistry();
 const memoryStore = new MemoryStore();
 const worktreeManager = new WorktreeManager();
+const autoSuggestEngine = new AutoSuggestEngine(process.cwd(), memoryStore, skillsRegistry);
 
 function canConnectToDevServer(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -208,6 +210,9 @@ function setupIpcHandlers() {
 
   // Context & Token Optimizer Handlers
   ipcMain.handle('context:optimize', (_, { raw, options }) => ContextOptimizer.optimizeTerminalLog(raw, options));
+
+  // Smart Ghost Text & Auto-Suggest Handler
+  ipcMain.handle('suggest:get', (_, input: string) => autoSuggestEngine.getSuggestion(input));
 
   ipcMain.handle('system:getCwd', () => process.cwd());
 }

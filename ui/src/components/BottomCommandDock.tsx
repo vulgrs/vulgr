@@ -28,15 +28,25 @@ interface CommandSuggestion {
   source: string;
 }
 
+interface AutoSuggestItem {
+  input: string;
+  completion: string;
+  suffix: string;
+  source: 'history' | 'skill' | 'builtin';
+  description?: string;
+}
+
 export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
   activeSession,
   onSendInput,
 }) => {
   const [input, setInput] = useState('');
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
+  const [ghostSuggestion, setGhostSuggestion] = useState<AutoSuggestItem | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [copied, setCopied] = useState(false);
   const debounceRef = useRef<any>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const isAiMode = input.startsWith('#');
 
@@ -75,6 +85,26 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
     };
   }, [input, isAiMode]);
 
+  // Query Smart Ghost Text auto-suggest when typing regular commands
+  useEffect(() => {
+    if (isAiMode || !input || input.trim().length === 0) {
+      setGhostSuggestion(null);
+      return;
+    }
+
+    if (window.warpApi?.getAutoSuggestion) {
+      window.warpApi.getAutoSuggestion(input).then((res: AutoSuggestItem | null) => {
+        if (res && res.suffix) {
+          setGhostSuggestion(res);
+        } else {
+          setGhostSuggestion(null);
+        }
+      }).catch(() => {
+        setGhostSuggestion(null);
+      });
+    }
+  }, [input, isAiMode]);
+
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!activeSession) return;
@@ -83,22 +113,46 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
       onSendInput(suggestion.command + '\r');
       setInput('');
       setSuggestion(null);
+      setGhostSuggestion(null);
       return;
     }
 
     if (!input.trim()) return;
     onSendInput(input + '\r');
+
+    // Also record in persistent MemoryStore for future history autocompletions
+    if (window.warpApi?.recordMemoryCommand) {
+      window.warpApi.recordMemoryCommand({ command: input.trim(), exitCode: 0 });
+    }
+
     setInput('');
+    setGhostSuggestion(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Tab' && suggestion) {
+    // 1. Ghost text completion via Tab or ArrowRight at end of line
+    if (!isAiMode && ghostSuggestion) {
+      const isAtEnd = e.currentTarget.selectionStart === input.length;
+      if (e.key === 'Tab' || (e.key === 'ArrowRight' && isAtEnd)) {
+        e.preventDefault();
+        setInput(ghostSuggestion.completion);
+        setGhostSuggestion(null);
+        return;
+      }
+    }
+
+    // 2. AI suggestion completion via Tab
+    if (isAiMode && e.key === 'Tab' && suggestion) {
       e.preventDefault();
       setInput(suggestion.command);
       setSuggestion(null);
-    } else if (e.key === 'Escape') {
+      return;
+    }
+
+    if (e.key === 'Escape') {
       setInput('');
       setSuggestion(null);
+      setGhostSuggestion(null);
     }
   };
 
@@ -285,17 +339,40 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
           </button>
         </div>
 
-        {/* Right: Inline Input */}
-        <form onSubmit={handleSubmit} className="flex items-center space-x-2">
+        {/* Right: Inline Input with Ghost Text */}
+        <form onSubmit={handleSubmit} className="relative flex items-center space-x-2">
+          {/* Floating Ghost Suggestion Micro-Pill */}
+          {ghostSuggestion && !isAiMode && (
+            <div className="absolute bottom-full mb-1.5 right-0 flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-[#0d101a]/95 border border-cyan-500/30 text-[11px] font-mono shadow-xl backdrop-blur-md animate-fadeIn z-20 select-none">
+              <span className="px-1.5 py-0.5 rounded bg-white/[0.1] text-cyan-300 font-bold text-[10px]">Tab ⇥</span>
+              <span className="text-slate-400">or</span>
+              <span className="px-1.5 py-0.5 rounded bg-white/[0.1] text-cyan-300 font-bold text-[10px]">→</span>
+              <span className="text-slate-300 truncate max-w-[200px]">{ghostSuggestion.description || 'Complete command'}</span>
+              <span className="px-1.5 py-0.5 rounded text-[9px] uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                {ghostSuggestion.source}
+              </span>
+            </div>
+          )}
+
           <div className="relative flex items-center">
             <span
-              className={`absolute left-2.5 font-mono text-xs select-none transition-colors ${
+              className={`absolute left-2.5 font-mono text-xs select-none transition-colors z-10 ${
                 isAiMode ? 'text-purple-400 font-bold' : 'text-cyan-400'
               }`}
             >
               {isAiMode ? '✨' : '❯'}
             </span>
+
+            {/* Ghost Text Overlay behind caret */}
+            {ghostSuggestion && !isAiMode && (
+              <div className="absolute inset-0 pl-7 pr-3 py-1.5 flex items-center pointer-events-none font-mono text-xs overflow-hidden select-none whitespace-pre">
+                <span className="opacity-0">{input}</span>
+                <span className="text-slate-500 italic opacity-80">{ghostSuggestion.suffix}</span>
+              </div>
+            )}
+
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -306,7 +383,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                   ? "Type command, or '# port 3000 kapat' for AI search..."
                   : 'Select a terminal first'
               }
-              className={`w-96 glass-input rounded-xl pl-7 pr-3 py-1.5 text-slate-200 text-xs font-mono placeholder:text-slate-500 focus:outline-none transition-all shadow-inner ${
+              className={`w-96 glass-input rounded-xl pl-7 pr-3 py-1.5 text-slate-200 text-xs font-mono placeholder:text-slate-500 focus:outline-none transition-all shadow-inner relative z-0 bg-transparent ${
                 isAiMode
                   ? 'border-purple-500/60 shadow-[0_0_15px_rgba(168,85,247,0.2)] text-purple-200'
                   : 'focus:border-cyan-500/60'

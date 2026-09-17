@@ -65,6 +65,9 @@ export interface WarpApi {
   getSandboxDiff: (worktreePath: string, baseBranch?: string) => Promise<{ hasChanges: boolean; diff: string; filesChanged: string[] }>;
   mergeSandbox: (options: { worktreePath: string; branchName: string; targetBranch?: string; commitMsg?: string }) => Promise<{ success: boolean; mergedCommit?: string; conflict?: boolean; conflictFiles?: string[]; error?: string }>;
   destroySandbox: (options: { worktreePath: string; branchName: string; force?: boolean }) => Promise<boolean>;
+
+  // Smart Ghost Text & Auto-Suggest
+  getAutoSuggestion: (input: string) => Promise<{ input: string; completion: string; suffix: string; source: 'history' | 'skill' | 'builtin'; description?: string } | null>;
 }
 
 const api: WarpApi = {
@@ -125,6 +128,9 @@ const api: WarpApi = {
   getSandboxDiff: (worktreePath, baseBranch) => ipcRenderer.invoke('sandbox:diff', { worktreePath, baseBranch }),
   mergeSandbox: (options) => ipcRenderer.invoke('sandbox:merge', options),
   destroySandbox: (options) => ipcRenderer.invoke('sandbox:destroy', options),
+
+  // Smart Ghost Text & Auto-Suggest
+  getAutoSuggestion: (input) => ipcRenderer.invoke('suggest:get', input),
 };
 
 contextBridge.exposeInMainWorld('warpApi', api);
