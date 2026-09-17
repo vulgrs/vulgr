@@ -9,6 +9,8 @@ import { CommandPalette } from './components/CommandPalette.js';
 import { AgentMeshModal } from './components/AgentMeshModal.js';
 import { SquadBar } from './components/SquadBar.js';
 import { LiveSquadModal } from './components/LiveSquadModal.js';
+import { SkillsModal } from './components/SkillsModal.js';
+import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
 import type {
   WorkspaceTab,
@@ -63,6 +65,7 @@ export const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(() => loadPersisted('warp.sidebarOpen', false));
   const [meshModalOpen, setMeshModalOpen] = useState(false);
   const [squadModalOpen, setSquadModalOpen] = useState(false);
+  const [skillsModalOpen, setSkillsModalOpen] = useState(false);
 
   const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('warp.primaryModel', 'claude'));
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
@@ -256,6 +259,18 @@ export const App: React.FC = () => {
 
   const handleCloseTab = (tabId: string) => {
     if (tabs.length <= 1) return;
+    const tabToClose = tabs.find((t) => t.id === tabId);
+    if (tabToClose) {
+      // Deterministic subscription cleanup & process kill
+      subscriptionRegistry.disposeScope(tabToClose.id);
+      for (const s of tabToClose.sessions) {
+        subscriptionRegistry.disposeScope(s.id);
+        if (window.warpApi?.killTerminal) {
+          window.warpApi.killTerminal(s.id);
+        }
+      }
+    }
+
     const remaining = tabs.filter((t) => t.id !== tabId);
     setTabs(remaining);
     if (activeTabId === tabId) {
@@ -283,6 +298,12 @@ export const App: React.FC = () => {
   };
 
   const handleCloseSession = (sessionId: string) => {
+    // Deterministic subscription cleanup & process kill for closing session
+    subscriptionRegistry.disposeScope(sessionId);
+    if (window.warpApi?.killTerminal) {
+      window.warpApi.killTerminal(sessionId);
+    }
+
     setTabs((prev) =>
       prev.map((t) => {
         if (t.id === activeTabId) {
@@ -457,6 +478,14 @@ export const App: React.FC = () => {
         run: () => activeSession && handleCloseSession(activeSession.id),
       },
       {
+        id: 'open-skills',
+        label: 'Open Shared Skills & Workspace Memory',
+        group: 'Skills',
+        shortcut: 'Ctrl+Shift+K',
+        keywords: 'skills memory workflows snippets templates docker git prompt',
+        run: () => setSkillsModalOpen(true),
+      },
+      {
         id: 'toggle-sidebar',
         label: 'Toggle Sidebar',
         group: 'View',
@@ -515,6 +544,10 @@ export const App: React.FC = () => {
           e.preventDefault();
           setPaletteOpen((v) => !v);
           break;
+        case 'k':
+          e.preventDefault();
+          setSkillsModalOpen((v) => !v);
+          break;
         case 's':
           e.preventDefault();
           setSquadModalOpen((v) => !v);
@@ -572,6 +605,7 @@ export const App: React.FC = () => {
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenMeshModal={() => setMeshModalOpen(true)}
         onOpenSquadModal={() => setSquadModalOpen(true)}
+        onOpenSkillsModal={() => setSkillsModalOpen(true)}
       />
 
       {/* Main Content: Sidebar + Terminal Grid */}
@@ -662,6 +696,20 @@ export const App: React.FC = () => {
         isOpen={squadModalOpen}
         onClose={() => setSquadModalOpen(false)}
         onLaunchSquad={handleLaunchLiveSquad}
+      />
+
+      {/* Universal Shared Skills & Persistent Memory Modal */}
+      <SkillsModal
+        isOpen={skillsModalOpen}
+        onClose={() => setSkillsModalOpen(false)}
+        onRunInTerminal={(command) => {
+          if (activeSession && window.warpApi?.writeTerminal) {
+            window.warpApi.writeTerminal(activeSession.id, command + '\r');
+          }
+        }}
+        onInsertIntoInput={(command) => {
+          handleSendInputToActive(command);
+        }}
       />
     </div>
   );

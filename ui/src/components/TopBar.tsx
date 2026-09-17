@@ -25,6 +25,7 @@ interface TopBarProps {
   onToggleDiff: () => void;
   onOpenMeshModal: () => void;
   onOpenSquadModal: () => void;
+  onOpenSkillsModal: () => void;
   doctor: DoctorStatus | null;
   hasUncommittedDiff: boolean;
   sidebarOpen: boolean;
@@ -42,6 +43,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleDiff,
   onOpenMeshModal,
   onOpenSquadModal,
+  onOpenSkillsModal,
   doctor,
   hasUncommittedDiff,
   sidebarOpen,
@@ -156,6 +158,16 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span>Codex</span>
           </button>
         </div>
+
+        {/* Universal Skills & Memory Trigger */}
+        <button
+          onClick={onOpenSkillsModal}
+          className="relative group flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-500/50 text-amber-200 text-xs font-semibold shadow-[0_0_12px_rgba(245,158,11,0.2)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+          title="Open Universal Shared Skills & Persistent Memory (Ctrl+Shift+K)"
+        >
+          <Zap size={12} className="text-amber-400 fill-current" />
+          <span>⚡ Skills</span>
+        </button>
 
         {/* Live Squad Trigger */}
         <button

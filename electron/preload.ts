@@ -39,6 +39,25 @@ export interface WarpApi {
 
   // AI Command Search
   generateCommand: (query: string) => Promise<{ command: string; explanation: string; source: string }>;
+
+  // Universal Shared Skills
+  listSkills: (options?: { category?: string; query?: string }) => Promise<any[]>;
+  getSkill: (id: string) => Promise<any>;
+  saveSkill: (skill: any) => Promise<any>;
+  deleteSkill: (id: string) => Promise<boolean>;
+  interpolateSkill: (template: string, values: Record<string, string>, parameters?: any[]) => Promise<string>;
+
+  // Persistent Workspace & Agent Memory
+  getMemory: () => Promise<any>;
+  setMemoryFact: (key: string, value: string, source?: string) => Promise<boolean>;
+  deleteMemoryFact: (key: string) => Promise<boolean>;
+  addMemoryRule: (rule: string) => Promise<boolean>;
+  removeMemoryRule: (rule: string) => Promise<boolean>;
+  recordMemoryCommand: (cmd: { command: string; exitCode: number; durationMs?: number; summary?: string }) => Promise<boolean>;
+  getMemorySnippet: () => Promise<string>;
+
+  // Context Optimizer
+  optimizeContext: (raw: string, options?: any) => Promise<string>;
 }
 
 const api: WarpApi = {
@@ -72,6 +91,26 @@ const api: WarpApi = {
   },
 
   generateCommand: (query) => ipcRenderer.invoke('ai:generateCommand', query),
+
+  // Universal Shared Skills
+  listSkills: (options) => ipcRenderer.invoke('skills:list', options),
+  getSkill: (id) => ipcRenderer.invoke('skills:get', id),
+  saveSkill: (skill) => ipcRenderer.invoke('skills:save', skill),
+  deleteSkill: (id) => ipcRenderer.invoke('skills:delete', id),
+  interpolateSkill: (template, values, parameters) =>
+    ipcRenderer.invoke('skills:interpolate', { template, values, parameters }),
+
+  // Persistent Memory
+  getMemory: () => ipcRenderer.invoke('memory:get'),
+  setMemoryFact: (key, value, source) => ipcRenderer.invoke('memory:setFact', { key, value, source }),
+  deleteMemoryFact: (key) => ipcRenderer.invoke('memory:deleteFact', key),
+  addMemoryRule: (rule) => ipcRenderer.invoke('memory:addRule', rule),
+  removeMemoryRule: (rule) => ipcRenderer.invoke('memory:removeRule', rule),
+  recordMemoryCommand: (cmd) => ipcRenderer.invoke('memory:recordCommand', cmd),
+  getMemorySnippet: () => ipcRenderer.invoke('memory:promptSnippet'),
+
+  // Context Optimizer
+  optimizeContext: (raw, options) => ipcRenderer.invoke('context:optimize', { raw, options }),
 };
 
 contextBridge.exposeInMainWorld('warpApi', api);

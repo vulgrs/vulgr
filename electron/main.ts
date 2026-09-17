@@ -9,12 +9,17 @@ import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
 import { AgentMesh } from '../src/engine/agentMesh.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
+import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
+import { MemoryStore } from '../src/engine/memoryStore.js';
+import { ContextOptimizer } from '../src/engine/contextOptimizer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
 const ptyManager = new PtyManager();
+const skillsRegistry = new SharedSkillsRegistry();
+const memoryStore = new MemoryStore();
 
 function canConnectToDevServer(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -153,6 +158,36 @@ function setupIpcHandlers() {
   ipcMain.handle('ai:generateCommand', async (_, query: string) => {
     return generateShellCommand(query);
   });
+
+  // Universal Shared Skills Handlers
+  ipcMain.handle('skills:list', (_, { category, query } = {}) => skillsRegistry.listSkills(category, query));
+  ipcMain.handle('skills:get', (_, id: string) => skillsRegistry.getSkill(id));
+  ipcMain.handle('skills:save', (_, skill) => skillsRegistry.saveCustomSkill(skill));
+  ipcMain.handle('skills:delete', (_, id: string) => skillsRegistry.deleteCustomSkill(id));
+  ipcMain.handle('skills:interpolate', (_, { template, values, parameters }) =>
+    interpolateSkillCommand(template, values, parameters)
+  );
+
+  // Persistent Memory Handlers
+  ipcMain.handle('memory:get', () => memoryStore.getMemoryData());
+  ipcMain.handle('memory:setFact', (_, { key, value, source }) => {
+    memoryStore.setFact(key, value, source);
+    return true;
+  });
+  ipcMain.handle('memory:deleteFact', (_, key: string) => memoryStore.deleteFact(key));
+  ipcMain.handle('memory:addRule', (_, rule: string) => {
+    memoryStore.addRule(rule);
+    return true;
+  });
+  ipcMain.handle('memory:removeRule', (_, rule: string) => memoryStore.removeRule(rule));
+  ipcMain.handle('memory:recordCommand', (_, { command, exitCode, durationMs, summary }) => {
+    memoryStore.recordCommand(command, exitCode, durationMs, summary);
+    return true;
+  });
+  ipcMain.handle('memory:promptSnippet', () => memoryStore.toPromptSnippet());
+
+  // Context & Token Optimizer Handlers
+  ipcMain.handle('context:optimize', (_, { raw, options }) => ContextOptimizer.optimizeTerminalLog(raw, options));
 
   ipcMain.handle('system:getCwd', () => process.cwd());
 }

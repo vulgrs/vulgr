@@ -80,4 +80,50 @@ export interface TerminalCommandBlock {
   isExecuting: boolean;
 }
 
+export type SkillCategory = 'git' | 'docker' | 'node' | 'system' | 'ai' | 'custom';
+
+export interface SkillParameter {
+  name: string;
+  label: string;
+  description: string;
+  defaultValue?: string;
+  options?: string[];
+  required?: boolean;
+}
+
+export interface SharedSkill {
+  id: string;
+  name: string;
+  category: SkillCategory;
+  description: string;
+  commandTemplate: string;
+  parameters: SkillParameter[];
+  tags: string[];
+  isCustom?: boolean;
+}
+
+export interface WorkspaceFact {
+  key: string;
+  value: string;
+  source: 'user' | 'agent' | 'learned';
+  updatedAt: string;
+}
+
+export interface CommandMemory {
+  command: string;
+  exitCode: number;
+  durationMs?: number;
+  summary?: string;
+  timestamp: string;
+}
+
+export interface MemoryData {
+  workspaceDir: string;
+  facts: Record<string, WorkspaceFact>;
+  rules: string[];
+  recentCommands: CommandMemory[];
+  skillsUsage: Record<string, number>;
+  lastUpdated: string;
+}
+
 

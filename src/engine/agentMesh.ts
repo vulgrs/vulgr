@@ -5,6 +5,8 @@ import { AgentMessageBus, type AgentMessage, type AgentRole } from '../bus/agent
 import { AdapterFactory } from '../adapters/factory.js';
 import { GitUtils } from '../git/gitUtils.js';
 import { logger } from '../utils/logger.js';
+import { ContextOptimizer } from './contextOptimizer.js';
+import { MemoryStore } from './memoryStore.js';
 import type { ICliAdapter } from '../types/index.js';
 
 const execAsync = promisify(exec);
@@ -73,18 +75,20 @@ export class AgentMesh {
         timeout: 60_000,
         maxBuffer: 5 * 1024 * 1024,
       });
+      const raw = [stdout, stderr].filter(Boolean).join('\n');
       return {
         success: true,
         exitCode: 0,
-        output: [stdout, stderr].filter(Boolean).join('\n'),
+        output: ContextOptimizer.optimizeTerminalLog(raw, { maxLines: 50, maxBytes: 8192 }),
       };
     } catch (err: any) {
       const stdout = err.stdout?.toString() || '';
       const stderr = err.stderr?.toString() || '';
+      const raw = [stdout, stderr, err.message].filter(Boolean).join('\n');
       return {
         success: false,
         exitCode: err.code ?? 1,
-        output: [stdout, stderr, err.message].filter(Boolean).join('\n'),
+        output: ContextOptimizer.optimizeTerminalLog(raw, { maxLines: 50, maxBytes: 8192 }),
       };
     }
   }
@@ -108,20 +112,24 @@ export class AgentMesh {
     logger.banner('AUTONOMOUS AGENT MESH', `Builder: [${this.builderName}] • Verifier: [${this.verifierName}] • Auditor: [${this.auditorName}]`);
     logger.info(`Goal: "${goal}"`);
 
+    const memory = new MemoryStore(this.cwd);
+    const memorySnippet = memory.toPromptSnippet();
+
     const builderAdapter = this.resolveAdapter(this.builderName);
     const verifierAdapter = this.resolveAdapter(this.verifierName);
     const auditorAdapter = this.resolveAdapter(this.auditorName);
 
     // Stage 1: Orchestrator publishes USER_TASK to Builder
+    const taskDetails = `${goal}\n\n${memorySnippet}`;
     await this.bus.publish(runId, 'orchestrator', this.builderName, 'USER_TASK', {
       summary: `User assigned task: "${goal}"`,
-      details: goal,
+      details: taskDetails,
     });
     logger.step(1, 4, `[orchestrator -> ${this.builderName}]: Dispatching task goal`);
 
     // Builder executes initial code generation
     logger.model(this.builderName, 'Writing code autonomously...');
-    const buildExec = await builderAdapter.execute(goal, {
+    const buildExec = await builderAdapter.execute(taskDetails, {
       cwd: this.cwd,
       timeoutMs: this.timeoutMs,
       onStdout: (chunk) => logger.streamChunk(chunk),
@@ -130,7 +138,7 @@ export class AgentMesh {
     const diffInitial = this.gitUtils.getDiff();
     await this.bus.publish(runId, this.builderName, this.verifierName, 'CODE_READY', {
       summary: `Code generation completed by ${this.builderName}`,
-      gitDiff: diffInitial.diff,
+      gitDiff: ContextOptimizer.optimizeDiff(diffInitial.diff),
       filesChanged: diffInitial.filesChanged,
     });
     logger.step(2, 4, `[${this.builderName} -> ${this.verifierName}]: CODE_READY (${diffInitial.filesChanged.length} files modified)`);
@@ -142,19 +150,20 @@ export class AgentMesh {
     for (; currentRound <= this.maxRounds; currentRound++) {
       logger.info(`[${this.verifierName}]: Running verification "${this.verifyCmd}" (Round ${currentRound}/${this.maxRounds})...`);
       const verifyResult = await this.runVerificationCmd();
+      memory.recordCommand(this.verifyCmd, verifyResult.exitCode, undefined, verifyResult.success ? 'Verification passed' : 'Verification failed');
 
       if (verifyResult.success) {
         verificationPassed = true;
         await this.bus.publish(runId, this.verifierName, this.auditorName, 'VERIFICATION_PASSED', {
           summary: `All tests and compiler checks passed cleanly on Round ${currentRound}`,
-          gitDiff: this.gitUtils.getDiff().diff,
+          gitDiff: ContextOptimizer.optimizeDiff(this.gitUtils.getDiff().diff),
         });
         logger.success(`[${this.verifierName} -> ${this.auditorName}]: VERIFICATION_PASSED!`);
         break;
       }
 
       // Verification failed -> Verifier autonomously messages Builder
-      const cleanError = verifyResult.output.slice(0, 2000);
+      const cleanError = verifyResult.output;
       await this.bus.publish(runId, this.verifierName, this.builderName, 'VERIFICATION_FAILED', {
         summary: `Compiler / Test check failed (exit code ${verifyResult.exitCode})`,
         errorTrace: cleanError,
@@ -204,7 +213,7 @@ export class AgentMesh {
     const auditPrompt = [
       `You are ${this.auditorName.toUpperCase()} conducting an adversarial review of code produced by ${this.builderName} and verified by ${this.verifierName}.`,
       `GIT DIFF:`,
-      finalDiff.diff,
+      ContextOptimizer.optimizeDiff(finalDiff.diff),
       `Check for critical vulnerabilities, memory leaks, and race conditions.`,
       `If safe, output "VERDICT: APPROVED". If vulnerable, output "VERDICT: REJECTED: <reason>".`,
     ].join('\n');
