@@ -12,8 +12,11 @@ import {
   SplitSquareVertical,
   Wrench,
   AlertTriangle,
+  Layers,
+  Play,
 } from 'lucide-react';
-import type { TerminalSession, SessionType } from '../types/warp.js';
+import { TerminalBlock } from './TerminalBlock.js';
+import type { TerminalSession, SessionType, TerminalCommandBlock } from '../types/warp.js';
 
 interface XtermPaneProps {
   session: TerminalSession;
@@ -36,6 +39,28 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   const xtermInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const [detectedError, setDetectedError] = useState<string | null>(null);
+
+  const [viewMode, setViewMode] = useState<'terminal' | 'blocks'>('terminal');
+  const [blocks, setBlocks] = useState<TerminalCommandBlock[]>(() => {
+    if (session.command) {
+      return [
+        {
+          id: `blk-${Date.now()}`,
+          command: session.command,
+          cwd: session.cwd,
+          timestamp: new Date().toLocaleTimeString(),
+          exitCode: 0,
+          stdout: `Process "${session.command}" initialized. Streaming active output.`,
+          stderr: '',
+          isExecuting: false,
+        },
+      ];
+    }
+    return [];
+  });
+
+  const activeBlockRef = useRef<TerminalCommandBlock | null>(null);
+  const inputLineRef = useRef<string>('');
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -90,29 +115,67 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         rows: term.rows,
       });
 
-      // Stream data from backend to terminal
-      const unsubscribeData = window.warpApi.onTerminalData(({ id, data }) => {
+      // Stream data from backend to terminal & blocks
+      const unsubscribeData = window.warpApi.onTerminalData(({ id, data }: { id: string; data: string }) => {
         if (id === session.id) {
           term.write(data);
 
+          const clean = data.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+
           // Error sniffer for self-correction trigger
           if (
-            /(?:error\s+TS\d+:|TS\d{4}:|FAIL\s+|Tests:\s+\d+\s+failed|AssertionError|Traceback \(most recent call last\):|error\[E\d+\]:)/i.test(
+            /(?:error\s+TS\d+:|TS\d{4}:|FAIL\s+|Tests:\s+\d+\s+failed|AssertionError|Traceback \(most recent call last\):|error\[E\d+\]:|npm ERR!)/i.test(
               data
             )
           ) {
-            // Clean up ANSI escape codes for clean prompt injection
-            const clean = data.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '').trim();
-            if (clean.length > 20) {
-              setDetectedError(clean);
+            if (clean.trim().length > 20) {
+              setDetectedError(clean.trim());
             }
+          }
+
+          // Accumulate output into current active block if running
+          if (activeBlockRef.current) {
+            activeBlockRef.current.stdout += clean;
+            if (/(?:FAIL|error\s+TS|npm ERR!|AssertionError)/i.test(clean)) {
+              activeBlockRef.current.exitCode = 1;
+              activeBlockRef.current.stderr += clean;
+            } else if (/(?:PASS|0 failed|compiled successfully)/i.test(clean)) {
+              activeBlockRef.current.exitCode = 0;
+            }
+
+            setBlocks((prev) =>
+              prev.map((b) => (b.id === activeBlockRef.current?.id ? { ...activeBlockRef.current } : b))
+            );
           }
         }
       });
 
-      // Stream user input from terminal to backend PTY
+      // Stream user input from terminal to backend PTY & capture command blocks
       term.onData((data) => {
         window.warpApi.writeTerminal(session.id, data);
+
+        if (data === '\r' || data === '\n') {
+          const cmd = inputLineRef.current.trim();
+          if (cmd) {
+            const newBlock: TerminalCommandBlock = {
+              id: `blk-${Date.now()}`,
+              command: cmd,
+              cwd: session.cwd,
+              timestamp: new Date().toLocaleTimeString(),
+              exitCode: null,
+              stdout: '',
+              stderr: '',
+              isExecuting: true,
+            };
+            activeBlockRef.current = newBlock;
+            setBlocks((prev) => [...prev, newBlock]);
+            inputLineRef.current = '';
+          }
+        } else if (data === '\u007f' || data === '\b') {
+          inputLineRef.current = inputLineRef.current.slice(0, -1);
+        } else if (data.length === 1 && data >= ' ') {
+          inputLineRef.current += data;
+        }
       });
 
       // Handle ResizeObserver
@@ -136,6 +199,29 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       term.dispose();
     };
   }, [session.id]);
+
+  const handleRerun = (cmd: string) => {
+    if (window.warpApi) {
+      window.warpApi.writeTerminal(session.id, cmd + '\r');
+      setViewMode('terminal');
+    }
+  };
+
+  const handleExplainWithClaude = (cmd: string, output: string) => {
+    const prompt = `Please explain this command and output:\n\`\`\`sh\n$ ${cmd}\n\`\`\`\nOutput:\n\`\`\`\n${output.slice(
+      0,
+      2000
+    )}\n\`\`\``;
+    onPipeErrorToAgent('claude', prompt);
+  };
+
+  const handleFixWithAgy = (cmd: string, errorSnippet: string) => {
+    const prompt = `The command '$ ${cmd}' failed with:\n\`\`\`\n${errorSnippet.slice(
+      0,
+      2000
+    )}\n\`\`\`\nPlease diagnose and repair this error.`;
+    onPipeErrorToAgent('agy', prompt);
+  };
 
   const getSessionBadge = (type: SessionType) => {
     switch (type) {
@@ -224,6 +310,41 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
           <span className="font-mono text-[11px] text-slate-400 truncate max-w-[160px]">
             {session.command ? `$ ${session.command}` : session.title}
           </span>
+
+          {/* Warp View Switcher: Terminal vs Blocks */}
+          <div className="flex items-center p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.08] ml-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewMode('terminal');
+              }}
+              className={`flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-all ${
+                viewMode === 'terminal'
+                  ? 'bg-white/[0.1] text-white shadow-sm font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Interactive Terminal Emulator"
+            >
+              <TerminalIcon size={10} />
+              <span>Terminal</span>
+            </button>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setViewMode('blocks');
+              }}
+              className={`flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-all ${
+                viewMode === 'blocks'
+                  ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/30 shadow-sm font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Warp Command Blocks Stream"
+            >
+              <Layers size={10} />
+              <span>Blocks ({blocks.length})</span>
+            </button>
+          </div>
         </div>
 
         {/* Right: Quick Action Icons */}
@@ -317,8 +438,58 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         </div>
       )}
 
-      {/* Terminal Canvas */}
-      <div ref={terminalRef} className="flex-1 w-full h-full p-2 overflow-hidden bg-[#07080c]" />
+      {/* View 1: Blocks Stream */}
+      {viewMode === 'blocks' && (
+        <div className="flex-1 w-full h-full p-3 overflow-y-auto space-y-3 bg-[#07080c] select-text">
+          {blocks.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
+              <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center text-cyan-400 mb-2">
+                <Layers size={20} />
+              </div>
+              <p className="text-xs font-semibold text-slate-300">Warp Command Blocks Stream</p>
+              <p className="text-[11px] text-slate-500 mt-1 max-w-xs">
+                Each command you execute creates an isolated block with execution time, exit code, and 1-click AI actions (Explain with Claude / Fix with AGY).
+              </p>
+              <div className="flex items-center space-x-2 mt-4">
+                <button
+                  onClick={() => handleRerun('npm test')}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 text-xs font-mono"
+                >
+                  <Play size={10} className="text-cyan-400" />
+                  <span>Run 'npm test'</span>
+                </button>
+                <button
+                  onClick={() => handleRerun('git status')}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 text-xs font-mono"
+                >
+                  <Play size={10} className="text-amber-400" />
+                  <span>Run 'git status'</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            blocks.map((b) => (
+              <TerminalBlock
+                key={b.id}
+                block={b}
+                onExplainWithClaude={handleExplainWithClaude}
+                onFixWithAgy={handleFixWithAgy}
+                onRerunCommand={handleRerun}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* View 2: Interactive Terminal Canvas */}
+      <div
+        ref={terminalRef}
+        className={
+          viewMode === 'terminal'
+            ? 'flex-1 w-full h-full p-2 overflow-hidden bg-[#07080c]'
+            : 'hidden'
+        }
+      />
     </div>
   );
 };

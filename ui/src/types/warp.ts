@@ -68,3 +68,16 @@ export interface SquadSession {
   lastErrorSnippet?: string;
 }
 
+export interface TerminalCommandBlock {
+  id: string;
+  command: string;
+  cwd?: string;
+  timestamp: string;
+  durationMs?: number;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  isExecuting: boolean;
+}
+
+
