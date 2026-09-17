@@ -9,16 +9,16 @@ export default {
     extend: {
       colors: {
         warp: {
-          bg: '#0c0d12',
-          surface: '#14161f',
-          card: '#1a1d29',
-          border: '#262a3b',
-          borderLight: '#353b52',
-          cyan: '#00d8ff',
-          green: '#22c55e',
+          bg: '#000000',
+          surface: '#09090b',
+          card: '#121215',
+          border: '#27272a',
+          borderLight: '#3f3f46',
+          cyan: '#f4f4f5',
+          green: '#10b981',
           amber: '#f59e0b',
           red: '#ef4444',
-          purple: '#a855f7',
+          purple: '#e4e4e7',
         }
       },
       fontFamily: {

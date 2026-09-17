@@ -61,31 +61,31 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
 
   return (
     <div
-      className="fixed inset-0 bg-black/75 backdrop-blur-md z-[100] flex items-start justify-center pt-[15vh] select-none"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-start justify-center pt-[15vh] select-none"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl glass-modal rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] border border-white/[0.12] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+        className="w-full max-w-xl bg-[#09090b] rounded-xl shadow-2xl border border-zinc-800 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
       >
-        <div className="flex items-center px-4 py-3 border-b border-white/[0.08] bg-white/[0.02]">
-          <Search size={16} className="text-cyan-400 mr-2.5 flex-shrink-0" />
+        <div className="flex items-center px-4 py-3 border-b border-zinc-800 bg-zinc-950">
+          <Search size={15} className="text-zinc-400 mr-2.5 flex-shrink-0" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a command or search actions..."
-            className="flex-1 bg-transparent outline-none text-sm text-slate-100 placeholder:text-slate-500 font-sans"
+            className="flex-1 bg-transparent outline-none text-sm text-zinc-100 placeholder:text-zinc-600 font-sans"
           />
-          <span className="text-[10px] text-slate-400 font-mono bg-white/[0.05] border border-white/[0.1] rounded-md px-2 py-0.5">
+          <span className="text-[10px] text-zinc-500 font-mono bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5">
             Esc
           </span>
         </div>
 
-        <div className="max-h-80 overflow-y-auto py-2 px-1.5 space-y-1">
+        <div className="max-h-80 overflow-y-auto py-2 px-1.5 space-y-0.5">
           {filtered.length === 0 ? (
-            <div className="px-3 py-8 text-center text-xs text-slate-500">No matching commands found</div>
+            <div className="px-3 py-8 text-center text-xs text-zinc-600">No matching commands found</div>
           ) : (
             filtered.map((action, i) => (
               <div
@@ -95,25 +95,25 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                   action.run();
                   onClose();
                 }}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs transition-all duration-150 ${
+                className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-xs transition-all duration-150 ${
                   i === highlighted
-                    ? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/30 shadow-[0_0_15px_rgba(0,216,255,0.15)]'
-                    : 'text-slate-300 hover:bg-white/[0.04] border border-transparent'
+                    ? 'bg-zinc-800/90 text-zinc-100 border border-zinc-700/60 shadow-sm'
+                    : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent'
                 }`}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 w-16 flex-shrink-0 font-mono">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 w-16 flex-shrink-0 font-mono">
                     {action.group}
                   </span>
                   <span className="truncate font-medium">{action.label}</span>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0">
                   {action.shortcut && (
-                    <span className="text-[10px] font-mono text-slate-400 bg-white/[0.05] border border-white/[0.1] rounded-md px-2 py-0.5">
+                    <span className="text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5">
                       {action.shortcut}
                     </span>
                   )}
-                  {i === highlighted && <CornerDownLeft size={12} className="text-cyan-400" />}
+                  {i === highlighted && <CornerDownLeft size={12} className="text-zinc-300" />}
                 </div>
               </div>
             ))

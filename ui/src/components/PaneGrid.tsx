@@ -32,12 +32,12 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
   if (tab.sessions.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 select-none font-sans">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-400 via-indigo-500 to-purple-500 flex items-center justify-center font-bold text-xl text-black shadow-[0_0_30px_rgba(0,216,255,0.3)] mb-4">
-          <Zap size={28} className="text-black fill-current" />
+        <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-100 shadow-sm mb-4">
+          <Zap size={22} className="text-zinc-100 fill-current" />
         </div>
 
-        <h2 className="text-lg font-bold text-white tracking-wide">Workspace Ready</h2>
-        <p className="text-xs text-slate-400 mt-1 max-w-sm text-center leading-relaxed">
+        <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">Workspace Ready</h2>
+        <p className="text-xs text-zinc-500 mt-1 max-w-sm text-center leading-relaxed">
           Open an AI agent or shell terminal pane to start collaborating.
         </p>
 
@@ -45,53 +45,53 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
           <div className="grid grid-cols-2 gap-3 mt-6 w-full max-w-md">
             <button
               onClick={() => onLaunchAgent('claude')}
-              className="flex items-center space-x-3 p-3.5 rounded-xl glass-card hover:bg-purple-500/10 border border-purple-500/20 hover:border-purple-500/40 text-left transition-all group"
+              className="flex items-center space-x-3 p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 text-left transition-all group"
             >
-              <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400 group-hover:scale-110 transition-transform">
+              <div className="p-2 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 group-hover:scale-105 transition-transform">
                 <Sparkles size={16} />
               </div>
               <div>
-                <div className="text-xs font-semibold text-slate-100">Claude Code</div>
-                <div className="text-[10px] text-slate-400">Anthropic AI CLI</div>
+                <div className="text-xs font-semibold text-zinc-200">Claude Code</div>
+                <div className="text-[10px] text-zinc-500">Anthropic AI CLI</div>
               </div>
             </button>
 
             <button
               onClick={() => onLaunchAgent('agy')}
-              className="flex items-center space-x-3 p-3.5 rounded-xl glass-card hover:bg-cyan-500/10 border border-cyan-500/20 hover:border-cyan-500/40 text-left transition-all group"
+              className="flex items-center space-x-3 p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 text-left transition-all group"
             >
-              <div className="p-2 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:scale-110 transition-transform">
+              <div className="p-2 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 group-hover:scale-105 transition-transform">
                 <Shield size={16} />
               </div>
               <div>
-                <div className="text-xs font-semibold text-slate-100">AGY Engine</div>
-                <div className="text-[10px] text-slate-400">Antigravity 2.0 CLI</div>
+                <div className="text-xs font-semibold text-zinc-200">AGY Engine</div>
+                <div className="text-[10px] text-zinc-500">Antigravity 2.0 CLI</div>
               </div>
             </button>
 
             <button
               onClick={() => onLaunchAgent('codex')}
-              className="flex items-center space-x-3 p-3.5 rounded-xl glass-card hover:bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 text-left transition-all group"
+              className="flex items-center space-x-3 p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 text-left transition-all group"
             >
-              <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 group-hover:scale-110 transition-transform">
+              <div className="p-2 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 group-hover:scale-105 transition-transform">
                 <Bot size={16} />
               </div>
               <div>
-                <div className="text-xs font-semibold text-slate-100">Codex CLI</div>
-                <div className="text-[10px] text-slate-400">OpenAI Terminal CLI</div>
+                <div className="text-xs font-semibold text-zinc-200">Codex CLI</div>
+                <div className="text-[10px] text-zinc-500">OpenAI Terminal CLI</div>
               </div>
             </button>
 
             <button
               onClick={() => onLaunchAgent('shell')}
-              className="flex items-center space-x-3 p-3.5 rounded-xl glass-card hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/[0.15] text-left transition-all group"
+              className="flex items-center space-x-3 p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 text-left transition-all group"
             >
-              <div className="p-2 rounded-lg bg-white/[0.06] text-slate-300 group-hover:scale-110 transition-transform">
+              <div className="p-2 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 group-hover:scale-105 transition-transform">
                 <Terminal size={16} />
               </div>
               <div>
-                <div className="text-xs font-semibold text-slate-100">Interactive Shell</div>
-                <div className="text-[10px] text-slate-400">Bash / PowerShell PTY</div>
+                <div className="text-xs font-semibold text-zinc-200">Interactive Shell</div>
+                <div className="text-[10px] text-zinc-500">Bash / PowerShell PTY</div>
               </div>
             </button>
           </div>
@@ -204,7 +204,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
               title="Drag to resize"
             >
               <div
-                className={`bg-white/[0.08] group-hover:bg-cyan-400 group-hover:shadow-[0_0_10px_#00d8ff] transition-all rounded-full ${
+                className={`bg-zinc-800/80 group-hover:bg-zinc-500 transition-all rounded-full ${
                   axis === 'x' ? 'w-[2px] h-full group-hover:w-[3px]' : 'h-[2px] w-full group-hover:h-[3px]'
                 }`}
               />

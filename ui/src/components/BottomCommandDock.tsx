@@ -167,16 +167,16 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
     <div className="relative">
       {/* Floating AI Command Generator Card */}
       {isAiMode && (
-        <div className="absolute bottom-full mb-2 right-4 w-[520px] glass-modal rounded-2xl p-4 shadow-[0_15px_40px_rgba(0,0,0,0.8)] border border-cyan-500/30 animate-in slide-in-from-bottom-2 duration-150 z-30 select-none">
-          <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
+        <div className="absolute bottom-full mb-2 right-4 w-[520px] bg-[#09090b] rounded-xl p-4 shadow-2xl border border-zinc-800 animate-in slide-in-from-bottom-2 duration-150 z-30 select-none">
+          <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
             <div className="flex items-center space-x-2">
-              <div className="p-1 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-[0_0_10px_rgba(0,216,255,0.2)]">
-                <Sparkles size={13} className="animate-pulse" />
+              <div className="p-1 rounded-md bg-zinc-900 text-zinc-300 border border-zinc-800">
+                <Sparkles size={13} />
               </div>
-              <span className="font-bold text-xs text-white font-sans">
-                Warp AI Command Search
+              <span className="font-semibold text-xs text-zinc-100 font-sans tracking-wide">
+                Dexter AI Command Search
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.1] text-cyan-300">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
                 Natural Language ➔ Shell
               </span>
             </div>
@@ -186,7 +186,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                 setInput('');
                 setSuggestion(null);
               }}
-              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
             >
               <X size={13} />
             </button>
@@ -194,23 +194,23 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 
           <div className="pt-3 space-y-2.5">
             {loadingAi && !suggestion ? (
-              <div className="flex items-center space-x-2 py-3 text-xs text-slate-400 font-mono">
-                <Loader2 size={14} className="animate-spin text-cyan-400" />
+              <div className="flex items-center space-x-2 py-3 text-xs text-zinc-400 font-mono">
+                <Loader2 size={14} className="animate-spin text-zinc-300" />
                 <span>Translating query into shell command...</span>
               </div>
             ) : suggestion ? (
               <>
                 {/* Monospace Command Box */}
-                <div className="p-2.5 rounded-xl bg-black/80 border border-cyan-500/40 font-mono text-xs text-cyan-200 flex items-center justify-between shadow-inner">
+                <div className="p-2.5 rounded-lg bg-black border border-zinc-800 font-mono text-xs text-zinc-100 flex items-center justify-between shadow-inner">
                   <div className="flex items-center space-x-2 min-w-0">
-                    <span className="text-cyan-400 font-bold select-none">$</span>
+                    <span className="text-zinc-500 font-bold select-none">$</span>
                     <span className="truncate font-semibold select-text">{suggestion.command}</span>
                   </div>
 
                   <div className="flex items-center space-x-1 flex-shrink-0 pl-2">
                     <button
                       onClick={handleCopySuggestion}
-                      className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+                      className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
                       title="Copy command"
                     >
                       {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
@@ -219,16 +219,16 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                 </div>
 
                 {/* Explanation */}
-                <p className="text-[11px] text-slate-300 font-sans leading-relaxed">
+                <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
                   {suggestion.explanation}
                 </p>
 
                 {/* Keyboard Shortcuts & Actions */}
-                <div className="pt-2 flex items-center justify-between border-t border-white/[0.06] text-[10px] font-mono text-slate-400">
+                <div className="pt-2 flex items-center justify-between border-t border-zinc-800/80 text-[10px] font-mono text-zinc-400">
                   <div className="flex items-center space-x-2">
-                    <span><kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.1] text-slate-300 font-sans">↵ Enter</kbd> Run</span>
-                    <span><kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.1] text-slate-300 font-sans">Tab</kbd> Insert</span>
-                    <span><kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.1] text-slate-300 font-sans">Esc</kbd> Cancel</span>
+                    <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">↵ Enter</kbd> Run</span>
+                    <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">Tab</kbd> Insert</span>
+                    <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">Esc</kbd> Cancel</span>
                   </div>
 
                   <div className="flex items-center space-x-1.5">
@@ -237,7 +237,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                         setInput(suggestion.command);
                         setSuggestion(null);
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-slate-200 text-[10px] font-sans font-medium transition-all"
+                      className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-[10px] font-sans font-medium transition-all"
                     >
                       Insert into Input
                     </button>
@@ -247,7 +247,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                         setInput('');
                         setSuggestion(null);
                       }}
-                      className="flex items-center space-x-1 px-3 py-1 rounded-lg bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-[10px] font-sans font-semibold transition-all shadow-[0_0_12px_rgba(0,216,255,0.3)]"
+                      className="flex items-center space-x-1 px-3 py-1 rounded-md bg-zinc-100 hover:bg-white text-zinc-950 text-[10px] font-sans font-semibold transition-all shadow-sm"
                     >
                       <Play size={10} className="fill-current" />
                       <span>Run Now</span>
@@ -256,8 +256,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                 </div>
               </>
             ) : (
-              <div className="py-2 text-xs text-slate-400 font-sans">
-                Type what you want to do in plain English or Turkish (e.g. <span className="font-mono text-cyan-300"># port 3000 kapat</span> or <span className="font-mono text-cyan-300"># undo last commit</span>)
+              <div className="py-2 text-xs text-zinc-400 font-sans">
+                Type what you want to do in plain English or Turkish (e.g. <span className="font-mono text-zinc-200"># port 3000 kapat</span> or <span className="font-mono text-zinc-200"># undo last commit</span>)
               </div>
             )}
           </div>
@@ -265,16 +265,16 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
       )}
 
       {/* Main Bottom Dock Bar */}
-      <div className="h-10 bg-[#090b12]/95 backdrop-blur-xl border-t border-white/[0.06] flex items-center justify-between px-3.5 select-none flex-shrink-0 z-20">
+      <div className="h-10 bg-[#000000] border-t border-zinc-900 flex items-center justify-between px-3.5 select-none flex-shrink-0 z-20">
         {/* Left: Active Session Indicator */}
         <div className="flex items-center space-x-2 min-w-0 flex-shrink-0">
           {activeSession ? (
-            <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.08] text-slate-300 font-mono text-[11px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00d8ff]" />
+            <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-zinc-950 border border-zinc-800/80 text-zinc-300 font-mono text-[11px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
               <span className="font-medium truncate max-w-[130px]">{activeSession.title}</span>
             </div>
           ) : (
-            <span className="text-[11px] text-slate-500 font-mono italic">No active pane</span>
+            <span className="text-[11px] text-zinc-600 font-mono italic">No active pane</span>
           )}
         </div>
 
@@ -282,12 +282,12 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
         <form onSubmit={handleSubmit} className="relative flex-1 max-w-2xl mx-4 flex items-center space-x-2">
           {/* Floating Ghost Suggestion Micro-Pill */}
           {ghostSuggestion && !isAiMode && (
-            <div className="absolute bottom-full mb-1.5 left-0 flex items-center space-x-2 px-2.5 py-0.5 rounded-lg bg-[#0d101a]/95 border border-cyan-500/30 text-[10px] font-mono shadow-xl backdrop-blur-md animate-in fade-in z-20 select-none">
-              <span className="px-1 py-0.2 rounded bg-white/[0.1] text-cyan-300 font-bold text-[9px]">Tab ⇥</span>
-              <span className="text-slate-400">or</span>
-              <span className="px-1 py-0.2 rounded bg-white/[0.1] text-cyan-300 font-bold text-[9px]">→</span>
-              <span className="text-slate-300 truncate max-w-[200px]">{ghostSuggestion.description || 'Complete command'}</span>
-              <span className="px-1 py-0.2 rounded text-[8px] uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <div className="absolute bottom-full mb-1.5 left-0 flex items-center space-x-2 px-2.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[10px] font-mono shadow-xl animate-in fade-in z-20 select-none">
+              <span className="px-1 py-0.2 rounded bg-zinc-900 text-zinc-300 font-bold text-[9px] border border-zinc-800">Tab ⇥</span>
+              <span className="text-zinc-500">or</span>
+              <span className="px-1 py-0.2 rounded bg-zinc-900 text-zinc-300 font-bold text-[9px] border border-zinc-800">→</span>
+              <span className="text-zinc-300 truncate max-w-[200px]">{ghostSuggestion.description || 'Complete command'}</span>
+              <span className="px-1 py-0.2 rounded text-[8px] uppercase bg-zinc-900 text-zinc-400 border border-zinc-800">
                 {ghostSuggestion.source}
               </span>
             </div>
@@ -296,7 +296,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
           <div className="relative flex-1 flex items-center">
             <span
               className={`absolute left-2.5 font-mono text-xs select-none transition-colors z-10 ${
-                isAiMode ? 'text-purple-400 font-bold' : 'text-cyan-400'
+                isAiMode ? 'text-zinc-200 font-bold' : 'text-zinc-500'
               }`}
             >
               {isAiMode ? '✨' : '❯'}
@@ -306,7 +306,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
             {ghostSuggestion && !isAiMode && (
               <div className="absolute inset-0 pl-6 pr-3 py-1 flex items-center pointer-events-none font-mono text-xs overflow-hidden select-none whitespace-pre">
                 <span className="opacity-0">{input}</span>
-                <span className="text-slate-500 italic opacity-80">{ghostSuggestion.suffix}</span>
+                <span className="text-zinc-500 italic opacity-80">{ghostSuggestion.suffix}</span>
               </div>
             )}
 
@@ -322,10 +322,10 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                   ? "Type command, or '# port 3000 kapat' for AI search..."
                   : 'Select a terminal first'
               }
-              className={`w-full glass-input rounded-lg pl-6 pr-3 py-1 text-slate-200 text-xs font-mono placeholder:text-slate-500 focus:outline-none transition-all shadow-inner relative z-0 bg-white/[0.02] border border-white/[0.08] ${
+              className={`w-full rounded-md pl-6 pr-3 py-1 text-zinc-100 text-xs font-mono placeholder:text-zinc-600 focus:outline-none transition-all shadow-inner relative z-0 bg-zinc-950 border border-zinc-800/80 focus:border-zinc-600 focus:bg-zinc-900/50 ${
                 isAiMode
-                  ? 'border-purple-500/60 shadow-[0_0_12px_rgba(168,85,247,0.2)] text-purple-200'
-                  : 'focus:border-cyan-500/50 focus:bg-white/[0.04]'
+                  ? 'border-zinc-600 shadow-[0_0_12px_rgba(255,255,255,0.06)] text-zinc-100'
+                  : ''
               }`}
             />
           </div>
@@ -333,19 +333,15 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
           <button
             type="submit"
             disabled={!input.trim() || !activeSession}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-white text-xs font-medium transition-all shadow-sm disabled:opacity-20 disabled:cursor-not-allowed ${
-              isAiMode
-                ? 'bg-purple-600 hover:bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.3)]'
-                : 'bg-cyan-600 hover:bg-cyan-500 shadow-[0_0_10px_rgba(0,216,255,0.25)]'
-            }`}
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all shadow-sm bg-zinc-100 hover:bg-white text-zinc-950 disabled:bg-zinc-900 disabled:text-zinc-600 disabled:border disabled:border-zinc-800/60 disabled:cursor-not-allowed"
           >
             <Send size={11} />
-            <CornerDownLeft size={10} className="text-white/80" />
+            <CornerDownLeft size={10} className="text-zinc-600" />
           </button>
         </form>
 
         {/* Right shortcut tip */}
-        <div className="hidden lg:flex items-center space-x-2 text-[10px] font-mono text-slate-500">
+        <div className="hidden lg:flex items-center space-x-2 text-[10px] font-mono text-zinc-600">
           <span># for AI</span>
           <span>•</span>
           <span>^⇧P for palette</span>

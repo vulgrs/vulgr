@@ -72,23 +72,23 @@ export const TopBar: React.FC<TopBarProps> = ({
   }, []);
 
   return (
-    <div className="h-11 bg-[#090a0f]/95 backdrop-blur-xl border-b border-white/[0.06] flex items-center justify-between px-3 select-none flex-shrink-0 z-30">
+    <div className="h-10 bg-[#000000] border-b border-zinc-800/80 flex items-center justify-between px-3 select-none flex-shrink-0 z-30">
       {/* Left: App Brand & Tab Strip */}
       <div className="flex items-center space-x-2 min-w-0">
         <button
           onClick={onToggleSidebar}
-          className="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/[0.05] transition-all"
+          className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-all"
           title="Toggle Sidebar"
         >
-          {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeft size={14} />}
+          {sidebarOpen ? <PanelLeftClose size={13} /> : <PanelLeft size={13} />}
         </button>
 
         {/* Brand Icon & Name */}
         <div className="flex items-center space-x-1.5 mr-2 pl-0.5">
-          <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-cyan-400 via-indigo-500 to-purple-500 flex items-center justify-center font-bold text-[11px] text-black shadow-[0_0_10px_rgba(0,216,255,0.3)]">
-            <Zap size={11} className="text-black fill-current" />
+          <div className="w-5 h-5 rounded-md bg-zinc-900 border border-zinc-700/80 flex items-center justify-center text-zinc-100 shadow-xs">
+            <Zap size={11} className="text-zinc-100 fill-current" />
           </div>
-          <span className="font-bold text-xs text-slate-100 tracking-wider font-sans">
+          <span className="font-bold text-xs text-zinc-100 tracking-wider font-mono">
             DEXTER
           </span>
         </div>
@@ -103,11 +103,11 @@ export const TopBar: React.FC<TopBarProps> = ({
                 onClick={() => onSelectTab(tab.id)}
                 className={`group relative flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-mono transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-white/[0.08] text-white font-medium border border-white/[0.12] shadow-sm'
-                    : 'bg-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+                    ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-700/80 shadow-xs'
+                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
                 }`}
               >
-                <Terminal size={11} className={isActive ? 'text-cyan-400' : 'text-slate-500'} />
+                <Terminal size={11} className={isActive ? 'text-zinc-200' : 'text-zinc-500'} />
                 <span className="max-w-[110px] truncate text-[11px]">{tab.title}</span>
 
                 {tabs.length > 1 && (
@@ -116,14 +116,14 @@ export const TopBar: React.FC<TopBarProps> = ({
                       e.stopPropagation();
                       onCloseTab(tab.id);
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-red-400 hover:bg-white/[0.08] transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-red-400 hover:bg-zinc-800 transition-opacity"
                   >
                     <X size={10} />
                   </button>
                 )}
 
                 {isActive && (
-                  <div className="absolute bottom-0 left-1.5 right-1.5 h-[1.5px] bg-gradient-to-r from-cyan-400 to-purple-400 rounded-full" />
+                  <div className="absolute bottom-0 left-1.5 right-1.5 h-[1.5px] bg-zinc-300 rounded-full" />
                 )}
               </div>
             );
@@ -131,7 +131,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
           <button
             onClick={onAddTab}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-white/[0.05] transition-all"
+            className="p-1 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-all"
             title="New Tab (Ctrl+Shift+T)"
           >
             <Plus size={12} />
@@ -142,14 +142,14 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Center: Sleek Command Search Omnibar */}
       <button
         onClick={onOpenPalette}
-        className="hidden md:flex items-center space-x-2 px-3 py-1 rounded-lg border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.12] text-xs text-slate-400 hover:text-slate-200 transition-all w-64 max-w-xs justify-between"
+        className="hidden md:flex items-center space-x-2 px-3 py-1 rounded-lg border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 hover:border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 transition-all w-64 max-w-xs justify-between shadow-inner"
         title="Search commands, files, or ask AI (#) (Ctrl+Shift+P)"
       >
         <div className="flex items-center space-x-2">
-          <Search size={11} className="text-cyan-400" />
-          <span className="text-[11px]">Search or ask AI (#)...</span>
+          <Search size={11} className="text-zinc-400" />
+          <span className="text-[11px] text-zinc-400">Search or ask AI (#)...</span>
         </div>
-        <kbd className="px-1.5 py-0.5 rounded bg-white/[0.05] border border-white/[0.07] text-[9px] font-mono text-slate-400">
+        <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] font-mono text-zinc-400">
           ^⇧P
         </kbd>
       </button>
@@ -165,26 +165,26 @@ export const TopBar: React.FC<TopBarProps> = ({
             }}
             className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
               agentMenuOpen
-                ? 'bg-white/[0.1] border-white/[0.2] text-white'
-                : 'bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.07] text-slate-300 hover:text-white'
+                ? 'bg-zinc-800 border-zinc-700 text-zinc-100'
+                : 'bg-zinc-950 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-zinc-100'
             }`}
             title="Add Terminal Pane or AI Agent"
           >
-            <Plus size={11} className="text-cyan-400" />
+            <Plus size={11} className="text-zinc-300" />
             <span>Pane</span>
-            <ChevronDown size={10} className="text-slate-400" />
+            <ChevronDown size={10} className="text-zinc-400" />
           </button>
 
           {agentMenuOpen && (
-            <div className="absolute right-0 mt-1.5 w-44 rounded-xl bg-[#0c0e17] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs font-sans animate-in fade-in">
+            <div className="absolute right-0 mt-1.5 w-44 rounded-xl bg-[#09090b] border border-zinc-800 shadow-2xl p-1 z-50 text-xs font-sans animate-in fade-in">
               <button
                 onClick={() => {
                   onLaunchAgent('shell');
                   setAgentMenuOpen(false);
                 }}
-                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.08] text-left transition-colors"
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors"
               >
-                <Terminal size={12} className="text-slate-400" />
+                <Terminal size={12} className="text-zinc-400" />
                 <span>Interactive Shell</span>
               </button>
               <button
@@ -192,9 +192,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onLaunchAgent('claude');
                   setAgentMenuOpen(false);
                 }}
-                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-purple-200 hover:text-white hover:bg-purple-500/15 text-left transition-colors"
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors"
               >
-                <Sparkles size={12} className="text-purple-400" />
+                <Sparkles size={12} className="text-zinc-400" />
                 <span>Claude Code</span>
               </button>
               <button
@@ -202,9 +202,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onLaunchAgent('agy');
                   setAgentMenuOpen(false);
                 }}
-                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-cyan-200 hover:text-white hover:bg-cyan-500/15 text-left transition-colors"
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors"
               >
-                <Shield size={12} className="text-cyan-400" />
+                <Shield size={12} className="text-zinc-400" />
                 <span>AGY Engine</span>
               </button>
               <button
@@ -212,9 +212,9 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onLaunchAgent('codex');
                   setAgentMenuOpen(false);
                 }}
-                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-emerald-500/15 text-left transition-colors"
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors"
               >
-                <Bot size={12} className="text-emerald-400" />
+                <Bot size={12} className="text-zinc-400" />
                 <span>Codex CLI</span>
               </button>
             </div>
@@ -230,29 +230,29 @@ export const TopBar: React.FC<TopBarProps> = ({
             }}
             className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
               aiMenuOpen
-                ? 'bg-purple-500/25 border-purple-500/50 text-purple-200'
-                : 'bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/25 text-purple-300'
+                ? 'bg-zinc-800 border-zinc-700 text-zinc-100'
+                : 'bg-zinc-950 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-zinc-100'
             }`}
             title="Autonomous Squads & Skills"
           >
-            <Sparkles size={11} className="text-cyan-400" />
+            <Sparkles size={11} className="text-zinc-300" />
             <span>AI Squad</span>
-            <ChevronDown size={10} className="text-purple-300" />
+            <ChevronDown size={10} className="text-zinc-400" />
           </button>
 
           {aiMenuOpen && (
-            <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-[#0c0e17] border border-white/[0.1] shadow-2xl p-1.5 z-50 text-xs font-sans animate-in fade-in">
+            <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-[#09090b] border border-zinc-800 shadow-2xl p-1.5 z-50 text-xs font-sans animate-in fade-in">
               <button
                 onClick={() => {
                   onOpenSquadModal();
                   setAiMenuOpen(false);
                 }}
-                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-cyan-200 hover:text-white hover:bg-cyan-500/15 text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors"
               >
-                <Users size={13} className="text-cyan-400" />
+                <Users size={13} className="text-zinc-400" />
                 <div>
                   <div className="font-medium">Live 2-Way Squad</div>
-                  <div className="text-[10px] text-slate-400">Claude ⇄ AGY Split view</div>
+                  <div className="text-[10px] text-zinc-500">Claude ⇄ AGY Split view</div>
                 </div>
               </button>
               <button
@@ -260,26 +260,26 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onOpenMeshModal();
                   setAiMenuOpen(false);
                 }}
-                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-purple-200 hover:text-white hover:bg-purple-500/15 text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors"
               >
-                <Zap size={13} className="text-purple-400" />
+                <Zap size={13} className="text-zinc-400" />
                 <div>
                   <div className="font-medium">Autonomous Agent Mesh</div>
-                  <div className="text-[10px] text-slate-400">Verification & self-correction</div>
+                  <div className="text-[10px] text-zinc-500">Verification & self-correction</div>
                 </div>
               </button>
-              <div className="h-px bg-white/[0.08] my-1" />
+              <div className="h-px bg-zinc-800 my-1" />
               <button
                 onClick={() => {
                   onOpenSkillsModal();
                   setAiMenuOpen(false);
                 }}
-                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-amber-200 hover:text-white hover:bg-amber-500/15 text-left transition-colors"
+                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors"
               >
-                <Zap size={13} className="text-amber-400 fill-current" />
+                <Zap size={13} className="text-zinc-400" />
                 <div>
                   <div className="font-medium">Shared Skills & Memory</div>
-                  <div className="text-[10px] text-slate-400">Universal workflows</div>
+                  <div className="text-[10px] text-zinc-500">Universal workflows</div>
                 </div>
               </button>
             </div>
@@ -291,12 +291,12 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={onToggleDiff}
           className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
             hasUncommittedDiff
-              ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
-              : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:text-slate-200'
+              ? 'bg-zinc-900 border-zinc-700 text-zinc-100 shadow-xs'
+              : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
           }`}
           title="Inspect Git Diff & Review (Ctrl+Shift+G)"
         >
-          <GitCompare size={12} className={hasUncommittedDiff ? 'text-amber-400' : 'text-slate-400'} />
+          <GitCompare size={12} className={hasUncommittedDiff ? 'text-amber-400' : 'text-zinc-500'} />
           <span>Diff</span>
           {hasUncommittedDiff && (
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
@@ -306,7 +306,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Technical Report Export Button */}
         <button
           onClick={onOpenExportReport}
-          className="p-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] text-slate-400 hover:text-white hover:border-white/[0.12] transition-all"
+          className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 hover:border-zinc-700 transition-all"
           title="Export Technical Report (Ctrl+Shift+X)"
         >
           <FileDown size={13} />
@@ -315,7 +315,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Settings Modal Button */}
         <button
           onClick={onOpenSettings}
-          className="p-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] text-slate-400 hover:text-white hover:border-white/[0.12] transition-all"
+          className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 hover:border-zinc-700 transition-all"
           title="CLI Permissions & Settings (Ctrl+,)"
         >
           <Settings size={13} />
@@ -324,10 +324,10 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Doctor Status Dot */}
         {doctor && (
           <div
-            className="flex items-center justify-center p-1.5 text-slate-400"
+            className="flex items-center justify-center p-1.5 text-zinc-400"
             title={`System Ready (Node ${doctor.node.version})`}
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#22c55e]" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_4px_#10b981]" />
           </div>
         )}
       </div>

@@ -71,26 +71,26 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       fontSize: 13,
       fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace",
       theme: {
-        background: '#0c0d12',
-        foreground: '#e2e8f0',
-        cursor: '#00d8ff',
-        cursorAccent: '#0c0d12',
-        selectionBackground: '#262a3b',
-        black: '#14161f',
+        background: '#000000',
+        foreground: '#e4e4e7',
+        cursor: '#ededed',
+        cursorAccent: '#000000',
+        selectionBackground: '#27272a',
+        black: '#18181b',
         red: '#ef4444',
         green: '#22c55e',
-        yellow: '#f59e0b',
-        blue: '#38bdf8',
+        yellow: '#eab308',
+        blue: '#3b82f6',
         magenta: '#a855f7',
-        cyan: '#00d8ff',
-        white: '#f8fafc',
-        brightBlack: '#475569',
+        cyan: '#06b6d4',
+        white: '#f4f4f5',
+        brightBlack: '#52525b',
         brightRed: '#f87171',
         brightGreen: '#4ade80',
-        brightYellow: '#fbbf24',
+        brightYellow: '#fde047',
         brightBlue: '#60a5fa',
         brightMagenta: '#c084fc',
-        brightCyan: '#38bdf8',
+        brightCyan: '#22d3ee',
         brightWhite: '#ffffff',
       },
     });
@@ -227,32 +227,32 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
     switch (type) {
       case 'claude':
         return {
-          icon: <Sparkles size={12} className="text-purple-400 animate-pulse" />,
+          icon: <Sparkles size={11} className="text-zinc-300" />,
           label: 'Claude Code',
-          color: 'border-purple-500/40 bg-purple-500/10 text-purple-200 shadow-[0_0_10px_rgba(168,85,247,0.15)]',
-          dot: 'bg-purple-400',
+          color: 'border-zinc-700/80 bg-zinc-900 text-zinc-100 shadow-xs',
+          dot: 'bg-zinc-300',
         };
       case 'agy':
         return {
-          icon: <Shield size={12} className="text-cyan-400" />,
+          icon: <Shield size={11} className="text-zinc-300" />,
           label: 'AGY Engine',
-          color: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200 shadow-[0_0_10px_rgba(0,216,255,0.15)]',
-          dot: 'bg-cyan-400',
+          color: 'border-zinc-700/80 bg-zinc-900 text-zinc-100 shadow-xs',
+          dot: 'bg-zinc-300',
         };
       case 'codex':
         return {
-          icon: <Bot size={12} className="text-emerald-400" />,
+          icon: <Bot size={11} className="text-zinc-300" />,
           label: 'Codex CLI',
-          color: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200 shadow-[0_0_10px_rgba(34,197,94,0.15)]',
-          dot: 'bg-emerald-400',
+          color: 'border-zinc-700/80 bg-zinc-900 text-zinc-100 shadow-xs',
+          dot: 'bg-zinc-300',
         };
       case 'shell':
       default:
         return {
-          icon: <TerminalIcon size={12} className="text-slate-300" />,
+          icon: <TerminalIcon size={11} className="text-zinc-400" />,
           label: 'Terminal',
-          color: 'border-white/[0.1] bg-white/[0.05] text-slate-200',
-          dot: 'bg-slate-400',
+          color: 'border-zinc-800 bg-zinc-950 text-zinc-400',
+          dot: 'bg-zinc-500',
         };
     }
   };
@@ -262,14 +262,14 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   return (
     <div
       onClick={onFocus}
-      className={`flex flex-col h-full w-full rounded-xl overflow-hidden border transition-all duration-200 ${
+      className={`flex flex-col h-full w-full rounded-xl overflow-hidden border transition-all duration-150 ${
         isActive
-          ? 'border-cyan-500/50 shadow-[0_0_24px_rgba(0,216,255,0.1)] ring-1 ring-cyan-500/20 bg-[#08090f]'
-          : 'border-white/[0.07] hover:border-white/[0.14] bg-[#090b12]/80 backdrop-blur-md'
+          ? 'border-zinc-700 shadow-[0_0_30px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.08] bg-[#000000]'
+          : 'border-zinc-800/80 bg-[#040404]'
       }`}
     >
       {/* Sleek Pane Chrome / Header */}
-      <div className="h-7 bg-white/[0.02] backdrop-blur-md border-b border-white/[0.05] flex items-center justify-between px-2.5 select-none text-[11px]">
+      <div className="h-7 bg-[#0a0a0c] border-b border-zinc-800/80 flex items-center justify-between px-2.5 select-none text-[11px]">
         {/* Left: Model / CLI Badge & Title */}
         <div className="flex items-center space-x-2 min-w-0">
           <div className={`flex items-center space-x-1 px-2 py-0.2 rounded-md border text-[10px] ${badge.color}`}>
@@ -277,7 +277,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
             <span className="font-semibold font-sans">{badge.label}</span>
           </div>
 
-          <span className="font-mono text-[10px] text-slate-400 truncate max-w-[180px]">
+          <span className="font-mono text-[10px] text-zinc-400 truncate max-w-[180px]">
             {session.command ? `$ ${session.command}` : session.title}
           </span>
         </div>
