@@ -8,6 +8,7 @@ import { GitUtils } from '../src/git/gitUtils.js';
 import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
 import { AgentMesh } from '../src/engine/agentMesh.js';
+import { generateShellCommand } from '../src/engine/commandGenerator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -146,6 +147,11 @@ function setupIpcHandlers() {
     });
 
     return mesh.runMesh(goal);
+  });
+
+  // Natural Language to Shell Command Generator (Warp AI Command Search)
+  ipcMain.handle('ai:generateCommand', async (_, query: string) => {
+    return generateShellCommand(query);
   });
 
   ipcMain.handle('system:getCwd', () => process.cwd());

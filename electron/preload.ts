@@ -36,6 +36,9 @@ export interface WarpApi {
     cwd?: string;
   }) => Promise<any>;
   onMeshEvent: (callback: (message: any) => void) => () => void;
+
+  // AI Command Search
+  generateCommand: (query: string) => Promise<{ command: string; explanation: string; source: string }>;
 }
 
 const api: WarpApi = {
@@ -67,6 +70,8 @@ const api: WarpApi = {
     ipcRenderer.on('mesh:event', handler);
     return () => ipcRenderer.removeListener('mesh:event', handler);
   },
+
+  generateCommand: (query) => ipcRenderer.invoke('ai:generateCommand', query),
 };
 
 contextBridge.exposeInMainWorld('warpApi', api);
