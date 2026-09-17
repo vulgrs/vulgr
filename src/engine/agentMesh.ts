@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { AgentMessageBus, type AgentMessage, type AgentRole } from '../bus/agentMessageBus.js';
 import { AdapterFactory } from '../adapters/factory.js';
 import { GitUtils } from '../git/gitUtils.js';
+import { WorktreeManager, type SandboxSession } from '../git/worktreeManager.js';
 import { logger } from '../utils/logger.js';
 import { ContextOptimizer } from './contextOptimizer.js';
 import { MemoryStore } from './memoryStore.js';
@@ -19,6 +20,7 @@ export interface AgentMeshOptions {
   maxRounds?: number;   // default: 3
   timeoutMs?: number;
   cwd?: string;
+  useSandbox?: boolean; // Run agents in isolated git worktree
   onMessage?: (message: AgentMessage) => void;
 }
 
@@ -29,6 +31,7 @@ export interface AgentMeshResult {
   messages: AgentMessage[];
   diff: string;
   durationMs: number;
+  sandbox?: SandboxSession;
   error?: string;
 }
 
@@ -42,6 +45,7 @@ export class AgentMesh {
   private readonly verifyCmd: string;
   private readonly maxRounds: number;
   private readonly timeoutMs: number;
+  private readonly useSandbox: boolean;
   private readonly onMessage?: (message: AgentMessage) => void;
 
   constructor(options: AgentMeshOptions = {}) {
@@ -55,6 +59,7 @@ export class AgentMesh {
     this.verifyCmd = options.verifyCmd || 'npm test';
     this.maxRounds = options.maxRounds ?? 3;
     this.timeoutMs = options.timeoutMs ?? 180_000;
+    this.useSandbox = options.useSandbox ?? false;
     this.onMessage = options.onMessage;
   }
 
@@ -68,10 +73,10 @@ export class AgentMesh {
     }
   }
 
-  private async runVerificationCmd(): Promise<{ success: boolean; exitCode: number; output: string }> {
+  private async runVerificationCmd(targetCwd?: string): Promise<{ success: boolean; exitCode: number; output: string }> {
     try {
       const { stdout, stderr } = await execAsync(this.verifyCmd, {
-        cwd: this.cwd,
+        cwd: targetCwd || this.cwd,
         timeout: 60_000,
         maxBuffer: 5 * 1024 * 1024,
       });
@@ -109,6 +114,22 @@ export class AgentMesh {
       }
     }, { from: undefined });
 
+    let activeCwd = this.cwd;
+    let sandboxSession: SandboxSession | undefined;
+    let activeGit = this.gitUtils;
+
+    if (this.useSandbox && this.gitUtils.isGitRepo()) {
+      try {
+        const worktreeMgr = new WorktreeManager(this.cwd);
+        sandboxSession = await worktreeMgr.createSandbox(runId);
+        activeCwd = sandboxSession.worktreePath;
+        activeGit = new GitUtils(activeCwd);
+        logger.info(`[Sandbox Active]: Agents isolated in worktree ${sandboxSession.worktreePath}`);
+      } catch (err: any) {
+        logger.warn(`Failed to initialize Git worktree sandbox: ${err.message}. Running in main workspace.`);
+      }
+    }
+
     logger.banner('AUTONOMOUS AGENT MESH', `Builder: [${this.builderName}] • Verifier: [${this.verifierName}] • Auditor: [${this.auditorName}]`);
     logger.info(`Goal: "${goal}"`);
 
@@ -130,12 +151,12 @@ export class AgentMesh {
     // Builder executes initial code generation
     logger.model(this.builderName, 'Writing code autonomously...');
     const buildExec = await builderAdapter.execute(taskDetails, {
-      cwd: this.cwd,
+      cwd: activeCwd,
       timeoutMs: this.timeoutMs,
       onStdout: (chunk) => logger.streamChunk(chunk),
     });
 
-    const diffInitial = this.gitUtils.getDiff();
+    const diffInitial = activeGit.getDiff();
     await this.bus.publish(runId, this.builderName, this.verifierName, 'CODE_READY', {
       summary: `Code generation completed by ${this.builderName}`,
       gitDiff: ContextOptimizer.optimizeDiff(diffInitial.diff),
@@ -149,14 +170,14 @@ export class AgentMesh {
 
     for (; currentRound <= this.maxRounds; currentRound++) {
       logger.info(`[${this.verifierName}]: Running verification "${this.verifyCmd}" (Round ${currentRound}/${this.maxRounds})...`);
-      const verifyResult = await this.runVerificationCmd();
+      const verifyResult = await this.runVerificationCmd(activeCwd);
       memory.recordCommand(this.verifyCmd, verifyResult.exitCode, undefined, verifyResult.success ? 'Verification passed' : 'Verification failed');
 
       if (verifyResult.success) {
         verificationPassed = true;
         await this.bus.publish(runId, this.verifierName, this.auditorName, 'VERIFICATION_PASSED', {
           summary: `All tests and compiler checks passed cleanly on Round ${currentRound}`,
-          gitDiff: ContextOptimizer.optimizeDiff(this.gitUtils.getDiff().diff),
+          gitDiff: ContextOptimizer.optimizeDiff(activeGit.getDiff().diff),
         });
         logger.success(`[${this.verifierName} -> ${this.auditorName}]: VERIFICATION_PASSED!`);
         break;
@@ -180,11 +201,11 @@ export class AgentMesh {
       ].join('\n');
 
       await builderAdapter.execute(repairPrompt, {
-        cwd: this.cwd,
+        cwd: activeCwd,
         onStdout: (chunk) => logger.streamChunk(chunk),
       });
 
-      const diffAfterPatch = this.gitUtils.getDiff();
+      const diffAfterPatch = activeGit.getDiff();
       await this.bus.publish(runId, this.builderName, this.verifierName, 'PATCH_APPLIED', {
         summary: `Repair patch applied by ${this.builderName}`,
         gitDiff: diffAfterPatch.diff,
@@ -200,15 +221,16 @@ export class AgentMesh {
         success: false,
         rounds: currentRound,
         messages: allMessages,
-        diff: this.gitUtils.getDiff().diff,
+        diff: activeGit.getDiff().diff,
         durationMs: Date.now() - startTime,
+        sandbox: sandboxSession,
         error: `Verification failed after ${this.maxRounds} autonomous repair rounds.`,
       };
     }
 
     // Stage 3: Autonomous Adversarial Audit (Auditor examines diff)
     logger.step(4, 4, `[${this.auditorName}]: Conducting adversarial security and edge-case audit...`);
-    const finalDiff = this.gitUtils.getDiff();
+    const finalDiff = activeGit.getDiff();
 
     const auditPrompt = [
       `You are ${this.auditorName.toUpperCase()} conducting an adversarial review of code produced by ${this.builderName} and verified by ${this.verifierName}.`,
@@ -218,7 +240,7 @@ export class AgentMesh {
       `If safe, output "VERDICT: APPROVED". If vulnerable, output "VERDICT: REJECTED: <reason>".`,
     ].join('\n');
 
-    const auditExec = await auditorAdapter.execute(auditPrompt, { cwd: this.cwd });
+    const auditExec = await auditorAdapter.execute(auditPrompt, { cwd: activeCwd });
 
     if (auditExec.stdout.includes('VERDICT: REJECTED')) {
       await this.bus.publish(runId, this.auditorName, this.builderName, 'SECURITY_CONCERN', {
@@ -243,6 +265,7 @@ export class AgentMesh {
       messages: allMessages,
       diff: finalDiff.diff,
       durationMs,
+      sandbox: sandboxSession,
     };
   }
 }

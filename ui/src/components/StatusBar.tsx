@@ -9,6 +9,8 @@ interface StatusBarProps {
   doctor: DoctorStatus | null;
   paneCount: number;
   activeSession: TerminalSession | null;
+  sandboxCount?: number;
+  onOpenSandbox?: () => void;
   onOpenPalette: () => void;
 }
 
@@ -19,6 +21,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   doctor,
   paneCount,
   activeSession,
+  sandboxCount = 0,
+  onOpenSandbox,
   onOpenPalette,
 }) => {
   const shortCwd = cwd ? cwd.split(/[\\/]/).slice(-2).join('/') : 'workspace';
@@ -35,7 +39,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           <span
             className={`flex items-center space-x-1.5 px-2 py-0.5 rounded-md border ${
               isDirty
-                ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                 ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
                 : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
             }`}
             title={isDirty ? 'Uncommitted changes' : 'Working tree clean'}
@@ -48,6 +52,17 @@ export const StatusBar: React.FC<StatusBarProps> = ({
               }`}
             />
           </span>
+        )}
+
+        {sandboxCount > 0 && onOpenSandbox && (
+          <button
+            onClick={onOpenSandbox}
+            className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-all shadow-[0_0_10px_rgba(34,197,94,0.2)]"
+            title="Inspect Isolated Agent Worktrees"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="font-semibold">🌱 Sandbox ({sandboxCount})</span>
+          </button>
         )}
 
         <span className="flex items-center space-x-1.5 text-slate-400">

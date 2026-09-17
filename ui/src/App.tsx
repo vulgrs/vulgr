@@ -10,6 +10,7 @@ import { AgentMeshModal } from './components/AgentMeshModal.js';
 import { SquadBar } from './components/SquadBar.js';
 import { LiveSquadModal } from './components/LiveSquadModal.js';
 import { SkillsModal } from './components/SkillsModal.js';
+import { SandboxDrawer } from './components/SandboxDrawer.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
 import type {
@@ -66,6 +67,8 @@ export const App: React.FC = () => {
   const [meshModalOpen, setMeshModalOpen] = useState(false);
   const [squadModalOpen, setSquadModalOpen] = useState(false);
   const [skillsModalOpen, setSkillsModalOpen] = useState(false);
+  const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
+  const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
 
   const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('warp.primaryModel', 'claude'));
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
@@ -101,14 +104,25 @@ export const App: React.FC = () => {
     // Initial diff & branch check
     refreshGitDiff();
     refreshGitBranch();
+    refreshSandboxes();
 
     // Periodic refresh every 5 seconds to show diff badge / branch changes as models edit files
     const diffTimer = setInterval(() => {
       refreshGitDiff();
       refreshGitBranch();
+      refreshSandboxes();
     }, 5000);
     return () => clearInterval(diffTimer);
   }, []);
+
+  const refreshSandboxes = async () => {
+    if (window.warpApi?.listSandboxes) {
+      try {
+        const list = await window.warpApi.listSandboxes();
+        setActiveSandboxes(list || []);
+      } catch {}
+    }
+  };
 
   const refreshGitDiff = async () => {
     if (window.warpApi) {
@@ -135,6 +149,36 @@ export const App: React.FC = () => {
         setDoctor(await window.warpApi.getDoctorStatus());
       } catch {}
     }
+  };
+
+  const handleOpenTerminalInSandbox = (worktreePath: string) => {
+    const id = `sess-sb-${Date.now()}`;
+    const newSession: TerminalSession = {
+      id,
+      title: 'Sandbox Shell',
+      type: 'shell',
+      command: '',
+      cwd: worktreePath,
+      createdAt: new Date().toISOString(),
+    };
+
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id === activeTabId) {
+          const sessions = [...t.sessions, newSession];
+          const layout = sessions.length > 1 ? 'split-h' : 'single';
+          return {
+            ...t,
+            sessions,
+            layout,
+            activeSessionId: id,
+            paneSizes: undefined,
+          };
+        }
+        return t;
+      })
+    );
+    setSandboxDrawerOpen(false);
   };
 
   // Launch an agent (Claude, AGY, Codex, Shell)
@@ -486,6 +530,14 @@ export const App: React.FC = () => {
         run: () => setSkillsModalOpen(true),
       },
       {
+        id: 'open-sandbox',
+        label: 'Inspect Agent Worktree Sandboxes',
+        group: 'Git',
+        shortcut: 'Ctrl+Shift+U',
+        keywords: 'sandbox worktree branch merge isolate test',
+        run: () => setSandboxDrawerOpen(true),
+      },
+      {
         id: 'toggle-sidebar',
         label: 'Toggle Sidebar',
         group: 'View',
@@ -547,6 +599,10 @@ export const App: React.FC = () => {
         case 'k':
           e.preventDefault();
           setSkillsModalOpen((v) => !v);
+          break;
+        case 'u':
+          e.preventDefault();
+          setSandboxDrawerOpen((v) => !v);
           break;
         case 's':
           e.preventDefault();
@@ -675,7 +731,17 @@ export const App: React.FC = () => {
         doctor={doctor}
         paneCount={currentTab?.sessions.length || 0}
         activeSession={activeSession}
+        sandboxCount={activeSandboxes.length}
+        onOpenSandbox={() => setSandboxDrawerOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
+      />
+
+      {/* Safe Git Worktree Sandbox Review Drawer */}
+      <SandboxDrawer
+        isOpen={sandboxDrawerOpen}
+        onClose={() => setSandboxDrawerOpen(false)}
+        onOpenTerminalInSandbox={handleOpenTerminalInSandbox}
+        onRefreshDiff={refreshGitDiff}
       />
 
       {/* Command Palette */}

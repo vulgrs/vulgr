@@ -4,3 +4,4 @@ dist/
 .test-mesh-workspace/
 *.log
 .DS_Store
+.warp-worktrees/

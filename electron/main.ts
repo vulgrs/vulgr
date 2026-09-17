@@ -12,6 +12,7 @@ import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
 import { MemoryStore } from '../src/engine/memoryStore.js';
 import { ContextOptimizer } from '../src/engine/contextOptimizer.js';
+import { WorktreeManager } from '../src/git/worktreeManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,6 +21,7 @@ let mainWindow: BrowserWindow | null = null;
 const ptyManager = new PtyManager();
 const skillsRegistry = new SharedSkillsRegistry();
 const memoryStore = new MemoryStore();
+const worktreeManager = new WorktreeManager();
 
 function canConnectToDevServer(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -138,7 +140,7 @@ function setupIpcHandlers() {
   });
 
   // Autonomous Agent Mesh IPC Handler
-  ipcMain.handle('mesh:run', async (_, { goal, builder, verifier, auditor, verifyCmd, maxRounds, cwd }) => {
+  ipcMain.handle('mesh:run', async (_, { goal, builder, verifier, auditor, verifyCmd, maxRounds, cwd, useSandbox }) => {
     const mesh = new AgentMesh({
       builder,
       verifier,
@@ -146,12 +148,30 @@ function setupIpcHandlers() {
       verifyCmd,
       maxRounds: maxRounds || 3,
       cwd: cwd || process.cwd(),
+      useSandbox: useSandbox ?? true,
       onMessage: (message) => {
         mainWindow?.webContents.send('mesh:event', message);
       },
     });
 
     return mesh.runMesh(goal);
+  });
+
+  // Git Worktree Sandbox IPC Handlers
+  ipcMain.handle('sandbox:create', async (_, { runId, baseBranch } = {}) => {
+    return worktreeManager.createSandbox(runId, baseBranch);
+  });
+  ipcMain.handle('sandbox:list', async () => {
+    return worktreeManager.listSandboxes();
+  });
+  ipcMain.handle('sandbox:diff', async (_, { worktreePath, baseBranch }) => {
+    return worktreeManager.getSandboxDiff(worktreePath, baseBranch);
+  });
+  ipcMain.handle('sandbox:merge', async (_, { worktreePath, branchName, targetBranch, commitMsg }) => {
+    return worktreeManager.mergeSandbox(worktreePath, branchName, targetBranch, commitMsg);
+  });
+  ipcMain.handle('sandbox:destroy', async (_, { worktreePath, branchName, force }) => {
+    return worktreeManager.destroySandbox(worktreePath, branchName, force);
   });
 
   // Natural Language to Shell Command Generator (Warp AI Command Search)

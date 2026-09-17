@@ -126,4 +126,21 @@ export interface MemoryData {
   lastUpdated: string;
 }
 
+export interface SandboxSession {
+  id: string;
+  branchName: string;
+  baseBranch: string;
+  worktreePath: string;
+  createdAt: string;
+  active: boolean;
+}
+
+export interface SandboxMergeResult {
+  success: boolean;
+  mergedCommit?: string;
+  conflict?: boolean;
+  conflictFiles?: string[];
+  error?: string;
+}
+
 

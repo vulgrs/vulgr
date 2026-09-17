@@ -58,6 +58,13 @@ export interface WarpApi {
 
   // Context Optimizer
   optimizeContext: (raw: string, options?: any) => Promise<string>;
+
+  // Safe Git Worktree Sandbox
+  createSandbox: (options?: { runId?: string; baseBranch?: string }) => Promise<any>;
+  listSandboxes: () => Promise<any[]>;
+  getSandboxDiff: (worktreePath: string, baseBranch?: string) => Promise<{ hasChanges: boolean; diff: string; filesChanged: string[] }>;
+  mergeSandbox: (options: { worktreePath: string; branchName: string; targetBranch?: string; commitMsg?: string }) => Promise<{ success: boolean; mergedCommit?: string; conflict?: boolean; conflictFiles?: string[]; error?: string }>;
+  destroySandbox: (options: { worktreePath: string; branchName: string; force?: boolean }) => Promise<boolean>;
 }
 
 const api: WarpApi = {
@@ -111,6 +118,13 @@ const api: WarpApi = {
 
   // Context Optimizer
   optimizeContext: (raw, options) => ipcRenderer.invoke('context:optimize', { raw, options }),
+
+  // Safe Git Worktree Sandbox
+  createSandbox: (options) => ipcRenderer.invoke('sandbox:create', options),
+  listSandboxes: () => ipcRenderer.invoke('sandbox:list'),
+  getSandboxDiff: (worktreePath, baseBranch) => ipcRenderer.invoke('sandbox:diff', { worktreePath, baseBranch }),
+  mergeSandbox: (options) => ipcRenderer.invoke('sandbox:merge', options),
+  destroySandbox: (options) => ipcRenderer.invoke('sandbox:destroy', options),
 };
 
 contextBridge.exposeInMainWorld('warpApi', api);
