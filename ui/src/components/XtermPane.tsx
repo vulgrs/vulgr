@@ -269,115 +269,84 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       }`}
     >
       {/* Sleek Pane Chrome / Header */}
-      <div className="h-9 bg-white/[0.03] backdrop-blur-md border-b border-white/[0.06] flex items-center justify-between px-3 select-none text-xs">
-        {/* Left: Traffic light subtle dots & Session info */}
-        <div className="flex items-center space-x-2.5">
-          {/* Subtle Window Dots */}
-          <div className="flex items-center space-x-1.5 pr-1">
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]/70 hover:bg-[#ff5f56] transition-colors cursor-pointer"
-              title="Close Pane"
-            />
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                onSplit('h');
-              }}
-              className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]/70 hover:bg-[#ffbd2e] transition-colors cursor-pointer"
-              title="Split Horizontal"
-            />
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                onSplit('v');
-              }}
-              className="w-2.5 h-2.5 rounded-full bg-[#27c93f]/70 hover:bg-[#27c93f] transition-colors cursor-pointer"
-              title="Split Vertical"
-            />
-          </div>
-
-          {/* Model / CLI Badge */}
-          <div className={`flex items-center space-x-1.5 px-2.5 py-0.5 rounded-lg border ${badge.color}`}>
+      <div className="h-7 bg-white/[0.02] backdrop-blur-md border-b border-white/[0.05] flex items-center justify-between px-2.5 select-none text-[11px]">
+        {/* Left: Model / CLI Badge & Title */}
+        <div className="flex items-center space-x-2 min-w-0">
+          <div className={`flex items-center space-x-1 px-2 py-0.2 rounded-md border text-[10px] ${badge.color}`}>
             {badge.icon}
-            <span className="font-semibold text-[11px] font-sans">{badge.label}</span>
+            <span className="font-semibold font-sans">{badge.label}</span>
           </div>
 
-          {/* Command or Title Breadcrumb */}
-          <span className="font-mono text-[11px] text-slate-400 truncate max-w-[160px]">
+          <span className="font-mono text-[10px] text-slate-400 truncate max-w-[180px]">
             {session.command ? `$ ${session.command}` : session.title}
           </span>
+        </div>
 
-          {/* Warp View Switcher: Terminal vs Blocks */}
-          <div className="flex items-center p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.08] ml-2">
+        {/* Right: View Switcher & Pane Actions */}
+        <div className="flex items-center space-x-1.5 text-slate-400">
+          {/* View Switcher: Terminal vs Blocks */}
+          <div className="flex items-center p-0.5 rounded-md bg-white/[0.03] border border-white/[0.06]">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setViewMode('terminal');
               }}
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-all ${
+              className={`px-1.5 py-0.2 rounded text-[9px] font-medium transition-all ${
                 viewMode === 'terminal'
-                  ? 'bg-white/[0.1] text-white shadow-sm font-semibold'
+                  ? 'bg-white/[0.1] text-white font-semibold shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Interactive Terminal Emulator"
+              title="Terminal View"
             >
-              <TerminalIcon size={10} />
-              <span>Terminal</span>
+              Terminal
             </button>
-
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setViewMode('blocks');
               }}
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-all ${
+              className={`px-1.5 py-0.2 rounded text-[9px] font-medium transition-all ${
                 viewMode === 'blocks'
-                  ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/30 shadow-sm font-semibold'
+                  ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/30 font-semibold shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Warp Command Blocks Stream"
+              title="Command Blocks View"
             >
-              <Layers size={10} />
-              <span>Blocks ({blocks.length})</span>
+              Blocks ({blocks.length})
             </button>
           </div>
-        </div>
 
-        {/* Right: Quick Action Icons */}
-        <div className="flex items-center space-x-1 text-slate-400">
+          <div className="h-3 w-px bg-white/[0.08]" />
+
           <button
             onClick={(e) => {
               e.stopPropagation();
               onSplit('h');
             }}
-            className="p-1 rounded-md hover:text-white hover:bg-white/[0.08] transition-colors"
+            className="p-0.5 rounded hover:text-white hover:bg-white/[0.08] transition-colors"
             title="Split Pane Horizontally (Ctrl+Shift+D)"
           >
-            <SplitSquareHorizontal size={13} />
+            <SplitSquareHorizontal size={12} />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onSplit('v');
             }}
-            className="p-1 rounded-md hover:text-white hover:bg-white/[0.08] transition-colors"
+            className="p-0.5 rounded hover:text-white hover:bg-white/[0.08] transition-colors"
             title="Split Pane Vertically (Ctrl+Shift+E)"
           >
-            <SplitSquareVertical size={13} />
+            <SplitSquareVertical size={12} />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onClose();
             }}
-            className="p-1 rounded-md hover:text-red-400 hover:bg-red-500/10 transition-colors"
-            title="Close Terminal Pane (Ctrl+Shift+W)"
+            className="p-0.5 rounded hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            title="Close Pane (Ctrl+Shift+W)"
           >
-            <X size={13} />
+            <X size={12} />
           </button>
         </div>
       </div>

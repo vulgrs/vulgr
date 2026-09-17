@@ -265,96 +265,35 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
       )}
 
       {/* Main Bottom Dock Bar */}
-      <div className="h-13 bg-[#090b12]/90 backdrop-blur-xl border-t border-white/[0.08] flex items-center justify-between px-4 py-2 select-none flex-shrink-0 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.4)]">
+      <div className="h-10 bg-[#090b12]/95 backdrop-blur-xl border-t border-white/[0.06] flex items-center justify-between px-3.5 select-none flex-shrink-0 z-20">
         {/* Left: Active Session Indicator */}
-        <div className="flex items-center space-x-2.5 min-w-0">
-          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
-            Target:
-          </span>
+        <div className="flex items-center space-x-2 min-w-0 flex-shrink-0">
           {activeSession ? (
-            <div className="flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.09] text-slate-200 font-mono text-xs shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00d8ff] animate-pulse" />
-              <span className="font-semibold">{activeSession.title}</span>
+            <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.08] text-slate-300 font-mono text-[11px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00d8ff]" />
+              <span className="font-medium truncate max-w-[130px]">{activeSession.title}</span>
             </div>
           ) : (
-            <span className="text-xs text-slate-500 italic">Select a terminal pane</span>
+            <span className="text-[11px] text-slate-500 font-mono italic">No active pane</span>
           )}
         </div>
 
-        {/* Center Quick Commands */}
-        <div className="flex items-center space-x-2">
-          {/* AI Command Trigger Chip */}
-          <button
-            onClick={() => setInput('# ')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-cyan-500/15 via-indigo-500/15 to-purple-500/15 hover:from-cyan-500/25 hover:to-purple-500/25 border border-cyan-500/30 text-cyan-200 text-xs font-mono transition-all hover:scale-105 active:scale-95 shadow-[0_0_10px_rgba(0,216,255,0.15)]"
-            title="Type '#' for Natural Language AI Command Search"
-          >
-            <Sparkles size={11} className="text-cyan-400 animate-pulse" />
-            <span># AI Cmd</span>
-          </button>
-
-          <button
-            onClick={() => onSendInput('claude\r')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-200 text-xs font-mono transition-all hover:scale-105 active:scale-95 shadow-sm"
-            title="Type 'claude' in active terminal"
-          >
-            <Sparkles size={11} className="text-purple-400" />
-            <span>claude</span>
-          </button>
-
-          <button
-            onClick={() => onSendInput('agy\r')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 text-cyan-200 text-xs font-mono transition-all hover:scale-105 active:scale-95 shadow-sm"
-            title="Type 'agy' in active terminal"
-          >
-            <Shield size={11} className="text-cyan-400" />
-            <span>agy</span>
-          </button>
-
-          <button
-            onClick={() => onSendInput('codex\r')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-200 text-xs font-mono transition-all hover:scale-105 active:scale-95 shadow-sm"
-            title="Type 'codex' in active terminal"
-          >
-            <Bot size={11} className="text-emerald-400" />
-            <span>codex</span>
-          </button>
-
-          <button
-            onClick={() => onSendInput('npm test\r')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 text-xs font-mono transition-all hover:scale-105 active:scale-95"
-            title="Run test suite"
-          >
-            <CheckCircle2 size={11} className="text-emerald-400" />
-            <span>npm test</span>
-          </button>
-
-          <button
-            onClick={() => onSendInput('git status\r')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 text-xs font-mono transition-all hover:scale-105 active:scale-95"
-            title="Check git status"
-          >
-            <GitBranch size={11} className="text-amber-400" />
-            <span>git status</span>
-          </button>
-        </div>
-
-        {/* Right: Inline Input with Ghost Text */}
-        <form onSubmit={handleSubmit} className="relative flex items-center space-x-2">
+        {/* Center & Right: Focused Prompt Input with Ghost Text */}
+        <form onSubmit={handleSubmit} className="relative flex-1 max-w-2xl mx-4 flex items-center space-x-2">
           {/* Floating Ghost Suggestion Micro-Pill */}
           {ghostSuggestion && !isAiMode && (
-            <div className="absolute bottom-full mb-1.5 right-0 flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-[#0d101a]/95 border border-cyan-500/30 text-[11px] font-mono shadow-xl backdrop-blur-md animate-fadeIn z-20 select-none">
-              <span className="px-1.5 py-0.5 rounded bg-white/[0.1] text-cyan-300 font-bold text-[10px]">Tab ⇥</span>
+            <div className="absolute bottom-full mb-1.5 left-0 flex items-center space-x-2 px-2.5 py-0.5 rounded-lg bg-[#0d101a]/95 border border-cyan-500/30 text-[10px] font-mono shadow-xl backdrop-blur-md animate-in fade-in z-20 select-none">
+              <span className="px-1 py-0.2 rounded bg-white/[0.1] text-cyan-300 font-bold text-[9px]">Tab ⇥</span>
               <span className="text-slate-400">or</span>
-              <span className="px-1.5 py-0.5 rounded bg-white/[0.1] text-cyan-300 font-bold text-[10px]">→</span>
+              <span className="px-1 py-0.2 rounded bg-white/[0.1] text-cyan-300 font-bold text-[9px]">→</span>
               <span className="text-slate-300 truncate max-w-[200px]">{ghostSuggestion.description || 'Complete command'}</span>
-              <span className="px-1.5 py-0.5 rounded text-[9px] uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+              <span className="px-1 py-0.2 rounded text-[8px] uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                 {ghostSuggestion.source}
               </span>
             </div>
           )}
 
-          <div className="relative flex items-center">
+          <div className="relative flex-1 flex items-center">
             <span
               className={`absolute left-2.5 font-mono text-xs select-none transition-colors z-10 ${
                 isAiMode ? 'text-purple-400 font-bold' : 'text-cyan-400'
@@ -365,7 +304,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 
             {/* Ghost Text Overlay behind caret */}
             {ghostSuggestion && !isAiMode && (
-              <div className="absolute inset-0 pl-7 pr-3 py-1.5 flex items-center pointer-events-none font-mono text-xs overflow-hidden select-none whitespace-pre">
+              <div className="absolute inset-0 pl-6 pr-3 py-1 flex items-center pointer-events-none font-mono text-xs overflow-hidden select-none whitespace-pre">
                 <span className="opacity-0">{input}</span>
                 <span className="text-slate-500 italic opacity-80">{ghostSuggestion.suffix}</span>
               </div>
@@ -383,26 +322,34 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                   ? "Type command, or '# port 3000 kapat' for AI search..."
                   : 'Select a terminal first'
               }
-              className={`w-96 glass-input rounded-xl pl-7 pr-3 py-1.5 text-slate-200 text-xs font-mono placeholder:text-slate-500 focus:outline-none transition-all shadow-inner relative z-0 bg-transparent ${
+              className={`w-full glass-input rounded-lg pl-6 pr-3 py-1 text-slate-200 text-xs font-mono placeholder:text-slate-500 focus:outline-none transition-all shadow-inner relative z-0 bg-white/[0.02] border border-white/[0.08] ${
                 isAiMode
-                  ? 'border-purple-500/60 shadow-[0_0_15px_rgba(168,85,247,0.2)] text-purple-200'
-                  : 'focus:border-cyan-500/60'
+                  ? 'border-purple-500/60 shadow-[0_0_12px_rgba(168,85,247,0.2)] text-purple-200'
+                  : 'focus:border-cyan-500/50 focus:bg-white/[0.04]'
               }`}
             />
           </div>
+
           <button
             type="submit"
             disabled={!input.trim() || !activeSession}
-            className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-white text-xs font-medium transition-all shadow-sm hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed ${
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-white text-xs font-medium transition-all shadow-sm disabled:opacity-20 disabled:cursor-not-allowed ${
               isAiMode
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_15px_rgba(168,85,247,0.3)]'
-                : 'bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 shadow-[0_0_12px_rgba(0,216,255,0.25)]'
+                ? 'bg-purple-600 hover:bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.3)]'
+                : 'bg-cyan-600 hover:bg-cyan-500 shadow-[0_0_10px_rgba(0,216,255,0.25)]'
             }`}
           >
             <Send size={11} />
-            <CornerDownLeft size={10} className="text-cyan-200" />
+            <CornerDownLeft size={10} className="text-white/80" />
           </button>
         </form>
+
+        {/* Right shortcut tip */}
+        <div className="hidden lg:flex items-center space-x-2 text-[10px] font-mono text-slate-500">
+          <span># for AI</span>
+          <span>•</span>
+          <span>^⇧P for palette</span>
+        </div>
       </div>
     </div>
   );

@@ -28,26 +28,26 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   const shortCwd = cwd ? cwd.split(/[\\/]/).slice(-2).join('/') : 'workspace';
 
   return (
-    <div className="h-7 bg-[#07080c]/90 backdrop-blur-md border-t border-white/[0.06] flex items-center justify-between px-3 select-none flex-shrink-0 text-[11px] font-mono text-slate-400">
+    <div className="h-6 bg-[#07080c]/95 backdrop-blur-md border-t border-white/[0.05] flex items-center justify-between px-3 select-none flex-shrink-0 text-[10px] font-mono text-slate-500">
       <div className="flex items-center space-x-3 min-w-0">
-        <span className="flex items-center space-x-1.5 text-slate-300" title={cwd}>
-          <FolderGit2 size={12} className="text-cyan-400" />
+        <span className="flex items-center space-x-1.5 text-slate-400 hover:text-slate-200 transition-colors" title={cwd}>
+          <FolderGit2 size={11} className="text-cyan-400" />
           <span className="truncate max-w-[220px] font-medium">{shortCwd}</span>
         </span>
 
         {gitBranch && (
           <span
-            className={`flex items-center space-x-1.5 px-2 py-0.5 rounded-md border ${
+            className={`flex items-center space-x-1 px-1.5 py-0.2 rounded border text-[9px] ${
               isDirty
-                 ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
                 : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
             }`}
             title={isDirty ? 'Uncommitted changes' : 'Working tree clean'}
           >
-            <GitBranch size={11} />
+            <GitBranch size={10} />
             <span className="font-semibold">{gitBranch}</span>
             <span
-              className={`w-1.5 h-1.5 rounded-full ${
+              className={`w-1 h-1 rounded-full ${
                 isDirty ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'
               }`}
             />
@@ -57,45 +57,36 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         {sandboxCount > 0 && onOpenSandbox && (
           <button
             onClick={onOpenSandbox}
-            className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-all shadow-[0_0_10px_rgba(34,197,94,0.2)]"
+            className="flex items-center space-x-1 px-1.5 py-0.2 rounded border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-all text-[9px]"
             title="Inspect Isolated Agent Worktrees"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span className="font-semibold">🌱 Sandbox ({sandboxCount})</span>
+            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+            <span className="font-semibold">Sandbox ({sandboxCount})</span>
           </button>
         )}
 
-        <span className="flex items-center space-x-1.5 text-slate-400">
-          <LayoutPanelLeft size={11} className="text-slate-500" />
+        <span className="flex items-center space-x-1 text-slate-500">
+          <LayoutPanelLeft size={10} />
           <span>
             {paneCount} pane{paneCount === 1 ? '' : 's'}
           </span>
         </span>
 
         {activeSession && (
-          <span className="text-slate-400 truncate max-w-[180px]">
+          <span className="text-slate-400 truncate max-w-[160px]">
             <span className="text-slate-600 mr-1">•</span>
             {activeSession.title}
           </span>
         )}
       </div>
 
-      <div className="flex items-center space-x-3 flex-shrink-0">
+      <div className="flex items-center space-x-3 flex-shrink-0 text-slate-500">
         {doctor && (
-          <span className="flex items-center space-x-1.5 text-slate-400" title="Node.js version">
-            <Cpu size={11} className="text-cyan-400" />
+          <span className="flex items-center space-x-1" title="Node.js runtime">
+            <Cpu size={10} className="text-cyan-400/70" />
             <span>{doctor.node.version}</span>
           </span>
         )}
-
-        <button
-          onClick={onOpenPalette}
-          className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] hover:text-white border border-white/[0.08] transition-all text-slate-300"
-          title="Open Command Palette (Ctrl+Shift+P)"
-        >
-          <Command size={11} className="text-cyan-400" />
-          <span>^⇧P</span>
-        </button>
       </div>
     </div>
   );

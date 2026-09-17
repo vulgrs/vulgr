@@ -14,6 +14,8 @@ import {
   Users,
   Settings,
   FileDown,
+  ChevronDown,
+  Search,
 } from 'lucide-react';
 import type { WorkspaceTab, DoctorStatus, SessionType } from '../types/warp.js';
 
@@ -56,44 +58,57 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleSidebar,
   onOpenPalette,
 }) => {
+  const [agentMenuOpen, setAgentMenuOpen] = React.useState(false);
+  const [aiMenuOpen, setAiMenuOpen] = React.useState(false);
+
+  // Close dropdowns on outside click or escape
+  React.useEffect(() => {
+    const handleGlobalClick = () => {
+      setAgentMenuOpen(false);
+      setAiMenuOpen(false);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
   return (
-    <div className="h-12 bg-[#090a0f]/90 backdrop-blur-xl border-b border-white/[0.07] flex items-center justify-between px-3 select-none flex-shrink-0 z-30">
+    <div className="h-11 bg-[#090a0f]/95 backdrop-blur-xl border-b border-white/[0.06] flex items-center justify-between px-3 select-none flex-shrink-0 z-30">
       {/* Left: App Brand & Tab Strip */}
       <div className="flex items-center space-x-2 min-w-0">
         <button
           onClick={onToggleSidebar}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/[0.05] transition-all"
+          className="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/[0.05] transition-all"
           title="Toggle Sidebar"
         >
-          {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeft size={15} />}
+          {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeft size={14} />}
         </button>
 
         {/* Brand Icon & Name */}
-        <div className="flex items-center space-x-2 mr-3 pl-1">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-cyan-400 via-indigo-500 to-purple-500 flex items-center justify-center font-bold text-xs text-black shadow-[0_0_12px_rgba(0,216,255,0.3)]">
-            <Zap size={13} className="text-black fill-current" />
+        <div className="flex items-center space-x-1.5 mr-2 pl-0.5">
+          <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-cyan-400 via-indigo-500 to-purple-500 flex items-center justify-center font-bold text-[11px] text-black shadow-[0_0_10px_rgba(0,216,255,0.3)]">
+            <Zap size={11} className="text-black fill-current" />
           </div>
           <span className="font-bold text-xs text-slate-100 tracking-wider font-sans">
-            DEXTER <span className="text-cyan-400 font-medium">ORCHESTRATOR</span>
+            DEXTER
           </span>
         </div>
 
         {/* Tabs Bar */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar">
+        <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar">
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
             return (
               <div
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id)}
-                className={`group relative flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+                className={`group relative flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-mono transition-all cursor-pointer ${
                   isActive
                     ? 'bg-white/[0.08] text-white font-medium border border-white/[0.12] shadow-sm'
                     : 'bg-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
                 }`}
               >
-                <Terminal size={12} className={isActive ? 'text-cyan-400' : 'text-slate-500'} />
-                <span className="max-w-[120px] truncate">{tab.title}</span>
+                <Terminal size={11} className={isActive ? 'text-cyan-400' : 'text-slate-500'} />
+                <span className="max-w-[110px] truncate text-[11px]">{tab.title}</span>
 
                 {tabs.length > 1 && (
                   <button
@@ -103,12 +118,12 @@ export const TopBar: React.FC<TopBarProps> = ({
                     }}
                     className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-red-400 hover:bg-white/[0.08] transition-opacity"
                   >
-                    <X size={11} />
+                    <X size={10} />
                   </button>
                 )}
 
                 {isActive && (
-                  <div className="absolute bottom-0 left-2 right-2 h-[2px] bg-gradient-to-r from-cyan-400 to-purple-400 rounded-full" />
+                  <div className="absolute bottom-0 left-1.5 right-1.5 h-[1.5px] bg-gradient-to-r from-cyan-400 to-purple-400 rounded-full" />
                 )}
               </div>
             );
@@ -116,136 +131,203 @@ export const TopBar: React.FC<TopBarProps> = ({
 
           <button
             onClick={onAddTab}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/[0.05] transition-all"
-            title="New Tab"
+            className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-white/[0.05] transition-all"
+            title="New Tab (Ctrl+Shift+T)"
           >
-            <Plus size={13} />
+            <Plus size={12} />
           </button>
         </div>
       </div>
 
-      {/* Right: Actions, Launchers & System Info */}
-      <div className="flex items-center space-x-2">
-        {/* Agent Quick Launchers */}
-        <div className="flex items-center space-x-1 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+      {/* Center: Sleek Command Search Omnibar */}
+      <button
+        onClick={onOpenPalette}
+        className="hidden md:flex items-center space-x-2 px-3 py-1 rounded-lg border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.12] text-xs text-slate-400 hover:text-slate-200 transition-all w-64 max-w-xs justify-between"
+        title="Search commands, files, or ask AI (#) (Ctrl+Shift+P)"
+      >
+        <div className="flex items-center space-x-2">
+          <Search size={11} className="text-cyan-400" />
+          <span className="text-[11px]">Search or ask AI (#)...</span>
+        </div>
+        <kbd className="px-1.5 py-0.5 rounded bg-white/[0.05] border border-white/[0.07] text-[9px] font-mono text-slate-400">
+          ^⇧P
+        </kbd>
+      </button>
+
+      {/* Right: Consolidated Controls */}
+      <div className="flex items-center space-x-1.5">
+        {/* + Pane / Agent Dropdown */}
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => onLaunchAgent('shell')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition-all"
-            title="Launch Interactive Shell"
+            onClick={() => {
+              setAgentMenuOpen(!agentMenuOpen);
+              setAiMenuOpen(false);
+            }}
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+              agentMenuOpen
+                ? 'bg-white/[0.1] border-white/[0.2] text-white'
+                : 'bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.07] text-slate-300 hover:text-white'
+            }`}
+            title="Add Terminal Pane or AI Agent"
           >
-            <Terminal size={12} className="text-slate-400" />
-            <span>Shell</span>
+            <Plus size={11} className="text-cyan-400" />
+            <span>Pane</span>
+            <ChevronDown size={10} className="text-slate-400" />
           </button>
 
-          <button
-            onClick={() => onLaunchAgent('claude')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-purple-200 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/40 transition-all shadow-sm"
-            title="Launch Claude Code"
-          >
-            <Sparkles size={12} className="text-purple-400" />
-            <span>Claude</span>
-          </button>
-
-          <button
-            onClick={() => onLaunchAgent('agy')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-cyan-200 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 hover:border-cyan-500/40 transition-all shadow-sm"
-            title="Launch Google AGY Engine"
-          >
-            <Shield size={12} className="text-cyan-400" />
-            <span>AGY</span>
-          </button>
-
-          <button
-            onClick={() => onLaunchAgent('codex')}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 hover:border-emerald-500/40 transition-all shadow-sm"
-            title="Launch Codex CLI"
-          >
-            <Bot size={12} className="text-emerald-400" />
-            <span>Codex</span>
-          </button>
+          {agentMenuOpen && (
+            <div className="absolute right-0 mt-1.5 w-44 rounded-xl bg-[#0c0e17] border border-white/[0.1] shadow-2xl p-1 z-50 text-xs font-sans animate-in fade-in">
+              <button
+                onClick={() => {
+                  onLaunchAgent('shell');
+                  setAgentMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.08] text-left transition-colors"
+              >
+                <Terminal size={12} className="text-slate-400" />
+                <span>Interactive Shell</span>
+              </button>
+              <button
+                onClick={() => {
+                  onLaunchAgent('claude');
+                  setAgentMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-purple-200 hover:text-white hover:bg-purple-500/15 text-left transition-colors"
+              >
+                <Sparkles size={12} className="text-purple-400" />
+                <span>Claude Code</span>
+              </button>
+              <button
+                onClick={() => {
+                  onLaunchAgent('agy');
+                  setAgentMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-cyan-200 hover:text-white hover:bg-cyan-500/15 text-left transition-colors"
+              >
+                <Shield size={12} className="text-cyan-400" />
+                <span>AGY Engine</span>
+              </button>
+              <button
+                onClick={() => {
+                  onLaunchAgent('codex');
+                  setAgentMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-emerald-500/15 text-left transition-colors"
+              >
+                <Bot size={12} className="text-emerald-400" />
+                <span>Codex CLI</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Universal Skills & Memory Trigger */}
-        <button
-          onClick={onOpenSkillsModal}
-          className="relative group flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-500/50 text-amber-200 text-xs font-semibold shadow-[0_0_12px_rgba(245,158,11,0.2)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-          title="Open Universal Shared Skills & Persistent Memory (Ctrl+Shift+K)"
-        >
-          <Zap size={12} className="text-amber-400 fill-current" />
-          <span>⚡ Skills</span>
-        </button>
+        {/* Autonomous AI Modes Dropdown */}
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => {
+              setAiMenuOpen(!aiMenuOpen);
+              setAgentMenuOpen(false);
+            }}
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+              aiMenuOpen
+                ? 'bg-purple-500/25 border-purple-500/50 text-purple-200'
+                : 'bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/25 text-purple-300'
+            }`}
+            title="Autonomous Squads & Skills"
+          >
+            <Sparkles size={11} className="text-cyan-400" />
+            <span>AI Squad</span>
+            <ChevronDown size={10} className="text-purple-300" />
+          </button>
 
-        {/* Live Squad Trigger */}
-        <button
-          onClick={onOpenSquadModal}
-          className="relative group flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 hover:border-cyan-500/50 text-cyan-200 text-xs font-semibold shadow-[0_0_12px_rgba(0,216,255,0.2)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-          title="Launch Live 2-Way Split Autonomous Squad (Claude + AGY)"
-        >
-          <Users size={12} className="text-cyan-400" />
-          <span>👥 Live Squad</span>
-        </button>
+          {aiMenuOpen && (
+            <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-[#0c0e17] border border-white/[0.1] shadow-2xl p-1.5 z-50 text-xs font-sans animate-in fade-in">
+              <button
+                onClick={() => {
+                  onOpenSquadModal();
+                  setAiMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-cyan-200 hover:text-white hover:bg-cyan-500/15 text-left transition-colors"
+              >
+                <Users size={13} className="text-cyan-400" />
+                <div>
+                  <div className="font-medium">Live 2-Way Squad</div>
+                  <div className="text-[10px] text-slate-400">Claude ⇄ AGY Split view</div>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  onOpenMeshModal();
+                  setAiMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-purple-200 hover:text-white hover:bg-purple-500/15 text-left transition-colors"
+              >
+                <Zap size={13} className="text-purple-400" />
+                <div>
+                  <div className="font-medium">Autonomous Agent Mesh</div>
+                  <div className="text-[10px] text-slate-400">Verification & self-correction</div>
+                </div>
+              </button>
+              <div className="h-px bg-white/[0.08] my-1" />
+              <button
+                onClick={() => {
+                  onOpenSkillsModal();
+                  setAiMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-amber-200 hover:text-white hover:bg-amber-500/15 text-left transition-colors"
+              >
+                <Zap size={13} className="text-amber-400 fill-current" />
+                <div>
+                  <div className="font-medium">Shared Skills & Memory</div>
+                  <div className="text-[10px] text-slate-400">Universal workflows</div>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
 
-        {/* Autonomous Mesh Trigger */}
-        <button
-          onClick={onOpenMeshModal}
-          className="relative group flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:via-indigo-500 hover:to-cyan-500 text-white text-xs font-semibold shadow-[0_0_16px_rgba(168,85,247,0.35)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-          title="Launch Autonomous Multi-CLI Agent Mesh"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 animate-ping" />
-          <span>⚡ Autonomous Mesh</span>
-        </button>
-
-        {/* Command Palette Button */}
-        <button
-          onClick={onOpenPalette}
-          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:text-white hover:border-white/[0.15] text-xs font-medium transition-all"
-          title="Command Palette (Ctrl+Shift+P)"
-        >
-          <Command size={12} className="text-cyan-400" />
-          <span className="text-[10px] font-mono text-slate-400">^⇧P</span>
-        </button>
-
-        {/* Settings Modal Button */}
-        <button
-          onClick={onOpenSettings}
-          className="p-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-400 hover:text-white hover:border-white/[0.15] transition-all"
-          title="CLI Permissions, Models & Settings (Ctrl+,)"
-        >
-          <Settings size={13} className="text-slate-400 hover:text-cyan-400 transition-colors" />
-        </button>
-
-        {/* Technical Report Export Button */}
-        <button
-          onClick={onOpenExportReport}
-          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:text-white hover:border-white/[0.15] text-xs font-medium transition-all"
-          title="Export Session Timeline & Technical Report (Ctrl+Shift+X)"
-        >
-          <FileDown size={12} className="text-purple-400" />
-          <span>Report</span>
-        </button>
-
-        {/* Git Diff Inspector Pill */}
+        {/* Git Diff Pill */}
         <button
           onClick={onToggleDiff}
-          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+          className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
             hasUncommittedDiff
-              ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
-              : 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:text-white hover:border-white/[0.14]'
+              ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+              : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:text-slate-200'
           }`}
-          title="Inspect Git Diff & Review"
+          title="Inspect Git Diff & Review (Ctrl+Shift+G)"
         >
-          <GitCompare size={13} className={hasUncommittedDiff ? 'text-amber-400' : 'text-slate-400'} />
+          <GitCompare size={12} className={hasUncommittedDiff ? 'text-amber-400' : 'text-slate-400'} />
           <span>Diff</span>
           {hasUncommittedDiff && (
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
           )}
         </button>
 
-        {/* Doctor Status Badge */}
+        {/* Technical Report Export Button */}
+        <button
+          onClick={onOpenExportReport}
+          className="p-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] text-slate-400 hover:text-white hover:border-white/[0.12] transition-all"
+          title="Export Technical Report (Ctrl+Shift+X)"
+        >
+          <FileDown size={13} />
+        </button>
+
+        {/* Settings Modal Button */}
+        <button
+          onClick={onOpenSettings}
+          className="p-1.5 rounded-lg border border-white/[0.06] bg-white/[0.03] text-slate-400 hover:text-white hover:border-white/[0.12] transition-all"
+          title="CLI Permissions & Settings (Ctrl+,)"
+        >
+          <Settings size={13} />
+        </button>
+
+        {/* Doctor Status Dot */}
         {doctor && (
-          <div className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[11px] font-mono text-slate-300">
+          <div
+            className="flex items-center justify-center p-1.5 text-slate-400"
+            title={`System Ready (Node ${doctor.node.version})`}
+          >
             <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#22c55e]" />
-            <span className="text-slate-400">Ready</span>
           </div>
         )}
       </div>
