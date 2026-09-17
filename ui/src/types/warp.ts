@@ -179,4 +179,37 @@ export interface WarpConfig {
   lastUpdated: string;
 }
 
+export interface ReportCommandBlock {
+  id: string;
+  command: string;
+  exitCode: number | null;
+  timestamp: string;
+  durationMs?: number;
+  stdout: string;
+  stderr: string;
+  isExecuting?: boolean;
+}
+
+export interface ReportAgentEvent {
+  agent: string;
+  role?: string;
+  action: string;
+  status: 'success' | 'failed' | 'in_progress' | 'info';
+  timestamp: string;
+  details?: string;
+}
+
+export interface SessionReportData {
+  title: string;
+  workspacePath: string;
+  branch?: string | null;
+  timestamp: string;
+  totalDurationSeconds?: number;
+  commands: ReportCommandBlock[];
+  agentEvents?: ReportAgentEvent[];
+  gitDiff?: string;
+  filesChanged?: string[];
+  doctor?: any;
+}
+
 

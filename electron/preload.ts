@@ -73,6 +73,10 @@ export interface WarpApi {
   getConfig: () => Promise<any>;
   updateConfig: (updates: any) => Promise<any>;
   resetConfig: () => Promise<any>;
+
+  // Session Timeline & Technical Report Export
+  generateReport: (data: any, format: 'markdown' | 'html' | 'json', options?: any) => Promise<string>;
+  saveReportToFile: (content: string, defaultName?: string, format?: 'markdown' | 'html' | 'json') => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
 }
 
 const api: WarpApi = {
@@ -141,6 +145,11 @@ const api: WarpApi = {
   getConfig: () => ipcRenderer.invoke('config:get'),
   updateConfig: (updates) => ipcRenderer.invoke('config:update', updates),
   resetConfig: () => ipcRenderer.invoke('config:reset'),
+
+  // Session Timeline & Technical Report Export
+  generateReport: (data, format, options) => ipcRenderer.invoke('export:generate', { data, format, options }),
+  saveReportToFile: (content, defaultName, format) =>
+    ipcRenderer.invoke('export:save-file', { content, defaultName, format }),
 };
 
 contextBridge.exposeInMainWorld('warpApi', api);

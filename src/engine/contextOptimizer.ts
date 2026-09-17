@@ -28,6 +28,10 @@ export class ContextOptimizer {
       .replace(/\r\n/g, '\n');
   }
 
+  static stripAnsi(text: string): string {
+    return this.cleanAnsi(text);
+  }
+
   /**
    * Removes command-line spinner/progress bar overwrites (e.g. npm [==  ] 20%)
    */

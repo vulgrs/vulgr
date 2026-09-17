@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { get as httpGet } from 'node:http';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { PtyManager } from './ptyManager.js';
 import { GitUtils } from '../src/git/gitUtils.js';
 import { ClaudeAdapter } from '../src/adapters/claude.js';
@@ -15,6 +15,7 @@ import { ContextOptimizer } from '../src/engine/contextOptimizer.js';
 import { WorktreeManager } from '../src/git/worktreeManager.js';
 import { AutoSuggestEngine } from '../src/engine/autoSuggest.js';
 import { ConfigManager } from '../src/engine/configManager.js';
+import { SessionExporter } from '../src/engine/sessionExporter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -47,7 +48,7 @@ async function createWindow() {
     height: 880,
     minWidth: 900,
     minHeight: 600,
-    title: 'Warp Orchestrator - AI Terminal Workspace',
+    title: 'Dexter - AI Terminal Orchestrator',
     backgroundColor: '#0c0d12',
     show: true,
     autoHideMenuBar: true,
@@ -221,6 +222,48 @@ function setupIpcHandlers() {
   ipcMain.handle('config:get', () => configManager.getConfig());
   ipcMain.handle('config:update', (_, updates) => configManager.updateConfig(updates));
   ipcMain.handle('config:reset', () => configManager.resetConfig());
+
+  // Session Timeline & Technical Report Export Handlers
+  ipcMain.handle('export:generate', (_, { data, format, options }) => {
+    switch (format) {
+      case 'html':
+        return SessionExporter.toHtml(data, options);
+      case 'json':
+        return SessionExporter.toJson(data);
+      case 'markdown':
+      default:
+        return SessionExporter.toMarkdown(data, options);
+    }
+  });
+
+  ipcMain.handle('export:save-file', async (_, { content, defaultName, format }) => {
+    if (!mainWindow) return { success: false, error: 'No active window' };
+
+    const ext = format === 'html' ? 'html' : format === 'json' ? 'json' : 'md';
+    const filters =
+      format === 'html'
+        ? [{ name: 'HTML Document', extensions: ['html'] }]
+        : format === 'json'
+        ? [{ name: 'JSON Document', extensions: ['json'] }]
+        : [{ name: 'Markdown Document', extensions: ['md', 'markdown'] }];
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save Dexter Technical Report',
+      defaultPath: defaultName || `dexter-report-${Date.now()}.${ext}`,
+      filters,
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
+
+    try {
+      writeFileSync(result.filePath, content, 'utf-8');
+      return { success: true, filePath: result.filePath };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
 
   ipcMain.handle('system:getCwd', () => process.cwd());
 }

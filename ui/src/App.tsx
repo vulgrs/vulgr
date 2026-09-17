@@ -12,6 +12,7 @@ import { LiveSquadModal } from './components/LiveSquadModal.js';
 import { SkillsModal } from './components/SkillsModal.js';
 import { SandboxDrawer } from './components/SandboxDrawer.js';
 import { SettingsModal } from './components/SettingsModal.js';
+import { ExportReportModal } from './components/ExportReportModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
 import type {
@@ -20,6 +21,8 @@ import type {
   DoctorStatus,
   SessionType,
   CommandPaletteAction,
+  SessionReportData,
+  ReportCommandBlock,
 } from './types/warp.js';
 
 declare global {
@@ -71,6 +74,8 @@ export const App: React.FC = () => {
   const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
 
   const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('warp.primaryModel', 'claude'));
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
@@ -152,6 +157,38 @@ export const App: React.FC = () => {
       } catch {}
     }
   };
+
+  const handleOpenExportModal = async () => {
+    if (window.warpApi?.getMemory) {
+      try {
+        const mem = await window.warpApi.getMemory();
+        if (mem && mem.commands && mem.commands.length > 0) {
+          const blocks: ReportCommandBlock[] = mem.commands.map((c: any, i: number) => ({
+            id: `cmd-${i}-${c.timestamp || Date.now()}`,
+            command: c.command,
+            exitCode: c.exitCode ?? 0,
+            timestamp: c.timestamp ? new Date(c.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
+            durationMs: c.durationMs,
+            stdout: c.summary || '',
+            stderr: '',
+          }));
+          setSessionCommands(blocks);
+        }
+      } catch {}
+    }
+    setExportModalOpen(true);
+  };
+
+  const reportData: SessionReportData = useMemo(() => ({
+    title: currentTab?.title || 'Dexter Terminal Session',
+    workspacePath: cwd,
+    branch: gitBranch,
+    timestamp: new Date().toLocaleString(),
+    commands: sessionCommands,
+    gitDiff: gitDiff,
+    filesChanged: gitFiles,
+    doctor: doctor,
+  }), [currentTab, cwd, gitBranch, sessionCommands, gitDiff, gitFiles, doctor]);
 
   const handleOpenTerminalInSandbox = (worktreePath: string) => {
     const id = `sess-sb-${Date.now()}`;
@@ -579,8 +616,16 @@ export const App: React.FC = () => {
         keywords: 'settings preferences config dangerously-skip-permissions models shell font theme permissions',
         run: () => setSettingsModalOpen(true),
       },
+      {
+        id: 'export-report',
+        label: 'Export Technical Report (Markdown / HTML / JSON)',
+        group: 'Export',
+        shortcut: 'Ctrl+Shift+X',
+        keywords: 'export report markdown html timeline audit json summary',
+        run: handleOpenExportModal,
+      },
     ],
-    [activeSession, tabs, activeTabId, cwd]
+    [activeSession, tabs, activeTabId, cwd, handleOpenExportModal]
   );
 
   // Global keyboard shortcuts. Everything uses Ctrl/Cmd+Shift+<key> (VSCode/Warp
@@ -609,6 +654,10 @@ export const App: React.FC = () => {
       if (!e.shiftKey) return;
 
       switch (key) {
+        case 'x':
+          e.preventDefault();
+          handleOpenExportModal();
+          break;
         case 'p':
           e.preventDefault();
           setPaletteOpen((v) => !v);
@@ -680,6 +729,7 @@ export const App: React.FC = () => {
         onOpenSquadModal={() => setSquadModalOpen(true)}
         onOpenSkillsModal={() => setSkillsModalOpen(true)}
         onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenExportReport={handleOpenExportModal}
       />
 
       {/* Main Content: Sidebar + Terminal Grid */}
@@ -800,6 +850,13 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
+      />
+
+      {/* Dexter Session Timeline & Technical Report Modal */}
+      <ExportReportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        reportData={reportData}
       />
     </div>
   );

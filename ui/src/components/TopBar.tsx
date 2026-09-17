@@ -13,6 +13,7 @@ import {
   Zap,
   Users,
   Settings,
+  FileDown,
 } from 'lucide-react';
 import type { WorkspaceTab, DoctorStatus, SessionType } from '../types/warp.js';
 
@@ -28,6 +29,7 @@ interface TopBarProps {
   onOpenSquadModal: () => void;
   onOpenSkillsModal: () => void;
   onOpenSettings: () => void;
+  onOpenExportReport: () => void;
   doctor: DoctorStatus | null;
   hasUncommittedDiff: boolean;
   sidebarOpen: boolean;
@@ -47,6 +49,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenSquadModal,
   onOpenSkillsModal,
   onOpenSettings,
+  onOpenExportReport,
   doctor,
   hasUncommittedDiff,
   sidebarOpen,
@@ -71,7 +74,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Zap size={13} className="text-black fill-current" />
           </div>
           <span className="font-bold text-xs text-slate-100 tracking-wider font-sans">
-            WARP <span className="text-cyan-400 font-medium">ORCHESTRATOR</span>
+            DEXTER <span className="text-cyan-400 font-medium">ORCHESTRATOR</span>
           </span>
         </div>
 
@@ -209,6 +212,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           title="CLI Permissions, Models & Settings (Ctrl+,)"
         >
           <Settings size={13} className="text-slate-400 hover:text-cyan-400 transition-colors" />
+        </button>
+
+        {/* Technical Report Export Button */}
+        <button
+          onClick={onOpenExportReport}
+          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:text-white hover:border-white/[0.15] text-xs font-medium transition-all"
+          title="Export Session Timeline & Technical Report (Ctrl+Shift+X)"
+        >
+          <FileDown size={12} className="text-purple-400" />
+          <span>Report</span>
         </button>
 
         {/* Git Diff Inspector Pill */}
