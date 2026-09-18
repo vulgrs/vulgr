@@ -10,8 +10,8 @@
   "scripts": {
     "build": "tsc && vite build",
     "build:core": "tsc",
-    "build:ui": "vite build",
-    "type-check": "tsc --noEmit",
+    "build:ui": "tsc -p ui/tsconfig.json --noEmit && vite build",
+    "type-check": "tsc --noEmit && tsc -p ui/tsconfig.json --noEmit",
     "start": "node ./dist/src/index.js",
     "start:app": "electron dist/electron/main.js",
     "dev:app": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron dist/electron/main.js\"",
