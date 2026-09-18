@@ -32,11 +32,11 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[600px] bg-[#0b0d14]/95 backdrop-blur-2xl border-l border-white/[0.1] shadow-[-20px_0_50px_rgba(0,0,0,0.8)] z-50 flex flex-col animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-y-0 right-0 w-[600px] bg-[#0b0d14]/95 border-l border-white/[0.1] shadow-[-20px_0_50px_rgba(0,0,0,0.8)] z-50 flex flex-col animate-in slide-in-from-right duration-200">
       {/* Header */}
       <div className="h-14 px-5 bg-white/[0.03] border-b border-white/[0.08] flex items-center justify-between select-none">
         <div className="flex items-center space-x-2.5">
-          <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(0,216,255,0.2)]">
+          <div className="p-1.5 rounded-lg bg-zinc-500/10 border border-zinc-500/30 text-zinc-400 shadow-[0_0_10px_rgba(0,216,255,0.2)]">
             <GitCompare size={16} />
           </div>
           <div>
@@ -65,7 +65,7 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
       {/* Files List */}
       {filesChanged.length > 0 && (
         <div className="px-5 py-2.5 border-b border-white/[0.06] bg-[#07080c]/60 flex items-center space-x-2 overflow-x-auto text-xs font-mono text-slate-300">
-          <FileCode size={13} className="text-cyan-400 flex-shrink-0" />
+          <FileCode size={13} className="text-zinc-400 flex-shrink-0" />
           {filesChanged.map((f, i) => (
             <span
               key={i}
@@ -94,17 +94,17 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
         <div className="grid grid-cols-3 gap-2">
           <button
             onClick={() => onSendDiffToAgent('claude')}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/50 text-purple-200 text-xs font-semibold transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-xl bg-zinc-500/10 hover:bg-zinc-500/20 border border-zinc-500/30 hover:border-zinc-500/50 text-zinc-200 text-xs font-semibold transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Sparkles size={13} className="text-purple-400" />
+            <Sparkles size={13} className="text-zinc-400" />
             <span>Audit Claude</span>
           </button>
 
           <button
             onClick={() => onSendDiffToAgent('agy')}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 hover:border-cyan-500/50 text-cyan-200 text-xs font-semibold transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-xl bg-zinc-500/10 hover:bg-zinc-500/20 border border-zinc-500/30 hover:border-zinc-500/50 text-zinc-200 text-xs font-semibold transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Shield size={13} className="text-cyan-400" />
+            <Shield size={13} className="text-zinc-400" />
             <span>Audit AGY</span>
           </button>
 

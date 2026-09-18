@@ -38,18 +38,18 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         {gitBranch && (
           <span
             className={`flex items-center space-x-1 px-1.5 py-0.2 rounded border text-[9px] ${
-              isDirty
-                ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-                : 'border-zinc-800 bg-zinc-900/60 text-zinc-300'
-            }`}
+ isDirty
+ ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+ : 'border-zinc-800 bg-zinc-900/60 text-zinc-300'
+ }`}
             title={isDirty ? 'Uncommitted changes' : 'Working tree clean'}
           >
             <GitBranch size={10} />
             <span className="font-semibold">{gitBranch}</span>
             <span
               className={`w-1 h-1 rounded-full ${
-                isDirty ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'
-              }`}
+ isDirty ? 'bg-amber-400 ' : 'bg-emerald-400'
+ }`}
             />
           </span>
         )}
@@ -60,7 +60,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             className="flex items-center space-x-1 px-1.5 py-0.2 rounded border border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 transition-all text-[9px]"
             title="Inspect Isolated Agent Worktrees"
           >
-            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+            <span className="w-1 h-1 rounded-full bg-emerald-400" />
             <span className="font-semibold">Sandbox ({sandboxCount})</span>
           </button>
         )}

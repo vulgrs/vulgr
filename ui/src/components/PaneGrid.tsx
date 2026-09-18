@@ -199,14 +199,14 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
             <div
               onMouseDown={handleDividerMouseDown(i)}
               className={`group flex-shrink-0 flex items-center justify-center z-10 transition-colors ${
-                axis === 'x' ? 'w-2.5 cursor-col-resize px-0.5' : 'h-2.5 cursor-row-resize py-0.5'
-              }`}
+ axis === 'x' ? 'w-2.5 cursor-col-resize px-0.5' : 'h-2.5 cursor-row-resize py-0.5'
+ }`}
               title="Drag to resize"
             >
               <div
                 className={`bg-zinc-800/80 group-hover:bg-zinc-500 transition-all rounded-full ${
-                  axis === 'x' ? 'w-[2px] h-full group-hover:w-[3px]' : 'h-[2px] w-full group-hover:h-[3px]'
-                }`}
+ axis === 'x' ? 'w-[2px] h-full group-hover:w-[3px]' : 'h-[2px] w-full group-hover:h-[3px]'
+ }`}
               />
             </div>
           )}

@@ -144,7 +144,7 @@ export const CommandBlocksFeed: React.FC<CommandBlocksFeedProps> = ({
               </div>
             )}
 
-            {/* 4. Tool / Plugin Capsule (Matches reference: "⚡ Skipped authentication for plugin...") */}
+            {/* 4. Tool / Plugin Capsule */}
             {item.toolCapsule && (
               <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-zinc-950 border border-zinc-800/90 text-xs text-zinc-300 font-mono w-fit max-w-full shadow-inner">
                 <Zap size={12} className="text-zinc-400 flex-shrink-0" />
@@ -170,8 +170,8 @@ export const CommandBlocksFeed: React.FC<CommandBlocksFeedProps> = ({
                 <button
                   onClick={() => handleReaction(item.id, 'up')}
                   className={`p-1 rounded hover:text-zinc-200 transition-colors ${
-                    reactions[item.id] === 'up' ? 'text-emerald-400' : ''
-                  }`}
+ reactions[item.id] === 'up' ? 'text-emerald-400' : ''
+ }`}
                   title="Helpful"
                 >
                   <ThumbsUp size={12} />
@@ -179,8 +179,8 @@ export const CommandBlocksFeed: React.FC<CommandBlocksFeedProps> = ({
                 <button
                   onClick={() => handleReaction(item.id, 'down')}
                   className={`p-1 rounded hover:text-zinc-200 transition-colors ${
-                    reactions[item.id] === 'down' ? 'text-red-400' : ''
-                  }`}
+ reactions[item.id] === 'down' ? 'text-red-400' : ''
+ }`}
                   title="Not helpful"
                 >
                   <ThumbsDown size={12} />

@@ -308,7 +308,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
             onClick={onExplainActive}
             className="hidden sm:flex items-center space-x-1 px-2.5 py-1 rounded-md bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800/60 text-zinc-400 hover:text-zinc-200 text-[11px] transition-all"
           >
-            <Sparkles size={11} className="text-purple-400" />
+            <Sparkles size={11} className="text-zinc-400" />
             <span>Explain with Claude</span>
           </button>
         )}
@@ -420,7 +420,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                   }}
                   className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center space-x-2"
                 >
-                  <Sparkles size={12} className="text-purple-400" />
+                  <Sparkles size={12} className="text-zinc-400" />
                   <div>
                     <div className="font-medium">Claude 3.7 Sonnet</div>
                     <div className="text-[10px] text-zinc-500">High Fast / Reasoning</div>
@@ -480,7 +480,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               </span>
             )}
             <span className="flex items-center space-x-1 hover:text-zinc-400 cursor-pointer">
-              <span>💻 {shortCwd}</span>
+              <span>{shortCwd}</span>
               <span>▾</span>
             </span>
 
@@ -491,8 +491,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                 className="flex items-center space-x-1 px-1.5 py-0.5 rounded bg-zinc-900 border border-emerald-900/40 text-emerald-400 hover:text-emerald-300 hover:border-emerald-800 transition-colors"
                 title="Open Token & Context Optimizer HUD"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>⚡ {tokenSavingsText || '68% saved'}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>{tokenSavingsText || '68% saved'}</span>
               </button>
             )}
           </div>

@@ -61,7 +61,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-start justify-center pt-[15vh] select-none"
+      className="fixed inset-0 bg-black/80 z-[100] flex items-start justify-center pt-[15vh] select-none"
       onClick={onClose}
     >
       <div
@@ -96,10 +96,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                   onClose();
                 }}
                 className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-xs transition-all duration-150 ${
-                  i === highlighted
-                    ? 'bg-zinc-800/90 text-zinc-100 border border-zinc-700/60 shadow-sm'
-                    : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent'
-                }`}
+ i === highlighted
+ ? 'bg-zinc-800/90 text-zinc-100 border border-zinc-700/60 shadow-sm'
+ : 'text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200 border border-transparent'
+ }`}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 w-16 flex-shrink-0 font-mono">

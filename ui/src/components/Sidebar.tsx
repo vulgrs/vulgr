@@ -97,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
               >
-                <div className="p-1 rounded-md bg-purple-950/60 text-purple-400 border border-purple-800/60 group-hover:bg-purple-900/60">
+                <div className="p-1 rounded-md bg-zinc-950/60 text-zinc-400 border border-zinc-800/60 group-hover:bg-zinc-900/60">
                   <Sparkles size={13} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -186,10 +186,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="grid grid-cols-3 gap-1.5 pt-0.5">
           <button
             onClick={() => onNewSession('claude')}
-            className="flex items-center justify-center space-x-1 py-1 rounded-md bg-purple-950/30 hover:bg-purple-900/40 border border-purple-800/40 text-purple-300 text-[11px] font-medium transition-all"
+            className="flex items-center justify-center space-x-1 py-1 rounded-md bg-zinc-950/30 hover:bg-zinc-900/40 border border-zinc-800/40 text-zinc-300 text-[11px] font-medium transition-all"
             title="Start new Claude Code session"
           >
-            <Sparkles size={11} className="text-purple-400" />
+            <Sparkles size={11} className="text-zinc-400" />
             <span>Claude</span>
           </button>
           <button
@@ -276,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="mt-1 space-y-0.5 pl-1.5">
               <div className="flex items-center justify-between px-2 py-1 rounded-md text-xs text-zinc-300 bg-zinc-900/50 border border-zinc-800/60 font-medium">
                 <div className="flex items-center space-x-2 truncate">
-                  <span className="text-zinc-500">📁</span>
+                  <FolderGit2 size={12} className="text-zinc-500 flex-shrink-0" />
                   <span className="truncate">{repoName}</span>
                 </div>
                 {gitBranch && (
@@ -321,14 +321,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       key={tab.id}
                       onClick={() => onSelectTab(tab.id)}
                       className={`flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer text-xs transition-all ${
-                        isActive
-                          ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
-                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
-                      }`}
+ isActive
+ ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
+ : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+ }`}
                     >
                       <div className="flex items-center space-x-2 truncate min-w-0">
                         {sessionType === 'claude' ? (
-                          <Sparkles size={11} className="text-purple-400 flex-shrink-0" />
+                          <Sparkles size={11} className="text-zinc-400 flex-shrink-0" />
                         ) : sessionType === 'agy' ? (
                           <Shield size={11} className="text-zinc-300 flex-shrink-0" />
                         ) : sessionType === 'codex' ? (

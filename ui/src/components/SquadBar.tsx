@@ -47,26 +47,26 @@ export const SquadBar: React.FC<SquadBarProps> = ({
       case 'building':
         return {
           label: `${getAgentLabel(squad.builderType)} is writing code...`,
-          color: 'bg-purple-500/20 border-purple-500/40 text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.2)]',
-          icon: <Sparkles size={13} className="text-purple-400 animate-pulse" />,
+          color: 'bg-zinc-500/20 border-zinc-500/40 text-zinc-200 shadow-[0_0_15px_rgba(168,85,247,0.2)]',
+          icon: <Sparkles size={13} className="text-zinc-400" />,
         };
       case 'handing_off':
         return {
           label: `Handing off to ${getAgentLabel(squad.verifierType)}...`,
-          color: 'bg-indigo-500/20 border-indigo-500/40 text-indigo-200 shadow-[0_0_15px_rgba(99,102,241,0.2)]',
-          icon: <ArrowRight size={13} className="text-indigo-400 animate-bounce" />,
+          color: 'bg-zinc-500/20 border-zinc-500/40 text-zinc-200 shadow-[0_0_15px_rgba(99,102,241,0.2)]',
+          icon: <ArrowRight size={13} className="text-zinc-400" />,
         };
       case 'verifying':
         return {
           label: `${getAgentLabel(squad.verifierType)} running verification...`,
-          color: 'bg-cyan-500/20 border-cyan-500/40 text-cyan-200 shadow-[0_0_15px_rgba(0,216,255,0.2)]',
-          icon: <Shield size={13} className="text-cyan-400 animate-pulse" />,
+          color: 'bg-zinc-500/20 border-zinc-500/40 text-zinc-200 shadow-[0_0_15px_rgba(0,216,255,0.2)]',
+          icon: <Shield size={13} className="text-zinc-400" />,
         };
       case 'repairing':
         return {
           label: `Auto-repairing errors (Round ${squad.round}/${squad.maxRounds})...`,
           color: 'bg-amber-500/20 border-amber-500/40 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.2)]',
-          icon: <AlertTriangle size={13} className="text-amber-400 animate-pulse" />,
+          icon: <AlertTriangle size={13} className="text-amber-400" />,
         };
       case 'consensus':
         return {
@@ -87,11 +87,11 @@ export const SquadBar: React.FC<SquadBarProps> = ({
   const badge = getPhaseBadge();
 
   return (
-    <div className="mx-2 mt-2 px-3.5 py-2 rounded-xl glass-surface border border-cyan-500/20 flex items-center justify-between select-none z-10 shadow-lg animate-in slide-in-from-top-1 duration-150">
+    <div className="mx-2 mt-2 px-3.5 py-2 rounded-xl glass-surface border border-zinc-500/20 flex items-center justify-between select-none z-10 shadow-lg animate-in slide-in-from-top-1 duration-150">
       {/* Left: Squad Branding & Goal */}
       <div className="flex items-center space-x-3 min-w-0">
         <div className="flex items-center space-x-2">
-          <div className="w-5 h-5 rounded-lg bg-gradient-to-tr from-cyan-400 via-indigo-500 to-purple-500 flex items-center justify-center font-bold text-[10px] text-black">
+          <div className="w-5 h-5 rounded-lg bg-gradient-to-tr from-zinc-400 via-zinc-500 to-zinc-500 flex items-center justify-center font-bold text-[10px] text-black">
             👥
           </div>
           <span className="font-bold text-xs text-white font-sans tracking-wide">
@@ -103,11 +103,11 @@ export const SquadBar: React.FC<SquadBarProps> = ({
 
         {/* Builder <-> Verifier Pair */}
         <div className="flex items-center space-x-1.5 font-mono text-[11px]">
-          <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/30 text-purple-300">
+          <span className="px-2 py-0.5 rounded-md bg-zinc-500/10 border border-zinc-500/30 text-zinc-300">
             {getAgentLabel(squad.builderType)} (Builder)
           </span>
           <span className="text-slate-500">⇄</span>
-          <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+          <span className="px-2 py-0.5 rounded-md bg-zinc-500/10 border border-zinc-500/30 text-zinc-300">
             {getAgentLabel(squad.verifierType)} (Verifier)
           </span>
         </div>
@@ -134,10 +134,10 @@ export const SquadBar: React.FC<SquadBarProps> = ({
         <button
           onClick={onPauseToggle}
           className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
-            squad.phase === 'paused'
-              ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-              : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-slate-300 hover:text-white'
-          }`}
+ squad.phase === 'paused'
+ ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+ : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-slate-300 hover:text-white'
+ }`}
           title={squad.phase === 'paused' ? 'Resume Autonomous Loop' : 'Pause Loop to Intervene'}
         >
           {squad.phase === 'paused' ? <Play size={11} /> : <Pause size={11} />}
@@ -147,7 +147,7 @@ export const SquadBar: React.FC<SquadBarProps> = ({
         {squad.phase !== 'consensus' && (
           <button
             onClick={onForceHandoff}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-200 text-xs font-medium transition-all"
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-zinc-500/10 hover:bg-zinc-500/20 border border-zinc-500/30 text-zinc-200 text-xs font-medium transition-all"
             title="Force immediate handoff to partner CLI"
           >
             <FastForward size={11} />

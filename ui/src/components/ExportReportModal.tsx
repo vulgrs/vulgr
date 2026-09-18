@@ -111,7 +111,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-200">
       <div
         className="relative w-full max-w-4xl max-h-[85vh] flex flex-col rounded-2xl bg-[#090b11] border border-white/[0.1] shadow-2xl overflow-hidden font-sans text-slate-200"
         onClick={(e) => e.stopPropagation()}
@@ -119,7 +119,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-white/[0.02]">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-500 to-cyan-400 flex items-center justify-center text-black shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-zinc-500 to-zinc-400 flex items-center justify-center text-black shadow-[0_0_15px_rgba(168,85,247,0.3)]">
               <FileDown size={17} className="text-black fill-current" />
             </div>
             <div>
@@ -127,7 +127,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                 <h2 className="text-sm font-bold text-white tracking-wide">
                   Dexter Technical Session Report
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/25">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-zinc-500/10 text-zinc-300 border border-zinc-500/25">
                   {totalCmds} commands
                 </span>
                 {failedCmds > 0 && (
@@ -141,7 +141,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                 {reportData.branch && (
                   <>
                     <span>•</span>
-                    <span className="flex items-center space-x-1 text-purple-300">
+                    <span className="flex items-center space-x-1 text-zinc-300">
                       <GitBranch size={11} />
                       <span>{reportData.branch}</span>
                     </span>
@@ -166,10 +166,10 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             <button
               onClick={() => setActiveTab('timeline')}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-                activeTab === 'timeline'
-                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
+ activeTab === 'timeline'
+ ? 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/40 shadow-sm'
+ : 'text-slate-400 hover:text-slate-200'
+ }`}
             >
               <Clock size={13} />
               <span>Timeline View</span>
@@ -178,10 +178,10 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             <button
               onClick={() => setActiveTab('preview')}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
-                activeTab === 'preview'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
+ activeTab === 'preview'
+ ? 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/40 shadow-sm'
+ : 'text-slate-400 hover:text-slate-200'
+ }`}
             >
               <FileCode size={13} />
               <span>Generated Code Preview</span>
@@ -194,30 +194,30 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
               <button
                 onClick={() => setFormat('markdown')}
                 className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all ${
-                  format === 'markdown'
-                    ? 'bg-white/[0.1] text-white font-semibold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
+ format === 'markdown'
+ ? 'bg-white/[0.1] text-white font-semibold'
+ : 'text-slate-400 hover:text-slate-200'
+ }`}
               >
                 Markdown (.md)
               </button>
               <button
                 onClick={() => setFormat('html')}
                 className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all ${
-                  format === 'html'
-                    ? 'bg-white/[0.1] text-white font-semibold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
+ format === 'html'
+ ? 'bg-white/[0.1] text-white font-semibold'
+ : 'text-slate-400 hover:text-slate-200'
+ }`}
               >
                 HTML (.html)
               </button>
               <button
                 onClick={() => setFormat('json')}
                 className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all ${
-                  format === 'json'
-                    ? 'bg-white/[0.1] text-white font-semibold'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
+ format === 'json'
+ ? 'bg-white/[0.1] text-white font-semibold'
+ : 'text-slate-400 hover:text-slate-200'
+ }`}
               >
                 JSON (.json)
               </button>
@@ -229,7 +229,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                 type="checkbox"
                 checked={includeDiff}
                 onChange={(e) => setIncludeDiff(e.target.checked)}
-                className="rounded border-white/[0.2] bg-white/[0.05] text-cyan-500 focus:ring-0"
+                className="rounded border-white/[0.2] bg-white/[0.05] text-zinc-500 focus:ring-0"
               />
               <span>Include Diff</span>
             </label>
@@ -265,10 +265,10 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                           </code>
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
-                              isSuccess
-                                ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/25'
-                                : 'bg-rose-500/10 text-rose-300 border border-rose-500/25'
-                            }`}
+ isSuccess
+ ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/25'
+ : 'bg-rose-500/10 text-rose-300 border border-rose-500/25'
+ }`}
                           >
                             {isSuccess ? 'EXIT 0' : `EXIT ${cmd.exitCode ?? 1}`}
                           </span>
@@ -322,7 +322,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             <button
               onClick={handleSaveToDisk}
               disabled={isSaving}
-              className="flex items-center space-x-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white text-xs font-semibold shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              className="flex items-center space-x-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-zinc-600 to-zinc-600 hover:from-zinc-500 hover:to-zinc-500 text-white text-xs font-semibold shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
               <FileDown size={13} />
               <span>{isSaving ? 'Saving...' : 'Save to File...'}</span>

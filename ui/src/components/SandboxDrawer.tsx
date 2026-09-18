@@ -134,7 +134,7 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[640px] bg-[#0b0d14]/95 backdrop-blur-2xl border-l border-white/[0.1] shadow-[-20px_0_50px_rgba(0,0,0,0.8)] z-50 flex flex-col animate-in slide-in-from-right duration-200 select-none text-slate-200">
+    <div className="fixed inset-y-0 right-0 w-[640px] bg-[#0b0d14]/95 border-l border-white/[0.1] shadow-[-20px_0_50px_rgba(0,0,0,0.8)] z-50 flex flex-col animate-in slide-in-from-right duration-200 select-none text-slate-200">
       {/* Header */}
       <div className="h-14 px-5 bg-white/[0.03] border-b border-white/[0.08] flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
@@ -177,10 +177,10 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
                   setMergeResult(null);
                 }}
                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
-                  isSelected
-                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                    : 'bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
-                }`}
+ isSelected
+ ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-sm'
+ : 'bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
+ }`}
               >
                 <GitBranch size={12} />
                 <span className="truncate max-w-[160px]">{s.branchName}</span>
@@ -198,10 +198,10 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
       {mergeResult && (
         <div
           className={`mx-5 my-3 p-3 rounded-xl border text-xs font-mono flex items-center justify-between ${
-            mergeResult.success
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-              : 'bg-red-500/10 border-red-500/30 text-red-300'
-          }`}
+ mergeResult.success
+ ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+ : 'bg-red-500/10 border-red-500/30 text-red-300'
+ }`}
         >
           <div className="flex items-center space-x-2">
             {mergeResult.success ? <Check size={14} /> : <AlertTriangle size={14} />}
@@ -249,7 +249,7 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
                 className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-medium text-slate-200 border border-white/[0.08] transition-all"
                 title="Open interactive terminal session in this sandbox directory"
               >
-                <Terminal size={13} className="text-cyan-400" />
+                <Terminal size={13} className="text-zinc-400" />
                 <span>Open Terminal Here</span>
               </button>
 

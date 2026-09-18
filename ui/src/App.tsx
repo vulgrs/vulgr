@@ -106,7 +106,7 @@ export const App: React.FC = () => {
       id: 'stream-init',
       userPrompt: 'Dexter AI Developer Environment initialized',
       thoughtLog: 'Log verified: Working tree connected. Autonomous CLI mesh and PTY bridge ready.',
-      toolCapsule: '⚡ Initialized: Shell & Agent Bridge',
+      toolCapsule: 'Initialized: Shell & Agent Bridge',
       commandBlock: {
         id: 'blk-init',
         command: 'git status',
@@ -369,7 +369,7 @@ export const App: React.FC = () => {
 
     const squadTab: WorkspaceTab = {
       id: newTabId,
-      title: `👥 Squad: ${config.builder} ⇄ ${config.verifier}`,
+      title: `Squad: ${config.builder} ⇄ ${config.verifier}`,
       layout: 'split-h',
       activeSessionId: builderSessionId,
       paneSizes: [50, 50],
@@ -587,7 +587,7 @@ export const App: React.FC = () => {
       thoughtLog: isAiQuery
         ? `Dexter AI Search: Translating query into executable CLI pipeline...`
         : `Terminal Execution: Running command in active shell (${activeSession?.title || 'Shell'})...`,
-      toolCapsule: `⚡ Command: ${trimmed.slice(0, 45)}`,
+      toolCapsule: `Command: ${trimmed.slice(0, 45)}`,
       commandBlock: {
         id: blockId,
         command: trimmed,
@@ -958,10 +958,10 @@ export const App: React.FC = () => {
             <div className="flex items-center space-x-1.5">
               <button
                 onClick={() => handleLaunchAgent('claude')}
-                className="flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-purple-950/40 text-purple-300 border border-purple-800/50 hover:bg-purple-900/50 hover:text-purple-100 transition-all shadow-xs"
+                className="flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-zinc-950/40 text-zinc-300 border border-zinc-800/50 hover:bg-zinc-900/50 hover:text-zinc-100 transition-all shadow-xs"
                 title="Launch Claude Code interactive CLI in split pane"
               >
-                <Sparkles size={11} className="text-purple-400" />
+                <Sparkles size={11} className="text-zinc-400" />
                 <span>+ Claude</span>
               </button>
               <button
@@ -1006,8 +1006,8 @@ export const App: React.FC = () => {
                 className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono bg-zinc-950/80 border border-emerald-900/50 text-emerald-400 hover:bg-emerald-950/40 hover:border-emerald-700/60 transition-all shadow-sm"
                 title="Open Token & Context Optimizer HUD (Ctrl+Shift+O)"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>⚡ {contextTelemetry?.savingsPercentage ?? 68}% saved</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>{contextTelemetry?.savingsPercentage ?? 68}% saved</span>
                 <span className="text-zinc-600">|</span>
                 <span className="text-zinc-300">{(contextTelemetry?.savedTokensTotal ?? 3300).toLocaleString()} tk</span>
               </button>
@@ -1017,10 +1017,10 @@ export const App: React.FC = () => {
                 <button
                   onClick={() => setCenterViewMode('terminal')}
                   className={`px-2.5 py-0.5 rounded-md transition-all ${
-                    centerViewMode === 'terminal'
-                      ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
+ centerViewMode === 'terminal'
+ ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
+ : 'text-zinc-500 hover:text-zinc-300'
+ }`}
                   title="Full-Screen PTY Terminal Grid"
                 >
                   Terminal
@@ -1028,10 +1028,10 @@ export const App: React.FC = () => {
                 <button
                   onClick={() => setCenterViewMode('split')}
                   className={`px-2.5 py-0.5 rounded-md transition-all ${
-                    centerViewMode === 'split'
-                      ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
+ centerViewMode === 'split'
+ ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
+ : 'text-zinc-500 hover:text-zinc-300'
+ }`}
                   title="Split Stream & Terminal Side-by-Side"
                 >
                   Split
@@ -1039,10 +1039,10 @@ export const App: React.FC = () => {
                 <button
                   onClick={() => setCenterViewMode('stream')}
                   className={`px-2.5 py-0.5 rounded-md transition-all ${
-                    centerViewMode === 'stream'
-                      ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
+ centerViewMode === 'stream'
+ ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
+ : 'text-zinc-500 hover:text-zinc-300'
+ }`}
                   title="Command Blocks & Agent Stream Feed"
                 >
                   Blocks
@@ -1052,14 +1052,14 @@ export const App: React.FC = () => {
               <button
                 onClick={() => setRightPanelOpen(!rightPanelOpen)}
                 className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  rightPanelOpen
-                    ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
-                }`}
+ rightPanelOpen
+ ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
+ : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
+ }`}
                 title="Toggle Changes / Sandbox Split Panel"
               >
                 <GitCompare size={12} />
-                <span className="hidden sm:inline">± Changes</span>
+                <span className="hidden sm:inline">Changes</span>
                 {gitFiles.length > 0 && (
                   <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-zinc-800 text-zinc-300">
                     +{gitFiles.length}
@@ -1130,7 +1130,7 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Split Panel (Matches reference IDE layout: ± Changes | 🌐 Sandbox) */}
+        {/* Right Split Panel: Changes / Sandbox */}
         {rightPanelOpen && (
           <RightPanel
             isOpen={rightPanelOpen}

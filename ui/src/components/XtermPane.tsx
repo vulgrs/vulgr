@@ -272,10 +272,10 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         xtermInstance.current?.focus();
       }}
       className={`flex flex-col h-full w-full rounded-xl overflow-hidden border transition-all duration-150 ${
-        isActive
-          ? 'border-zinc-700 shadow-[0_0_30px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.08] bg-[#000000]'
-          : 'border-zinc-800/80 bg-[#040404]'
-      }`}
+ isActive
+ ? 'border-zinc-700 shadow-[0_0_30px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.08] bg-[#000000]'
+ : 'border-zinc-800/80 bg-[#040404]'
+ }`}
     >
       {/* Sleek Pane Chrome / Header */}
       <div className="h-7 bg-[#0a0a0c] border-b border-zinc-800/80 flex items-center justify-between px-2.5 select-none text-[11px]">
@@ -297,10 +297,10 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                   e.stopPropagation();
                   handleRerun('claude');
                 }}
-                className="flex items-center space-x-0.5 px-1.5 py-0.2 rounded bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/40 text-[9px] text-purple-300 font-mono transition-colors"
+                className="flex items-center space-x-0.5 px-1.5 py-0.2 rounded bg-zinc-950/40 hover:bg-zinc-900/50 border border-zinc-800/40 text-[9px] text-zinc-300 font-mono transition-colors"
                 title="Execute 'claude' in this shell"
               >
-                <Sparkles size={9} className="text-purple-400" />
+                <Sparkles size={9} className="text-zinc-400" />
                 <span>run claude</span>
               </button>
               <button
@@ -328,10 +328,10 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                 setViewMode('terminal');
               }}
               className={`px-1.5 py-0.2 rounded text-[9px] font-medium transition-all ${
-                viewMode === 'terminal'
-                  ? 'bg-white/[0.1] text-white font-semibold shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
+ viewMode === 'terminal'
+ ? 'bg-white/[0.1] text-white font-semibold shadow-xs'
+ : 'text-slate-400 hover:text-slate-200'
+ }`}
               title="Terminal View"
             >
               Terminal
@@ -342,10 +342,10 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                 setViewMode('blocks');
               }}
               className={`px-1.5 py-0.2 rounded text-[9px] font-medium transition-all ${
-                viewMode === 'blocks'
-                  ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/30 font-semibold shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
+ viewMode === 'blocks'
+ ? 'bg-zinc-500/20 text-zinc-200 border border-zinc-500/30 font-semibold shadow-xs'
+ : 'text-slate-400 hover:text-slate-200'
+ }`}
               title="Command Blocks View"
             >
               Blocks ({blocks.length})
@@ -389,10 +389,10 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
 
       {/* Floating Error Sniffer & Self-Correction Banner */}
       {detectedError && (
-        <div className="bg-amber-950/85 border-b border-amber-500/40 px-3 py-2 text-xs flex items-center justify-between text-amber-200 backdrop-blur-lg z-10 animate-in slide-in-from-top-2 duration-150 shadow-[0_4px_20px_rgba(245,158,11,0.15)]">
+        <div className="bg-amber-950/85 border-b border-amber-500/40 px-3 py-2 text-xs flex items-center justify-between text-amber-200 z-10 animate-in slide-in-from-top-2 duration-150 shadow-[0_4px_20px_rgba(245,158,11,0.15)]">
           <div className="flex items-center space-x-2 min-w-0">
             <div className="p-1 rounded-md bg-amber-500/20 text-amber-300">
-              <AlertTriangle size={14} className="animate-pulse" />
+              <AlertTriangle size={14} className="" />
             </div>
             <span className="font-semibold text-[11px]">Self-Correction Sniffer:</span>
             <span className="font-mono text-[10px] text-amber-300/90 truncate max-w-sm">
@@ -407,7 +407,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                 onPipeErrorToAgent('claude', detectedError);
                 setDetectedError(null);
               }}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 text-purple-200 text-[10px] font-semibold transition-all shadow-sm"
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-zinc-600/30 hover:bg-zinc-600/50 border border-zinc-500/50 text-zinc-200 text-[10px] font-semibold transition-all shadow-sm"
             >
               <Sparkles size={10} />
               <span>Claude</span>
@@ -417,7 +417,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                 onPipeErrorToAgent('agy', detectedError);
                 setDetectedError(null);
               }}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/50 text-cyan-200 text-[10px] font-semibold transition-all shadow-sm"
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-zinc-600/30 hover:bg-zinc-600/50 border border-zinc-500/50 text-zinc-200 text-[10px] font-semibold transition-all shadow-sm"
             >
               <Shield size={10} />
               <span>AGY</span>
@@ -448,7 +448,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         <div className="flex-1 w-full h-full p-3 overflow-y-auto space-y-3 bg-[#07080c] select-text">
           {blocks.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
-              <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center text-cyan-400 mb-2">
+              <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center text-zinc-400 mb-2">
                 <Layers size={20} />
               </div>
               <p className="text-xs font-semibold text-slate-300">Warp Command Blocks Stream</p>
@@ -460,7 +460,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                   onClick={() => handleRerun('npm test')}
                   className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-300 text-xs font-mono"
                 >
-                  <Play size={10} className="text-cyan-400" />
+                  <Play size={10} className="text-zinc-400" />
                   <span>Run 'npm test'</span>
                 </button>
                 <button

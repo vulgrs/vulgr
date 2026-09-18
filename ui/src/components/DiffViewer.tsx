@@ -260,12 +260,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) =>
                           <div
                             key={lIdx}
                             className={`flex items-start text-[11px] leading-5 transition-colors ${
-                              isAdd
-                                ? 'bg-emerald-950/35 text-emerald-300'
-                                : isDel
-                                ? 'bg-red-950/35 text-red-300'
-                                : 'text-zinc-400 hover:bg-zinc-900/40'
-                            }`}
+ isAdd
+ ? 'bg-emerald-950/35 text-emerald-300'
+ : isDel
+ ? 'bg-red-950/35 text-red-300'
+ : 'text-zinc-400 hover:bg-zinc-900/40'
+ }`}
                           >
                             {/* Gutter Line Numbers (Screenshot: 32, 33, 34, 35, 36) */}
                             <div className="w-10 flex-shrink-0 text-right pr-3 select-none text-zinc-600 font-mono text-[10px]">

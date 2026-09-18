@@ -102,10 +102,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id)}
                 className={`group relative flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-mono transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-700/80 shadow-xs'
-                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
-                }`}
+ isActive
+ ? 'bg-zinc-900 text-zinc-100 font-medium border border-zinc-700/80 shadow-xs'
+ : 'bg-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+ }`}
               >
                 <Terminal size={11} className={isActive ? 'text-zinc-200' : 'text-zinc-500'} />
                 <span className="max-w-[110px] truncate text-[11px]">{tab.title}</span>
@@ -164,10 +164,10 @@ export const TopBar: React.FC<TopBarProps> = ({
               setAiMenuOpen(false);
             }}
             className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-              agentMenuOpen
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-100'
-                : 'bg-zinc-950 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-zinc-100'
-            }`}
+ agentMenuOpen
+ ? 'bg-zinc-800 border-zinc-700 text-zinc-100'
+ : 'bg-zinc-950 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-zinc-100'
+ }`}
             title="Add Terminal Pane or AI Agent"
           >
             <Plus size={11} className="text-zinc-300" />
@@ -229,10 +229,10 @@ export const TopBar: React.FC<TopBarProps> = ({
               setAgentMenuOpen(false);
             }}
             className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
-              aiMenuOpen
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-100'
-                : 'bg-zinc-950 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-zinc-100'
-            }`}
+ aiMenuOpen
+ ? 'bg-zinc-800 border-zinc-700 text-zinc-100'
+ : 'bg-zinc-950 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-zinc-100'
+ }`}
             title="Autonomous Squads & Skills"
           >
             <Sparkles size={11} className="text-zinc-300" />
@@ -290,16 +290,16 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={onToggleDiff}
           className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
-            hasUncommittedDiff
-              ? 'bg-zinc-900 border-zinc-700 text-zinc-100 shadow-xs'
-              : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-          }`}
+ hasUncommittedDiff
+ ? 'bg-zinc-900 border-zinc-700 text-zinc-100 shadow-xs'
+ : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
+ }`}
           title="Inspect Git Diff & Review (Ctrl+Shift+G)"
         >
           <GitCompare size={12} className={hasUncommittedDiff ? 'text-amber-400' : 'text-zinc-500'} />
           <span>Diff</span>
           {hasUncommittedDiff && (
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
           )}
         </button>
 

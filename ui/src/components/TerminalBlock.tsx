@@ -43,10 +43,10 @@ export const TerminalBlock: React.FC<TerminalBlockProps> = ({
   return (
     <div
       className={`rounded-xl border shadow-sm overflow-hidden transition-all duration-150 ${
-        isFailed
-          ? 'border-red-900/50 bg-[#070505]'
-          : 'border-zinc-800 hover:border-zinc-700 bg-[#050505]'
-      }`}
+ isFailed
+ ? 'border-red-900/50 bg-[#070505]'
+ : 'border-zinc-800 hover:border-zinc-700 bg-[#050505]'
+ }`}
     >
       {/* Block Header (Warp Style) */}
       <div className="px-3.5 py-2 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between text-xs select-none">
@@ -75,7 +75,7 @@ export const TerminalBlock: React.FC<TerminalBlockProps> = ({
           )}
 
           {block.isExecuting ? (
-            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-200 text-[10px] animate-pulse">
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-200 text-[10px]">
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-300" />
               <span>Running...</span>
             </div>
@@ -150,7 +150,7 @@ export const TerminalBlock: React.FC<TerminalBlockProps> = ({
           {isFailed && (
             <div className="mt-3 pt-2.5 border-t border-red-900/40 flex items-center justify-between bg-red-950/20 -mx-3 -mb-3 p-3">
               <span className="text-[11px] text-red-300 font-sans flex items-center space-x-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                 <span>Process exited with code {block.exitCode}. Error detected.</span>
               </span>
 

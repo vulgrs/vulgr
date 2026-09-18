@@ -158,7 +158,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
   const skillsUsage = memory?.skillsUsage || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 animate-in fade-in duration-200">
       <div className="relative w-full max-w-4xl h-[680px] bg-[#09090b] border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-zinc-100 font-sans">
         {/* Top Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-black/40">
@@ -227,7 +227,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70">
             <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
               <span>Memory Recall</span>
-              <Brain className="w-3.5 h-3.5 text-purple-400" />
+              <Brain className="w-3.5 h-3.5 text-zinc-400" />
             </div>
             <div className="text-lg font-bold font-mono text-zinc-100">
               {factsList.length} Facts <span className="text-xs font-normal text-zinc-400 font-sans">· {rulesList.length} Rules</span>
@@ -240,7 +240,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70">
             <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
               <span>Quota Savings (est.)</span>
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
             </div>
             <div className="text-lg font-bold font-mono text-zinc-100">
               ${estCostSaved} <span className="text-xs font-normal text-zinc-400 font-sans">prevented</span>
@@ -256,10 +256,10 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           <button
             onClick={() => setActiveTab('savings')}
             className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
-              activeTab === 'savings'
-                ? 'border-emerald-400 text-emerald-300'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+ activeTab === 'savings'
+ ? 'border-emerald-400 text-emerald-300'
+ : 'border-transparent text-zinc-400 hover:text-zinc-200'
+ }`}
           >
             <TrendingDown className="w-3.5 h-3.5" />
             Context & Token Savings
@@ -267,10 +267,10 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           <button
             onClick={() => setActiveTab('memory')}
             className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
-              activeTab === 'memory'
-                ? 'border-purple-400 text-purple-300'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+ activeTab === 'memory'
+ ? 'border-zinc-400 text-zinc-300'
+ : 'border-transparent text-zinc-400 hover:text-zinc-200'
+ }`}
           >
             <Brain className="w-3.5 h-3.5" />
             MemoryStore Explorer ({factsList.length + rulesList.length})
@@ -278,10 +278,10 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           <button
             onClick={() => setActiveTab('subscriptions')}
             className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
-              activeTab === 'subscriptions'
-                ? 'border-blue-400 text-blue-300'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+ activeTab === 'subscriptions'
+ ? 'border-zinc-400 text-zinc-300'
+ : 'border-transparent text-zinc-400 hover:text-zinc-200'
+ }`}
           >
             <Cpu className="w-3.5 h-3.5" />
             Local CLI Tools & Buffer
@@ -289,10 +289,10 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           <button
             onClick={() => setActiveTab('skills')}
             className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
-              activeTab === 'skills'
-                ? 'border-amber-400 text-amber-300'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+ activeTab === 'skills'
+ ? 'border-amber-400 text-amber-300'
+ : 'border-transparent text-zinc-400 hover:text-zinc-200'
+ }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
             Universal Skills Cache
@@ -392,10 +392,10 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         <div className="flex items-center gap-2">
                           <span
                             className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${
-                              ev.type === 'git_diff'
-                                ? 'bg-purple-950/60 text-purple-300 border border-purple-800/40'
-                                : 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40'
-                            }`}
+ ev.type === 'git_diff'
+ ? 'bg-zinc-950/60 text-zinc-300 border border-zinc-800/40'
+ : 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40'
+ }`}
                           >
                             {ev.type.replace('_', ' ')}
                           </span>
@@ -424,19 +424,19 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           {/* TAB 2: MEMORYSTORE */}
           {activeTab === 'memory' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-purple-950/20 border border-purple-900/40">
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-950/20 border border-zinc-900/40">
                 <div className="flex items-center gap-2.5">
-                  <Brain className="w-4 h-4 text-purple-400" />
+                  <Brain className="w-4 h-4 text-zinc-400" />
                   <div>
-                    <h3 className="text-xs font-semibold text-purple-200">Persistent Workspace Memory</h3>
-                    <p className="text-[11px] text-purple-300/80">
+                    <h3 className="text-xs font-semibold text-zinc-200">Persistent Workspace Memory</h3>
+                    <p className="text-[11px] text-zinc-300/80">
                       Stores facts & rules in <code className="text-white">.warp-memory.json</code> so agents don't repeatedly ask or relearn workspace context.
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={handleCopySnippet}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-purple-500/20 border border-purple-500/40 hover:bg-purple-500/30 text-purple-200 text-xs font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-500/20 border border-zinc-500/40 hover:bg-zinc-500/30 text-zinc-200 text-xs font-medium transition-colors"
                 >
                   {copiedSnippet ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   {copiedSnippet ? 'Copied' : 'Copy AI Snippet'}
@@ -482,7 +482,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800/80 text-xs"
                       >
                         <div className="truncate pr-2">
-                          <span className="font-mono text-purple-400 font-semibold">{fact.key}: </span>
+                          <span className="font-mono text-zinc-400 font-semibold">{fact.key}: </span>
                           <span className="text-zinc-300 font-mono">{fact.value}</span>
                         </div>
                         <button
@@ -546,12 +546,12 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           {/* TAB 3: SUBSCRIPTIONS & QUOTA GUARD */}
           {activeTab === 'subscriptions' && (
             <div className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-900/40">
+              <div className="p-3.5 rounded-xl bg-zinc-950/20 border border-zinc-900/40">
                 <div className="flex items-center gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-blue-400" />
+                  <ShieldCheck className="w-4 h-4 text-zinc-400" />
                   <div>
-                    <h3 className="text-xs font-semibold text-blue-200">Local CLI Subprocesses & Terminal Buffer Guard</h3>
-                    <p className="text-[11px] text-blue-300/80">
+                    <h3 className="text-xs font-semibold text-zinc-200">Local CLI Subprocesses & Terminal Buffer Guard</h3>
+                    <p className="text-[11px] text-zinc-300/80">
                       Dexter operates 100% via local CLI tools and terminal subprocesses. Zero external HTTP API keys or cloud connections required. Prevents terminal buffer overflows.
                     </p>
                   </div>
@@ -588,7 +588,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                 <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-xs">
+                      <div className="w-7 h-7 rounded-lg bg-zinc-500/10 border border-zinc-500/30 flex items-center justify-center text-zinc-400 font-bold text-xs">
                         G
                       </div>
                       <div>
@@ -601,7 +601,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                     </span>
                   </div>
                   <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
-                    <div className="h-full bg-blue-400 w-[8%]" />
+                    <div className="h-full bg-zinc-400 w-[8%]" />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-zinc-500">
                     <span>Active CLI Prompt: ~{optTotal} tokens</span>
@@ -679,7 +679,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-zinc-800 bg-zinc-950 text-xs text-zinc-500">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span>Dexter Context & Token Guardian Active</span>
           </div>
           <button

@@ -80,18 +80,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen || !config) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn select-none text-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-fadeIn select-none text-slate-200">
       <div className="relative w-full max-w-4xl h-[80vh] bg-[#0c0e17]/95 border border-white/[0.12] rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-500 via-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-zinc-500 via-zinc-500 to-zinc-400 flex items-center justify-center text-white shadow-[0_0_15px_rgba(168,85,247,0.3)]">
               <Settings size={17} />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-sm font-bold text-white tracking-wide">WARP SETTINGS & CLI PERMISSIONS</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-500/15 text-zinc-300 border border-zinc-500/30">
                   Global Config
                 </span>
               </div>
@@ -114,10 +114,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             onClick={() => setActiveTab('permissions')}
             className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-              activeTab === 'permissions'
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-            }`}
+ activeTab === 'permissions'
+ ? 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/40 font-semibold shadow-sm'
+ : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+ }`}
           >
             <Shield size={13} />
             <span>CLI Flags & Models</span>
@@ -126,10 +126,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             onClick={() => setActiveTab('terminal')}
             className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-              activeTab === 'terminal'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-            }`}
+ activeTab === 'terminal'
+ ? 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/40 font-semibold shadow-sm'
+ : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+ }`}
           >
             <Terminal size={13} />
             <span>Terminal & Shell</span>
@@ -138,10 +138,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             onClick={() => setActiveTab('safety')}
             className={`flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-              activeTab === 'safety'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-            }`}
+ activeTab === 'safety'
+ ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold shadow-sm'
+ : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+ }`}
           >
             <GitBranch size={13} />
             <span>Safety & Sandbox</span>
@@ -154,18 +154,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Claude Code Section */}
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-4">
               <div className="flex items-center space-x-2">
-                <Sparkles size={16} className="text-purple-400" />
+                <Sparkles size={16} className="text-zinc-400" />
                 <h3 className="text-xs font-bold text-white tracking-wide uppercase">Claude Code CLI Configuration</h3>
               </div>
 
               {/* Dangerous Skip Permissions Switch */}
-              <div className="flex items-start justify-between p-3.5 rounded-xl bg-purple-500/5 border border-purple-500/25">
+              <div className="flex items-start justify-between p-3.5 rounded-xl bg-zinc-500/5 border border-zinc-500/25">
                 <div className="space-y-1 max-w-xl">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-semibold text-purple-200">
+                    <span className="text-xs font-semibold text-zinc-200">
                       Dangerously Skip Permissions
                     </span>
-                    <code className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">
+                    <code className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-500/20 text-zinc-300 font-mono">
                       --dangerously-skip-permissions
                     </code>
                   </div>
@@ -186,7 +186,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-zinc-600"></div>
                 </label>
               </div>
 
@@ -202,7 +202,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         claude: { ...config.claude, model: e.target.value },
                       })
                     }
-                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-purple-500/60"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-zinc-500/60"
                   >
                     <option value="claude-3-7-sonnet">Claude 3.7 Sonnet (Hybrid Reasoning)</option>
                     <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Balanced Code)</option>
@@ -223,7 +223,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         claude: { ...config.claude, maxRetries: parseInt(e.target.value) || 3 },
                       })
                     }
-                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-purple-500/60"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-zinc-500/60"
                   />
                 </div>
               </div>
@@ -232,7 +232,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Google AGY Engine Section */}
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-4">
               <div className="flex items-center space-x-2">
-                <Shield size={16} className="text-cyan-400" />
+                <Shield size={16} className="text-zinc-400" />
                 <h3 className="text-xs font-bold text-white tracking-wide uppercase">Google AGY Engine Configuration</h3>
               </div>
 
@@ -247,7 +247,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         agy: { ...config.agy, model: e.target.value },
                       })
                     }
-                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-cyan-500/60"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-zinc-500/60"
                   >
                     <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Code Analysis)</option>
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash (Sub-Second Verify)</option>
@@ -267,7 +267,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         agy: { ...config.agy, budget: parseInt(e.target.value) || 3 },
                       })
                     }
-                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-cyan-500/60"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-zinc-500/60"
                   />
                 </div>
               </div>
@@ -337,7 +337,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         defaultShell: e.target.value as ShellType,
                       })
                     }
-                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-cyan-500/60"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-zinc-500/60"
                   >
                     <option value="powershell">Windows PowerShell (powershell.exe)</option>
                     <option value="cmd">Command Prompt (cmd.exe)</option>
@@ -356,7 +356,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         cursorStyle: e.target.value as CursorStyleType,
                       })
                     }
-                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-cyan-500/60"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-zinc-500/60"
                   >
                     <option value="bar">Bar ( | )</option>
                     <option value="block">Block ( █ )</option>
@@ -368,7 +368,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-medium text-slate-300">Font Size</span>
-                  <span className="font-mono text-cyan-400 font-bold">{config.fontSize}px</span>
+                  <span className="font-mono text-zinc-400 font-bold">{config.fontSize}px</span>
                 </div>
                 <input
                   type="range"
@@ -381,7 +381,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       fontSize: parseInt(e.target.value),
                     })
                   }
-                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-zinc-500"
                 />
               </div>
             </div>
@@ -464,7 +464,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <button
               onClick={handleSave}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-zinc-600 to-zinc-600 hover:from-zinc-500 hover:to-zinc-500 text-white font-semibold text-xs shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               Save Configuration
             </button>

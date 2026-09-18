@@ -71,19 +71,19 @@ export const RightPanel: React.FC<RightPanelProps> = ({
 
   return (
     <div className="w-[460px] lg:w-[500px] h-full bg-[#050507] border-l border-zinc-800/80 flex flex-col select-none z-20 flex-shrink-0 animate-in slide-in-from-right-2 duration-150">
-      {/* Top Tabs (Matches Reference: ± Changes | 🌐 Sandbox | + | ✕) */}
+      {/* Top Tabs: Changes / Sandbox */}
       <div className="h-10 bg-[#000000] border-b border-zinc-900 flex items-center justify-between px-2 flex-shrink-0">
         <div className="flex items-center space-x-1">
           <button
             onClick={() => setActiveTab('changes')}
             className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === 'changes'
-                ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40'
-            }`}
+ activeTab === 'changes'
+ ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
+ : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40'
+ }`}
           >
             <GitCompare size={13} className="text-zinc-400" />
-            <span>± Changes</span>
+            <span>Changes</span>
             {filesChanged.length > 0 && (
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-zinc-800 text-zinc-300">
                 {filesChanged.length}
@@ -94,10 +94,10 @@ export const RightPanel: React.FC<RightPanelProps> = ({
           <button
             onClick={() => setActiveTab('sandbox')}
             className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === 'sandbox'
-                ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40'
-            }`}
+ activeTab === 'sandbox'
+ ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
+ : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40'
+ }`}
           >
             <Globe size={13} className="text-zinc-400" />
             <span>Browser / Sandbox</span>

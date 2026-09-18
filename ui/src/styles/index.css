@@ -22,25 +22,19 @@
 }
 
 .glass-surface {
-  background: rgba(12, 12, 14, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: #0a0a0b;
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .glass-card {
-  background: rgba(18, 18, 20, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: #111113;
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .glass-modal {
   background: #09090b;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.85);
 }
 
 .glass-input {
@@ -71,18 +65,6 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
-}
-
-/* Micro-animations */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.shimmer-badge {
-  background: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.02) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 3s infinite;
 }
 
 /* Active terminal subtle border */
