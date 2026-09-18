@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   Search,
@@ -15,8 +15,9 @@ import {
   Clock,
   User,
   GitBranch,
+  Users,
 } from 'lucide-react';
-import type { WorkspaceTab } from '../types/warp.js';
+import type { WorkspaceTab, SessionType } from '../types/warp.js';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -26,7 +27,8 @@ interface SidebarProps {
   tabs: WorkspaceTab[];
   activeTabId: string;
   onSelectTab: (tabId: string) => void;
-  onNewSession: () => void;
+  onNewSession: (type?: SessionType) => void;
+  onLaunchAgent?: (type: SessionType) => void;
   onOpenPalette: () => void;
   onOpenSquads: () => void;
   onOpenSkills: () => void;
@@ -42,6 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTabId,
   onSelectTab,
   onNewSession,
+  onLaunchAgent,
   onOpenPalette,
   onOpenSquads,
   onOpenSkills,
@@ -50,6 +53,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [reposExpanded, setReposExpanded] = useState(true);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOutside = () => setNewMenuOpen(false);
+    if (newMenuOpen) {
+      window.addEventListener('click', handleOutside);
+      return () => window.removeEventListener('click', handleOutside);
+    }
+  }, [newMenuOpen]);
 
   if (!isOpen) return null;
 
@@ -57,15 +69,146 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="w-60 bg-[#000000] border-r border-zinc-800/80 flex flex-col h-full select-none text-xs text-zinc-300 z-20 flex-shrink-0 animate-in slide-in-from-left-2 duration-150">
-      {/* Top Action Button (Matches Reference: "+ New Chat" / "+ New Session") */}
-      <div className="p-3 border-b border-zinc-900">
-        <button
-          onClick={onNewSession}
-          className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-100 font-medium text-xs transition-all shadow-sm hover:border-zinc-700 active:scale-[0.99]"
-        >
-          <Plus size={14} className="text-zinc-400" />
-          <span>New Session</span>
-        </button>
+      {/* Top Action Button & Quick CLI Launchers */}
+      <div className="p-3 border-b border-zinc-900 space-y-2">
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setNewMenuOpen(!newMenuOpen)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-100 font-medium text-xs transition-all shadow-sm hover:border-zinc-700 active:scale-[0.99]"
+          >
+            <div className="flex items-center space-x-2">
+              <Plus size={14} className="text-zinc-400" />
+              <span>New Session</span>
+            </div>
+            <ChevronDown size={12} className={`text-zinc-500 transition-transform ${newMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* New Session Dropdown Picker */}
+          {newMenuOpen && (
+            <div className="absolute left-0 right-0 mt-1.5 rounded-xl bg-[#09090b] border border-zinc-800 shadow-2xl p-1.5 z-50 text-xs font-sans animate-in fade-in slide-in-from-top-1">
+              <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                Start Terminal CLI
+              </div>
+
+              <button
+                onClick={() => {
+                  onNewSession('claude');
+                  setNewMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
+              >
+                <div className="p-1 rounded-md bg-purple-950/60 text-purple-400 border border-purple-800/60 group-hover:bg-purple-900/60">
+                  <Sparkles size={13} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-zinc-200">Claude Code</div>
+                  <div className="text-[10px] text-zinc-500 truncate">Anthropic AI Terminal CLI</div>
+                </div>
+                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850">
+                  claude
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  onNewSession('agy');
+                  setNewMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
+              >
+                <div className="p-1 rounded-md bg-zinc-900 text-zinc-300 border border-zinc-750 group-hover:bg-zinc-800">
+                  <Shield size={13} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-zinc-200">AGY Engine</div>
+                  <div className="text-[10px] text-zinc-500 truncate">Antigravity 2.0 CLI</div>
+                </div>
+                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850">
+                  agy
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  onNewSession('shell');
+                  setNewMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
+              >
+                <div className="p-1 rounded-md bg-zinc-900 text-zinc-400 border border-zinc-800 group-hover:bg-zinc-800">
+                  <Terminal size={13} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-zinc-200">Interactive Shell</div>
+                  <div className="text-[10px] text-zinc-500 truncate">PowerShell / Bash PTY</div>
+                </div>
+                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850">
+                  pwsh
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  onNewSession('codex');
+                  setNewMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
+              >
+                <div className="p-1 rounded-md bg-zinc-900 text-emerald-400 border border-emerald-900/60 group-hover:bg-zinc-800">
+                  <Bot size={13} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-zinc-200">Codex CLI</div>
+                  <div className="text-[10px] text-zinc-500 truncate">OpenAI Terminal CLI</div>
+                </div>
+                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850">
+                  codex
+                </span>
+              </button>
+
+              <div className="my-1 border-t border-zinc-850" />
+
+              <button
+                onClick={() => {
+                  onOpenSquads();
+                  setNewMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 text-left transition-colors"
+              >
+                <Users size={13} className="text-zinc-500" />
+                <span className="text-xs">Dual Squad (Claude + AGY)...</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 1-Click Quick Launcher Row */}
+        <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+          <button
+            onClick={() => onNewSession('claude')}
+            className="flex items-center justify-center space-x-1 py-1 rounded-md bg-purple-950/30 hover:bg-purple-900/40 border border-purple-800/40 text-purple-300 text-[11px] font-medium transition-all"
+            title="Start new Claude Code session"
+          >
+            <Sparkles size={11} className="text-purple-400" />
+            <span>Claude</span>
+          </button>
+          <button
+            onClick={() => onNewSession('agy')}
+            className="flex items-center justify-center space-x-1 py-1 rounded-md bg-zinc-900/80 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 text-[11px] font-medium transition-all"
+            title="Start new AGY Engine session"
+          >
+            <Shield size={11} className="text-zinc-300" />
+            <span>AGY</span>
+          </button>
+          <button
+            onClick={() => onNewSession('shell')}
+            className="flex items-center justify-center space-x-1 py-1 rounded-md bg-zinc-900/80 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-[11px] font-medium transition-all"
+            title="Start new Shell session"
+          >
+            <Terminal size={11} />
+            <span>Shell</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Navigation Links (Matches Reference: Search, Automations, Customize) */}

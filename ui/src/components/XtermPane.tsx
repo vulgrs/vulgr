@@ -200,6 +200,12 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
     };
   }, [session.id]);
 
+  useEffect(() => {
+    if (isActive && xtermInstance.current) {
+      xtermInstance.current.focus();
+    }
+  }, [isActive]);
+
   const handleRerun = (cmd: string) => {
     if (window.warpApi) {
       window.warpApi.writeTerminal(session.id, cmd + '\r');
@@ -261,7 +267,10 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
 
   return (
     <div
-      onClick={onFocus}
+      onClick={() => {
+        onFocus();
+        xtermInstance.current?.focus();
+      }}
       className={`flex flex-col h-full w-full rounded-xl overflow-hidden border transition-all duration-150 ${
         isActive
           ? 'border-zinc-700 shadow-[0_0_30px_rgba(0,0,0,0.9)] ring-1 ring-white/[0.08] bg-[#000000]'
@@ -280,6 +289,33 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
           <span className="font-mono text-[10px] text-zinc-400 truncate max-w-[180px]">
             {session.command ? `$ ${session.command}` : session.title}
           </span>
+
+          {session.type === 'shell' && (
+            <div className="hidden sm:flex items-center space-x-1 pl-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRerun('claude');
+                }}
+                className="flex items-center space-x-0.5 px-1.5 py-0.2 rounded bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/40 text-[9px] text-purple-300 font-mono transition-colors"
+                title="Execute 'claude' in this shell"
+              >
+                <Sparkles size={9} className="text-purple-400" />
+                <span>run claude</span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRerun('agy');
+                }}
+                className="flex items-center space-x-0.5 px-1.5 py-0.2 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[9px] text-zinc-300 font-mono transition-colors"
+                title="Execute 'agy' in this shell"
+              >
+                <Shield size={9} className="text-zinc-400" />
+                <span>run agy</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: View Switcher & Pane Actions */}

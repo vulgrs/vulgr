@@ -6,7 +6,17 @@ import { RightPanel } from './components/RightPanel.js';
 import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { CommandBlocksFeed, type StreamItem } from './components/CommandBlocksFeed.js';
-import { ArrowLeft, ArrowRight, GitCompare } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  GitCompare,
+  Sparkles,
+  Shield,
+  Terminal,
+  SplitSquareHorizontal,
+  SplitSquareVertical,
+  Plus,
+} from 'lucide-react';
 import { CommandPalette } from './components/CommandPalette.js';
 import { AgentMeshModal } from './components/AgentMeshModal.js';
 import { SquadBar } from './components/SquadBar.js';
@@ -83,9 +93,14 @@ export const App: React.FC = () => {
   const [hudOpen, setHudOpen] = useState(false);
   const [contextTelemetry, setContextTelemetry] = useState<ContextTelemetry | null>(null);
   const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
-  const [centerViewMode, setCenterViewMode] = useState<'stream' | 'terminal' | 'split'>(
-    () => loadPersisted('warp.centerViewMode', 'stream')
-  );
+  const [centerViewMode, setCenterViewMode] = useState<'terminal' | 'stream' | 'split'>(() => {
+    const persisted = loadPersisted<'terminal' | 'stream' | 'split'>('warp.centerViewMode', 'terminal');
+    return persisted === 'stream' ? 'terminal' : persisted;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('warp.centerViewMode', JSON.stringify(centerViewMode));
+  }, [centerViewMode]);
   const [streamFeed, setStreamFeed] = useState<StreamItem[]>([
     {
       id: 'stream-init',
@@ -312,6 +327,7 @@ export const App: React.FC = () => {
         return t;
       })
     );
+    setCenterViewMode('terminal');
   };
 
   // Launch a 2-way Split Live Autonomous Squad
@@ -362,24 +378,40 @@ export const App: React.FC = () => {
 
     setTabs((prev) => [...prev, squadTab]);
     setActiveTabId(newTabId);
+    setCenterViewMode('terminal');
 
     startSquad(config, newTabId, builderSessionId, verifierSessionId);
   };
 
   // Tab management
-  const handleAddTab = () => {
+  const handleAddTab = (type: SessionType = 'shell') => {
     const newTabId = `tab-${Date.now()}`;
     const newSessionId = `sess-${Date.now()}`;
+
+    let title = `Terminal ${tabs.length + 1}`;
+    let command = '';
+    if (type === 'claude') {
+      title = 'Claude Code';
+      command = 'claude';
+    } else if (type === 'agy') {
+      title = 'AGY Engine';
+      command = 'agy';
+    } else if (type === 'codex') {
+      title = 'Codex CLI';
+      command = 'codex';
+    }
+
     const newTab: WorkspaceTab = {
       id: newTabId,
-      title: `Terminal ${tabs.length + 1}`,
+      title,
       layout: 'single',
       activeSessionId: newSessionId,
       sessions: [
         {
           id: newSessionId,
-          title: 'Shell',
-          type: 'shell',
+          title,
+          type,
+          command,
           cwd,
           createdAt: new Date().toISOString(),
         },
@@ -388,6 +420,7 @@ export const App: React.FC = () => {
 
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTabId);
+    setCenterViewMode('terminal');
   };
 
   const handleCloseTab = (tabId: string) => {
@@ -869,7 +902,8 @@ export const App: React.FC = () => {
             tabs={tabs}
             activeTabId={activeTabId}
             onSelectTab={setActiveTabId}
-            onNewSession={handleAddTab}
+            onNewSession={(type) => handleAddTab(type || 'shell')}
+            onLaunchAgent={handleLaunchAgent}
             onOpenPalette={() => setPaletteOpen(true)}
             onOpenSquads={() => setSquadModalOpen(true)}
             onOpenSkills={() => setSkillsModalOpen(true)}
@@ -920,6 +954,51 @@ export const App: React.FC = () => {
               )}
             </div>
 
+            {/* Quick 1-Click Launchers Bar (Direct Terminal / CLI access) */}
+            <div className="flex items-center space-x-1.5">
+              <button
+                onClick={() => handleLaunchAgent('claude')}
+                className="flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-purple-950/40 text-purple-300 border border-purple-800/50 hover:bg-purple-900/50 hover:text-purple-100 transition-all shadow-xs"
+                title="Launch Claude Code interactive CLI in split pane"
+              >
+                <Sparkles size={11} className="text-purple-400" />
+                <span>+ Claude</span>
+              </button>
+              <button
+                onClick={() => handleLaunchAgent('agy')}
+                className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-zinc-900 text-zinc-300 border border-zinc-700/80 hover:bg-zinc-800 hover:text-white transition-all shadow-xs"
+                title="Launch AGY Engine interactive CLI in split pane"
+              >
+                <Shield size={11} className="text-zinc-300" />
+                <span>+ AGY</span>
+              </button>
+              <button
+                onClick={() => handleLaunchAgent('shell')}
+                className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800 hover:text-zinc-200 transition-all shadow-xs"
+                title="Launch PowerShell / Bash Shell in split pane"
+              >
+                <Terminal size={11} />
+                <span>+ Shell</span>
+              </button>
+
+              <div className="h-3 w-px bg-zinc-850 mx-0.5" />
+
+              <button
+                onClick={() => activeSession && handleSplitSession(activeSession.id, 'h')}
+                className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+                title="Split Horizontal (Ctrl+D)"
+              >
+                <SplitSquareHorizontal size={12} />
+              </button>
+              <button
+                onClick={() => activeSession && handleSplitSession(activeSession.id, 'v')}
+                className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
+                title="Split Vertical (Ctrl+E)"
+              >
+                <SplitSquareVertical size={12} />
+              </button>
+            </div>
+
             <div className="flex items-center space-x-2">
               {/* Token & Context Optimizer Badge */}
               <button
@@ -933,19 +1012,8 @@ export const App: React.FC = () => {
                 <span className="text-zinc-300">{(contextTelemetry?.savedTokensTotal ?? 3300).toLocaleString()} tk</span>
               </button>
 
-              {/* View Switcher: Blocks vs Terminal vs Split */}
+              {/* View Switcher: Terminal vs Split vs Blocks */}
               <div className="flex items-center bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 text-[11px] font-sans">
-                <button
-                  onClick={() => setCenterViewMode('stream')}
-                  className={`px-2.5 py-0.5 rounded-md transition-all ${
-                    centerViewMode === 'stream'
-                      ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                  title="Command Blocks & Agent Stream Feed (Cursor style)"
-                >
-                  Blocks
-                </button>
                 <button
                   onClick={() => setCenterViewMode('terminal')}
                   className={`px-2.5 py-0.5 rounded-md transition-all ${
@@ -967,6 +1035,17 @@ export const App: React.FC = () => {
                   title="Split Stream & Terminal Side-by-Side"
                 >
                   Split
+                </button>
+                <button
+                  onClick={() => setCenterViewMode('stream')}
+                  className={`px-2.5 py-0.5 rounded-md transition-all ${
+                    centerViewMode === 'stream'
+                      ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                  title="Command Blocks & Agent Stream Feed"
+                >
+                  Blocks
                 </button>
               </div>
 

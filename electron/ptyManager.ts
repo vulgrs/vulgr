@@ -1,6 +1,7 @@
 import * as pty from 'node-pty';
 import { BrowserWindow } from 'electron';
 import os from 'node:os';
+import path from 'node:path';
 import type { ConfigManager } from '../src/engine/configManager.js';
 
 export interface PtyCreateOptions {
@@ -54,11 +55,26 @@ export class PtyManager {
     const cols = options.cols || 80;
     const rows = options.rows || 24;
 
+    const home = os.homedir();
+    const extraPaths = [
+      path.join(home, '.local', 'bin'),
+      path.join(home, 'AppData', 'Local', 'agy', 'bin'),
+      path.join(home, 'AppData', 'Roaming', 'npm'),
+      path.join(home, '.cargo', 'bin'),
+    ];
+
     const env = {
       ...process.env,
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
     } as { [key: string]: string };
+
+    const pathKey = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
+    const currentPath = process.env[pathKey] || '';
+    const updatedPath = [...extraPaths, currentPath].filter(Boolean).join(path.delimiter);
+    env[pathKey] = updatedPath;
+    env['PATH'] = updatedPath;
+    env['Path'] = updatedPath;
 
     const ptyProcess = pty.spawn(file, args, {
       name: 'xterm-256color',
