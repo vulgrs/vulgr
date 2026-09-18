@@ -224,6 +224,11 @@ function setupIpcHandlers() {
 
   // Context & Token Optimizer Handlers
   ipcMain.handle('context:optimize', (_, { raw, options }) => ContextOptimizer.optimizeTerminalLog(raw, options));
+  ipcMain.handle('context:stats', () => ContextOptimizer.getTelemetry());
+  ipcMain.handle('context:reset-stats', () => {
+    ContextOptimizer.resetTelemetry();
+    return true;
+  });
 
   // Smart Ghost Text & Auto-Suggest Handler
   ipcMain.handle('suggest:get', (_, input: string) => autoSuggestEngine.getSuggestion(input));

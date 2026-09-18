@@ -212,4 +212,28 @@ export interface SessionReportData {
   doctor?: any;
 }
 
+export interface OptimizationEvent {
+  type: 'terminal_log' | 'git_diff' | 'command_output';
+  rawChars: number;
+  optimizedChars: number;
+  savedChars: number;
+  savingsPercentage: number;
+  rawTokens: number;
+  optimizedTokens: number;
+  savedTokens: number;
+  timestamp: string;
+}
+
+export interface ContextTelemetry {
+  rawTokensTotal: number;
+  optimizedTokensTotal: number;
+  savedTokensTotal: number;
+  savingsPercentage: number;
+  optimizationsCount: number;
+  cleanedAnsiCount: number;
+  squashedLinesCount: number;
+  recentEvents: OptimizationEvent[];
+}
+
+
 

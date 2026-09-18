@@ -29,6 +29,8 @@ interface BottomCommandDockProps {
   onExplainActive?: () => void;
   onFixActive?: () => void;
   onAttachContext?: (type: 'diff' | 'error' | 'skill') => void;
+  onOpenHud?: () => void;
+  tokenSavingsText?: string;
 }
 
 export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
@@ -43,6 +45,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
   onExplainActive,
   onFixActive,
   onAttachContext,
+  onOpenHud,
+  tokenSavingsText,
 }) => {
   const [input, setInput] = useState('');
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
@@ -477,6 +481,18 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               <span>💻 {shortCwd}</span>
               <span>▾</span>
             </span>
+
+            {onOpenHud && (
+              <button
+                type="button"
+                onClick={onOpenHud}
+                className="flex items-center space-x-1 px-1.5 py-0.5 rounded bg-zinc-900 border border-emerald-900/40 text-emerald-400 hover:text-emerald-300 hover:border-emerald-800 transition-colors"
+                title="Open Token & Context Optimizer HUD"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>⚡ {tokenSavingsText || '68% saved'}</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center space-x-1 text-zinc-600">

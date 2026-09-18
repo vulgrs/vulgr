@@ -60,6 +60,8 @@ export interface WarpApi {
 
   // Context Optimizer
   optimizeContext: (raw: string, options?: any) => Promise<string>;
+  getContextStats: () => Promise<any>;
+  resetContextStats: () => Promise<boolean>;
 
   // Safe Git Worktree Sandbox
   createSandbox: (options?: { runId?: string; baseBranch?: string }) => Promise<any>;
@@ -134,6 +136,8 @@ const api: WarpApi = {
 
   // Context Optimizer
   optimizeContext: (raw, options) => ipcRenderer.invoke('context:optimize', { raw, options }),
+  getContextStats: () => ipcRenderer.invoke('context:stats'),
+  resetContextStats: () => ipcRenderer.invoke('context:reset-stats'),
 
   // Safe Git Worktree Sandbox
   createSandbox: (options) => ipcRenderer.invoke('sandbox:create', options),

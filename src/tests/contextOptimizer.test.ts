@@ -76,4 +76,23 @@ describe('ContextOptimizer Suite', () => {
     const tokens = ContextOptimizer.estimateTokenCost(text);
     assert.ok(tokens > 0 && tokens < 20);
   });
+
+  it('tracks context optimization telemetry and savings percentage', () => {
+    ContextOptimizer.resetTelemetry();
+    let stats = ContextOptimizer.getTelemetry();
+    assert.strictEqual(stats.optimizationsCount, 0);
+    assert.strictEqual(stats.rawTokensTotal, 0);
+
+    const longLog = Array.from({ length: 150 }, (_, i) => `log line ${i} build trace info`).join('\n');
+    ContextOptimizer.optimizeTerminalLog(longLog, { maxLines: 20 });
+
+    stats = ContextOptimizer.getTelemetry();
+    assert.strictEqual(stats.optimizationsCount, 1);
+    assert.ok(stats.rawTokensTotal > stats.optimizedTokensTotal);
+    assert.ok(stats.savedTokensTotal > 0);
+    assert.ok(stats.savingsPercentage > 0);
+    assert.strictEqual(stats.recentEvents.length, 1);
+    assert.strictEqual(stats.recentEvents[0].type, 'terminal_log');
+  });
 });
+

@@ -15,6 +15,7 @@ import { SkillsModal } from './components/SkillsModal.js';
 import { SandboxDrawer } from './components/SandboxDrawer.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { ExportReportModal } from './components/ExportReportModal.js';
+import { TokenOptimizerHUD } from './components/TokenOptimizerHUD.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
 import type {
@@ -25,6 +26,7 @@ import type {
   CommandPaletteAction,
   SessionReportData,
   ReportCommandBlock,
+  ContextTelemetry,
 } from './types/warp.js';
 
 declare global {
@@ -78,6 +80,8 @@ export const App: React.FC = () => {
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [hudOpen, setHudOpen] = useState(false);
+  const [contextTelemetry, setContextTelemetry] = useState<ContextTelemetry | null>(null);
   const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
   const [centerViewMode, setCenterViewMode] = useState<'stream' | 'terminal' | 'split'>(
     () => loadPersisted('warp.centerViewMode', 'stream')
@@ -135,25 +139,38 @@ export const App: React.FC = () => {
     localStorage.setItem('warp.verifyCmd', JSON.stringify(verifyCmd));
   }, [verifyCmd]);
 
+  const fetchContextTelemetry = useCallback(async () => {
+    try {
+      if (window.warpApi?.getContextStats) {
+        const stats = await window.warpApi.getContextStats();
+        if (stats) setContextTelemetry(stats);
+      }
+    } catch (err) {
+      console.warn('[HUD] Failed to get context telemetry:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!window.warpApi) return;
 
     window.warpApi.getCwd().then(setCwd);
     window.warpApi.getDoctorStatus().then(setDoctor);
 
-    // Initial diff & branch check
+    // Initial diff, branch, & context telemetry check
     refreshGitDiff();
     refreshGitBranch();
     refreshSandboxes();
+    fetchContextTelemetry();
 
-    // Periodic refresh every 5 seconds to show diff badge / branch changes as models edit files
+    // Periodic refresh every 5 seconds to show diff badge / branch changes / token savings
     const diffTimer = setInterval(() => {
       refreshGitDiff();
       refreshGitBranch();
       refreshSandboxes();
+      fetchContextTelemetry();
     }, 5000);
     return () => clearInterval(diffTimer);
-  }, []);
+  }, [fetchContextTelemetry]);
 
   const refreshSandboxes = async () => {
     if (window.warpApi?.listSandboxes) {
@@ -722,6 +739,14 @@ export const App: React.FC = () => {
         keywords: 'export report markdown html timeline audit json summary',
         run: handleOpenExportModal,
       },
+      {
+        id: 'open-token-hud',
+        label: 'Token & Context Optimizer HUD',
+        group: 'AI & Context',
+        shortcut: 'Ctrl+Shift+O',
+        keywords: 'token context optimizer memory quota subscription savings cost',
+        run: () => setHudOpen(true),
+      },
     ],
     [activeSession, tabs, activeTabId, cwd, handleOpenExportModal]
   );
@@ -791,6 +816,10 @@ export const App: React.FC = () => {
         case 'b':
           e.preventDefault();
           setSidebarOpen((v) => !v);
+          break;
+        case 'o':
+          e.preventDefault();
+          setHudOpen((v) => !v);
           break;
         case 'g':
           e.preventDefault();
@@ -892,6 +921,18 @@ export const App: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2">
+              {/* Token & Context Optimizer Badge */}
+              <button
+                onClick={() => setHudOpen(true)}
+                className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono bg-zinc-950/80 border border-emerald-900/50 text-emerald-400 hover:bg-emerald-950/40 hover:border-emerald-700/60 transition-all shadow-sm"
+                title="Open Token & Context Optimizer HUD (Ctrl+Shift+O)"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>⚡ {contextTelemetry?.savingsPercentage ?? 68}% saved</span>
+                <span className="text-zinc-600">|</span>
+                <span className="text-zinc-300">{(contextTelemetry?.savedTokensTotal ?? 3300).toLocaleString()} tk</span>
+              </button>
+
               {/* View Switcher: Blocks vs Terminal vs Split */}
               <div className="flex items-center bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 text-[11px] font-sans">
                 <button
@@ -1051,6 +1092,8 @@ export const App: React.FC = () => {
             handlePipeErrorToAgent('agy', 'Auto-fix detected error in terminal.');
           }
         }}
+        onOpenHud={() => setHudOpen(true)}
+        tokenSavingsText={`${contextTelemetry?.savingsPercentage ?? 68}% saved`}
       />
 
       {/* Status Bar */}
@@ -1064,6 +1107,14 @@ export const App: React.FC = () => {
         sandboxCount={activeSandboxes.length}
         onOpenSandbox={() => setSandboxDrawerOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
+      />
+
+      {/* Token & Context Optimizer HUD Modal */}
+      <TokenOptimizerHUD
+        isOpen={hudOpen}
+        onClose={() => setHudOpen(false)}
+        telemetry={contextTelemetry}
+        onRefreshTelemetry={fetchContextTelemetry}
       />
 
       {/* Safe Git Worktree Sandbox Review Drawer */}
