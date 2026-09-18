@@ -220,9 +220,9 @@ export interface AgyConfig {
 }
 
 export interface CodexConfig {
+  binaryPath: string;
   model: string;
-  apiKey?: string;
-  endpoint?: string;
+  additionalFlags: string[];
 }
 
 export interface WarpConfig {

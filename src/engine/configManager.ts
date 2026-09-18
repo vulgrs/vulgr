@@ -19,9 +19,9 @@ export interface AgyConfig {
 }
 
 export interface CodexConfig {
+  binaryPath: string;       // Local CLI binary command (defaults to 'codex')
   model: string;            // e.g. 'gpt-4o', 'o3-mini', 'o1'
-  apiKey?: string;
-  endpoint?: string;
+  additionalFlags: string[];
 }
 
 export interface WarpConfig {
@@ -31,7 +31,7 @@ export interface WarpConfig {
   fontFamily: string;
   cursorStyle: CursorStyleType;
 
-  // Agent CLI Configurations
+  // Agent CLI Configurations (100% Local Terminal CLI Subprocesses)
   claude: ClaudeConfig;
   agy: AgyConfig;
   codex: CodexConfig;
@@ -61,9 +61,9 @@ export const DEFAULT_CONFIG: WarpConfig = {
     additionalFlags: [],
   },
   codex: {
+    binaryPath: 'codex',
     model: 'gpt-4o',
-    apiKey: '',
-    endpoint: '',
+    additionalFlags: [],
   },
 
   autoSandbox: true,

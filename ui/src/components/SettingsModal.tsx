@@ -32,7 +32,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'permissions' | 'terminal' | 'safety'>('permissions');
   const [config, setConfig] = useState<WarpConfig | null>(null);
   const [savedToast, setSavedToast] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -301,28 +300,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-300">Custom API Key (Optional)</label>
-                  <div className="relative">
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      placeholder="sk-..."
-                      value={config.codex.apiKey || ''}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          codex: { ...config.codex, apiKey: e.target.value },
-                        })
-                      }
-                      className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-emerald-500/60 pr-9"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300"
-                    >
-                      {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
+                  <label className="text-xs font-medium text-slate-300">Local CLI Binary Command</label>
+                  <input
+                    type="text"
+                    placeholder="codex"
+                    value={config.codex.binaryPath || 'codex'}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        codex: { ...config.codex, binaryPath: e.target.value },
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-black/40 border border-white/[0.1] rounded-xl text-xs text-white font-mono focus:outline-none focus:border-emerald-500/60"
+                  />
+                  <span className="text-[10px] text-zinc-500 block">Runs via local subprocess in terminal without API keys</span>
                 </div>
               </div>
             </div>

@@ -284,7 +284,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
-            Subscription & Quota Guard
+            Local CLI Tools & Buffer
           </button>
           <button
             onClick={() => setActiveTab('skills')}
@@ -550,16 +550,16 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                 <div className="flex items-center gap-2.5">
                   <ShieldCheck className="w-4 h-4 text-blue-400" />
                   <div>
-                    <h3 className="text-xs font-semibold text-blue-200">Active Subscription & Window Limits Guard</h3>
+                    <h3 className="text-xs font-semibold text-blue-200">Local CLI Subprocesses & Terminal Buffer Guard</h3>
                     <p className="text-[11px] text-blue-300/80">
-                      Ensures model context windows are never blown, saving subscription quotas and preventing unexpected tier overages.
+                      Dexter operates 100% via local CLI tools and terminal subprocesses. Zero external HTTP API keys or cloud connections required. Prevents terminal buffer overflows.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
-                {/* Claude Profile */}
+                {/* Claude CLI Profile */}
                 <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -567,24 +567,24 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         C
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-zinc-100">Anthropic Claude Code (Claude 3.7 Sonnet)</h4>
-                        <span className="text-[11px] text-zinc-400">Context Window: 200,000 tokens • Output: 8,192 tokens</span>
+                        <h4 className="text-xs font-semibold text-zinc-100">Claude Code CLI Subprocess</h4>
+                        <span className="text-[11px] text-zinc-400">Binary: <code className="text-zinc-300">claude</code> • Pipe Mode: <code className="text-zinc-300">-p</code> • Local Terminal Subprocess</span>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 border border-emerald-800/50 text-emerald-400">
-                      0.8% Window Used
+                      Pure Local CLI
                     </span>
                   </div>
                   <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
-                    <div className="h-full bg-orange-400 w-[0.8%]" />
+                    <div className="h-full bg-orange-400 w-[12%]" />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                    <span>Active context: ~{optTotal} / 200,000 tk</span>
-                    <span>Prompt Caching: Enabled (5 min TTL)</span>
+                    <span>Active CLI Prompt: ~{optTotal} tokens</span>
+                    <span>Direct Shell Pipe (No external API calls)</span>
                   </div>
                 </div>
 
-                {/* Gemini AGY Profile */}
+                {/* Gemini / AGY CLI Profile */}
                 <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -592,45 +592,45 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         G
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-zinc-100">Google Antigravity Engine (Gemini 2.5 Pro)</h4>
-                        <span className="text-[11px] text-zinc-400">Context Window: 1,000,000 tokens • Output: 8,192 tokens</span>
+                        <h4 className="text-xs font-semibold text-zinc-100">Antigravity / Gemini CLI Subprocess</h4>
+                        <span className="text-[11px] text-zinc-400">Binary: <code className="text-zinc-300">gemini</code> / <code className="text-zinc-300">agy</code> • Self-Healing Terminal Loop</span>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 border border-emerald-800/50 text-emerald-400">
-                      0.15% Window Used
+                      Pure Local CLI
                     </span>
                   </div>
                   <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
-                    <div className="h-full bg-blue-400 w-[0.2%]" />
+                    <div className="h-full bg-blue-400 w-[8%]" />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                    <span>Active context: ~{optTotal} / 1,000,000 tk</span>
-                    <span>Self-Healing Budget: 3 rounds</span>
+                    <span>Active CLI Prompt: ~{optTotal} tokens</span>
+                    <span>Self-Healing via exit codes (3 retry budget)</span>
                   </div>
                 </div>
 
-                {/* OpenAI Codex Profile */}
+                {/* Native PTY Shell Profile */}
                 <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs">
-                        O
+                        $
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-zinc-100">OpenAI Codex CLI (GPT-4o)</h4>
-                        <span className="text-[11px] text-zinc-400">Context Window: 128,000 tokens • Output: 4,096 tokens</span>
+                        <h4 className="text-xs font-semibold text-zinc-100">Native PTY Terminal Shell (PowerShell / Bash)</h4>
+                        <span className="text-[11px] text-zinc-400">Direct pseudo-terminal execution • node-pty stream bridge</span>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 border border-emerald-800/50 text-emerald-400">
-                      1.2% Window Used
+                      Active PTY
                     </span>
                   </div>
                   <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
-                    <div className="h-full bg-emerald-400 w-[1.2%]" />
+                    <div className="h-full bg-emerald-400 w-[100%]" />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                    <span>Active context: ~{optTotal} / 128,000 tk</span>
-                    <span>High-Speed Inference</span>
+                    <span>Terminal Stream: Zero Latency Raw PTY</span>
+                    <span>Fully Local Terminal Session</span>
                   </div>
                 </div>
               </div>
