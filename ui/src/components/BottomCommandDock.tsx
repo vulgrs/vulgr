@@ -20,31 +20,37 @@ import type { TerminalSession } from '../types/warp.js';
 interface BottomCommandDockProps {
   activeSession: TerminalSession | null;
   onSendInput: (text: string) => void;
-}
-
-interface CommandSuggestion {
-  command: string;
-  explanation: string;
-  source: string;
-}
-
-interface AutoSuggestItem {
-  input: string;
-  completion: string;
-  suffix: string;
-  source: 'history' | 'skill' | 'builtin';
-  description?: string;
+  primaryModel?: string;
+  onSelectModel?: (model: string) => void;
+  gitBranch?: string | null;
+  cwd?: string;
+  onContinueWorking?: () => void;
+  onCommitAndPush?: () => void;
+  onExplainActive?: () => void;
+  onFixActive?: () => void;
+  onAttachContext?: (type: 'diff' | 'error' | 'skill') => void;
 }
 
 export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
   activeSession,
   onSendInput,
+  primaryModel = 'claude',
+  onSelectModel,
+  gitBranch,
+  cwd,
+  onContinueWorking,
+  onCommitAndPush,
+  onExplainActive,
+  onFixActive,
+  onAttachContext,
 }) => {
   const [input, setInput] = useState('');
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
   const [ghostSuggestion, setGhostSuggestion] = useState<AutoSuggestItem | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const debounceRef = useRef<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -120,7 +126,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
     if (!input.trim()) return;
     onSendInput(input + '\r');
 
-    // Also record in persistent MemoryStore for future history autocompletions
+    // Also record in persistent MemoryStore
     if (window.warpApi?.recordMemoryCommand) {
       window.warpApi.recordMemoryCommand({ command: input.trim(), exitCode: 0 });
     }
@@ -130,7 +136,6 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // 1. Ghost text completion via Tab or ArrowRight at end of line
     if (!isAiMode && ghostSuggestion) {
       const isAtEnd = e.currentTarget.selectionStart === input.length;
       if (e.key === 'Tab' || (e.key === 'ArrowRight' && isAtEnd)) {
@@ -141,7 +146,6 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
       }
     }
 
-    // 2. AI suggestion completion via Tab
     if (isAiMode && e.key === 'Tab' && suggestion) {
       e.preventDefault();
       setInput(suggestion.command);
@@ -153,6 +157,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
       setInput('');
       setSuggestion(null);
       setGhostSuggestion(null);
+      setShowAttachMenu(false);
+      setShowModelPicker(false);
     }
   };
 
@@ -163,11 +169,28 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const getModelLabel = () => {
+    switch (primaryModel) {
+      case 'claude':
+        return 'High Fast (Claude 3.7)';
+      case 'agy':
+        return 'AGY Engine 2.0';
+      case 'codex':
+        return 'Codex CLI';
+      case 'shell':
+        return 'PTY Shell';
+      default:
+        return 'High Fast';
+    }
+  };
+
+  const shortCwd = cwd ? cwd.split(/[\\/]/).pop() || 'This PC' : 'This PC';
+
   return (
-    <div className="relative">
+    <div className="relative bg-[#000000] border-t border-zinc-900/80 px-4 pt-2.5 pb-2 select-none z-20 flex-shrink-0 font-sans">
       {/* Floating AI Command Generator Card */}
       {isAiMode && (
-        <div className="absolute bottom-full mb-2 right-4 w-[520px] bg-[#09090b] rounded-xl p-4 shadow-2xl border border-zinc-800 animate-in slide-in-from-bottom-2 duration-150 z-30 select-none">
+        <div className="absolute bottom-full mb-3 left-4 right-4 max-w-xl mx-auto bg-[#09090b] rounded-xl p-4 shadow-2xl border border-zinc-800 animate-in slide-in-from-bottom-2 duration-150 z-30 select-none">
           <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
             <div className="flex items-center space-x-2">
               <div className="p-1 rounded-md bg-zinc-900 text-zinc-300 border border-zinc-800">
@@ -200,7 +223,6 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               </div>
             ) : suggestion ? (
               <>
-                {/* Monospace Command Box */}
                 <div className="p-2.5 rounded-lg bg-black border border-zinc-800 font-mono text-xs text-zinc-100 flex items-center justify-between shadow-inner">
                   <div className="flex items-center space-x-2 min-w-0">
                     <span className="text-zinc-500 font-bold select-none">$</span>
@@ -218,29 +240,17 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                   </div>
                 </div>
 
-                {/* Explanation */}
                 <p className="text-[11px] text-zinc-400 font-sans leading-relaxed">
                   {suggestion.explanation}
                 </p>
 
-                {/* Keyboard Shortcuts & Actions */}
                 <div className="pt-2 flex items-center justify-between border-t border-zinc-800/80 text-[10px] font-mono text-zinc-400">
                   <div className="flex items-center space-x-2">
                     <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">↵ Enter</kbd> Run</span>
                     <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">Tab</kbd> Insert</span>
-                    <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">Esc</kbd> Cancel</span>
                   </div>
 
                   <div className="flex items-center space-x-1.5">
-                    <button
-                      onClick={() => {
-                        setInput(suggestion.command);
-                        setSuggestion(null);
-                      }}
-                      className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-[10px] font-sans font-medium transition-all"
-                    >
-                      Insert into Input
-                    </button>
                     <button
                       onClick={() => {
                         onSendInput(suggestion.command + '\r');
@@ -257,56 +267,112 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               </>
             ) : (
               <div className="py-2 text-xs text-zinc-400 font-sans">
-                Type what you want to do in plain English or Turkish (e.g. <span className="font-mono text-zinc-200"># port 3000 kapat</span> or <span className="font-mono text-zinc-200"># undo last commit</span>)
+                Type what you want to do in plain English or Turkish (e.g. <span className="font-mono text-zinc-200"># port 3000 kapat</span>)
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Main Bottom Dock Bar */}
-      <div className="h-10 bg-[#000000] border-t border-zinc-900 flex items-center justify-between px-3.5 select-none flex-shrink-0 z-20">
-        {/* Left: Active Session Indicator */}
-        <div className="flex items-center space-x-2 min-w-0 flex-shrink-0">
-          {activeSession ? (
-            <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-zinc-950 border border-zinc-800/80 text-zinc-300 font-mono text-[11px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
-              <span className="font-medium truncate max-w-[130px]">{activeSession.title}</span>
-            </div>
-          ) : (
-            <span className="text-[11px] text-zinc-600 font-mono italic">No active pane</span>
-          )}
-        </div>
+      {/* Floating Action Chips Row (Matches screenshot: [Continue Working] [Commit & Push ▾]) */}
+      <div className="max-w-3xl mx-auto flex items-center space-x-2 mb-2">
+        <button
+          onClick={() => {
+            if (onContinueWorking) onContinueWorking();
+            else if (activeSession) onSendInput('\r');
+          }}
+          className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800/80 text-zinc-300 hover:text-white text-[11px] font-medium transition-all shadow-sm"
+        >
+          <Play size={11} className="text-zinc-400" />
+          <span>Continue Working</span>
+        </button>
 
-        {/* Center & Right: Focused Prompt Input with Ghost Text */}
-        <form onSubmit={handleSubmit} className="relative flex-1 max-w-2xl mx-4 flex items-center space-x-2">
-          {/* Floating Ghost Suggestion Micro-Pill */}
-          {ghostSuggestion && !isAiMode && (
-            <div className="absolute bottom-full mb-1.5 left-0 flex items-center space-x-2 px-2.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[10px] font-mono shadow-xl animate-in fade-in z-20 select-none">
-              <span className="px-1 py-0.2 rounded bg-zinc-900 text-zinc-300 font-bold text-[9px] border border-zinc-800">Tab ⇥</span>
-              <span className="text-zinc-500">or</span>
-              <span className="px-1 py-0.2 rounded bg-zinc-900 text-zinc-300 font-bold text-[9px] border border-zinc-800">→</span>
-              <span className="text-zinc-300 truncate max-w-[200px]">{ghostSuggestion.description || 'Complete command'}</span>
-              <span className="px-1 py-0.2 rounded text-[8px] uppercase bg-zinc-900 text-zinc-400 border border-zinc-800">
-                {ghostSuggestion.source}
-              </span>
-            </div>
-          )}
+        {onCommitAndPush && (
+          <button
+            onClick={onCommitAndPush}
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800/80 text-zinc-300 hover:text-white text-[11px] font-medium transition-all shadow-sm"
+          >
+            <GitBranch size={11} className="text-zinc-400" />
+            <span>Commit & Push</span>
+          </button>
+        )}
 
-          <div className="relative flex-1 flex items-center">
-            <span
-              className={`absolute left-2.5 font-mono text-xs select-none transition-colors z-10 ${
-                isAiMode ? 'text-zinc-200 font-bold' : 'text-zinc-500'
-              }`}
+        {onExplainActive && (
+          <button
+            onClick={onExplainActive}
+            className="hidden sm:flex items-center space-x-1 px-2.5 py-1 rounded-md bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800/60 text-zinc-400 hover:text-zinc-200 text-[11px] transition-all"
+          >
+            <Sparkles size={11} className="text-purple-400" />
+            <span>Explain with Claude</span>
+          </button>
+        )}
+
+        {onFixActive && (
+          <button
+            onClick={onFixActive}
+            className="hidden sm:flex items-center space-x-1 px-2.5 py-1 rounded-md bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800/60 text-zinc-400 hover:text-zinc-200 text-[11px] transition-all"
+          >
+            <Shield size={11} className="text-zinc-400" />
+            <span>Auto-Fix w/ AGY</span>
+          </button>
+        )}
+      </div>
+
+      {/* Main Input Capsule (Matches screenshot: [+] [Send follow-up / command] [High Fast ▾] [Mic / Enter]) */}
+      <div className="max-w-3xl mx-auto">
+        <form
+          onSubmit={handleSubmit}
+          className="relative flex items-center bg-[#09090b] border border-zinc-800 rounded-xl px-2.5 py-1.5 shadow-xl transition-all focus-within:border-zinc-600 focus-within:bg-[#0c0c0f]"
+        >
+          {/* Context Attachment (+) Button */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowAttachMenu(!showAttachMenu)}
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors mr-1.5"
+              title="Attach context (Git diff, Error log, Skills)"
             >
-              {isAiMode ? '✨' : '❯'}
-            </span>
+              <Plus size={15} />
+            </button>
 
-            {/* Ghost Text Overlay behind caret */}
+            {/* Context attachment dropdown menu */}
+            {showAttachMenu && (
+              <div className="absolute bottom-full mb-2 left-0 w-44 bg-[#09090b] border border-zinc-800 rounded-lg shadow-2xl p-1 z-30 text-xs font-sans animate-in fade-in">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onAttachContext) onAttachContext('diff');
+                    setInput((v) => v + ' [Context: Working Tree Diff]');
+                    setShowAttachMenu(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded text-zinc-300 hover:bg-zinc-800 transition-colors flex items-center space-x-2"
+                >
+                  <GitBranch size={12} className="text-zinc-400" />
+                  <span>Attach Git Diff</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onAttachContext) onAttachContext('error');
+                    setInput((v) => v + ' [Context: Last Terminal Error]');
+                    setShowAttachMenu(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded text-zinc-300 hover:bg-zinc-800 transition-colors flex items-center space-x-2"
+                >
+                  <Terminal size={12} className="text-zinc-400" />
+                  <span>Attach Error Logs</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Prompt / Command Input */}
+          <div className="relative flex-1 flex items-center min-w-0">
+            {/* Ghost Text Overlay */}
             {ghostSuggestion && !isAiMode && (
-              <div className="absolute inset-0 pl-6 pr-3 py-1 flex items-center pointer-events-none font-mono text-xs overflow-hidden select-none whitespace-pre">
+              <div className="absolute inset-0 px-1 py-0.5 flex items-center pointer-events-none font-mono text-xs overflow-hidden select-none whitespace-pre">
                 <span className="opacity-0">{input}</span>
-                <span className="text-zinc-500 italic opacity-80">{ghostSuggestion.suffix}</span>
+                <span className="text-zinc-600 italic">{ghostSuggestion.suffix}</span>
               </div>
             )}
 
@@ -319,32 +385,104 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               disabled={!activeSession}
               placeholder={
                 activeSession
-                  ? "Type command, or '# port 3000 kapat' for AI search..."
+                  ? "Send follow-up, run command, or '# port 3000 kapat'..."
                   : 'Select a terminal first'
               }
-              className={`w-full rounded-md pl-6 pr-3 py-1 text-zinc-100 text-xs font-mono placeholder:text-zinc-600 focus:outline-none transition-all shadow-inner relative z-0 bg-zinc-950 border border-zinc-800/80 focus:border-zinc-600 focus:bg-zinc-900/50 ${
-                isAiMode
-                  ? 'border-zinc-600 shadow-[0_0_12px_rgba(255,255,255,0.06)] text-zinc-100'
-                  : ''
-              }`}
+              className="w-full bg-transparent text-zinc-100 text-xs font-sans placeholder:text-zinc-600 focus:outline-none outline-none relative z-10"
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={!input.trim() || !activeSession}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all shadow-sm bg-zinc-100 hover:bg-white text-zinc-950 disabled:bg-zinc-900 disabled:text-zinc-600 disabled:border disabled:border-zinc-800/60 disabled:cursor-not-allowed"
-          >
-            <Send size={11} />
-            <CornerDownLeft size={10} className="text-zinc-600" />
-          </button>
+          {/* Model Selector Dropdown (Matches Reference: "High Fast ▾") */}
+          <div className="relative flex items-center space-x-1.5 flex-shrink-0 ml-2">
+            <button
+              type="button"
+              onClick={() => setShowModelPicker(!showModelPicker)}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[11px] font-sans transition-all"
+            >
+              <span>{getModelLabel()}</span>
+              <ChevronDown size={11} className="text-zinc-500" />
+            </button>
+
+            {/* Model picker popover */}
+            {showModelPicker && onSelectModel && (
+              <div className="absolute bottom-full mb-2 right-0 w-48 bg-[#09090b] border border-zinc-800 rounded-lg shadow-2xl p-1 z-30 text-xs font-sans animate-in fade-in">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectModel('claude');
+                    setShowModelPicker(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center space-x-2"
+                >
+                  <Sparkles size={12} className="text-purple-400" />
+                  <div>
+                    <div className="font-medium">Claude 3.7 Sonnet</div>
+                    <div className="text-[10px] text-zinc-500">High Fast / Reasoning</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectModel('agy');
+                    setShowModelPicker(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center space-x-2"
+                >
+                  <Shield size={12} className="text-zinc-300" />
+                  <div>
+                    <div className="font-medium">AGY Engine 2.0</div>
+                    <div className="text-[10px] text-zinc-500">Antigravity CLI Agent</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectModel('codex');
+                    setShowModelPicker(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded text-zinc-200 hover:bg-zinc-800 transition-colors flex items-center space-x-2"
+                >
+                  <Bot size={12} className="text-emerald-400" />
+                  <div>
+                    <div className="font-medium">Codex CLI</div>
+                    <div className="text-[10px] text-zinc-500">Fast Scripting</div>
+                  </div>
+                </button>
+              </div>
+            )}
+
+            {/* Submit Arrow Button */}
+            <button
+              type="submit"
+              disabled={!input.trim() || !activeSession}
+              className="p-1.5 rounded-md bg-zinc-100 hover:bg-white text-zinc-950 disabled:bg-zinc-900 disabled:text-zinc-600 disabled:cursor-not-allowed transition-all shadow-sm"
+              title="Send"
+            >
+              <CornerDownLeft size={12} />
+            </button>
+          </div>
         </form>
 
-        {/* Right shortcut tip */}
-        <div className="hidden lg:flex items-center space-x-2 text-[10px] font-mono text-zinc-600">
-          <span># for AI</span>
-          <span>•</span>
-          <span>^⇧P for palette</span>
+        {/* Bottom Status Row (Matches Reference: main ▾ | This PC ▾ | dot) */}
+        <div className="flex items-center justify-between pt-1.5 px-1 text-[10px] font-mono text-zinc-600">
+          <div className="flex items-center space-x-3">
+            {gitBranch && (
+              <span className="flex items-center space-x-1 hover:text-zinc-400 cursor-pointer">
+                <GitBranch size={10} />
+                <span>{gitBranch}</span>
+                <span>▾</span>
+              </span>
+            )}
+            <span className="flex items-center space-x-1 hover:text-zinc-400 cursor-pointer">
+              <span>💻 {shortCwd}</span>
+              <span>▾</span>
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-1 text-zinc-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="font-sans">Dexter Ready</span>
+          </div>
         </div>
       </div>
     </div>

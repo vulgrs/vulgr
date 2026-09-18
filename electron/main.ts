@@ -145,6 +145,16 @@ function setupIpcHandlers() {
     return git.getBranch();
   });
 
+  ipcMain.handle('git:commit', (_, { message, cwd = process.cwd() }) => {
+    const git = new GitUtils(cwd);
+    return git.commitAll(message);
+  });
+
+  ipcMain.handle('git:push', (_, { remote = 'origin', branch, cwd = process.cwd() } = {}) => {
+    const git = new GitUtils(cwd);
+    return git.push(remote, branch);
+  });
+
   // Autonomous Agent Mesh IPC Handler
   ipcMain.handle('mesh:run', async (_, { goal, builder, verifier, auditor, verifyCmd, maxRounds, cwd, useSandbox }) => {
     const mesh = new AgentMesh({

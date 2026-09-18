@@ -145,4 +145,19 @@ export class GitUtils {
       return false;
     }
   }
+
+  /**
+   * Pushes commits to remote.
+   */
+  push(remote: string = 'origin', branch?: string): { success: boolean; error?: string } {
+    if (!this.isGitRepo()) return { success: false, error: 'Not a git repository' };
+
+    try {
+      const b = branch || this.getBranch() || 'master';
+      execSync(`git push ${remote} ${b}`, { cwd: this.cwd, stdio: 'pipe', encoding: 'utf-8' });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to push' };
+    }
+  }
 }

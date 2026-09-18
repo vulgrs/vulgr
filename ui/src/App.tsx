@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { TopBar } from './components/TopBar.js';
 import { PaneGrid } from './components/PaneGrid.js';
 import { BottomCommandDock } from './components/BottomCommandDock.js';
-import { DiffDrawer } from './components/DiffDrawer.js';
+import { RightPanel } from './components/RightPanel.js';
 import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
+import { ArrowLeft, ArrowRight, GitCompare } from 'lucide-react';
 import { CommandPalette } from './components/CommandPalette.js';
 import { AgentMeshModal } from './components/AgentMeshModal.js';
 import { SquadBar } from './components/SquadBar.js';
@@ -62,12 +63,13 @@ export const App: React.FC = () => {
   const [activeTabId, setActiveTabId] = useState('tab-1');
   const [doctor, setDoctor] = useState<DoctorStatus | null>(null);
   const [diffOpen, setDiffOpen] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => loadPersisted('warp.rightPanelOpen', false));
   const [gitDiff, setGitDiff] = useState('');
   const [gitFiles, setGitFiles] = useState<string[]>([]);
   const [gitBranch, setGitBranch] = useState<string | null>(null);
   const [cwd, setCwd] = useState('');
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(() => loadPersisted('warp.sidebarOpen', false));
+  const [sidebarOpen, setSidebarOpen] = useState(() => loadPersisted('warp.sidebarOpen', true));
   const [meshModalOpen, setMeshModalOpen] = useState(false);
   const [squadModalOpen, setSquadModalOpen] = useState(false);
   const [skillsModalOpen, setSkillsModalOpen] = useState(false);
@@ -92,6 +94,9 @@ export const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('warp.sidebarOpen', JSON.stringify(sidebarOpen));
   }, [sidebarOpen]);
+  useEffect(() => {
+    localStorage.setItem('warp.rightPanelOpen', JSON.stringify(rightPanelOpen));
+  }, [rightPanelOpen]);
   useEffect(() => {
     localStorage.setItem('warp.primaryModel', JSON.stringify(primaryModel));
   }, [primaryModel]);
@@ -479,6 +484,16 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleCommitAndPush = async (message: string) => {
+    if (window.warpApi?.gitCommit) {
+      await window.warpApi.gitCommit(message, cwd);
+      if (window.warpApi.gitPush) {
+        await window.warpApi.gitPush('origin', gitBranch || 'master', cwd);
+      }
+      await refreshGitDiff();
+    }
+  };
+
   const handleSendInputToActive = (text: string) => {
     if (window.warpApi && activeSession) {
       window.warpApi.writeTerminal(activeSession.id, text);
@@ -697,7 +712,7 @@ export const App: React.FC = () => {
         case 'g':
           e.preventDefault();
           refreshGitDiff();
-          setDiffOpen((v) => !v);
+          setRightPanelOpen((v) => !v);
           break;
       }
     };
@@ -718,7 +733,7 @@ export const App: React.FC = () => {
         onLaunchAgent={handleLaunchAgent}
         onToggleDiff={() => {
           refreshGitDiff();
-          setDiffOpen(!diffOpen);
+          setRightPanelOpen(!rightPanelOpen);
         }}
         doctor={doctor}
         hasUncommittedDiff={gitDiff.trim().length > 0}
@@ -732,23 +747,26 @@ export const App: React.FC = () => {
         onOpenExportReport={handleOpenExportModal}
       />
 
-      {/* Main Content: Sidebar + Terminal Grid */}
-      <div className="flex-1 w-full min-h-0 relative flex bg-transparent">
+      {/* Main Content: Sidebar + Center Workspace + Right Panel */}
+      <div className="flex-1 w-full min-h-0 relative flex bg-[#000000]">
         {sidebarOpen && (
           <Sidebar
+            isOpen={sidebarOpen}
+            cwd={cwd}
+            gitBranch={gitBranch}
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onSelectTab={setActiveTabId}
+            onNewSession={handleAddTab}
+            onOpenPalette={() => setPaletteOpen(true)}
+            onOpenSquads={() => setSquadModalOpen(true)}
+            onOpenSkills={() => setSkillsModalOpen(true)}
+            onOpenSettings={() => setSettingsModalOpen(true)}
             pastRuns={[]}
-            doctor={doctor}
-            onRevertGit={handleRevertGit}
-            primaryModel={primaryModel}
-            setPrimaryModel={setPrimaryModel}
-            reviewerModel={reviewerModel}
-            setReviewerModel={setReviewerModel}
-            verifyCmd={verifyCmd}
-            setVerifyCmd={setVerifyCmd}
           />
         )}
 
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-[#000000]">
           {/* Live Squad Status Banner (if active on current tab) */}
           {squad && squad.tabId === activeTabId && squad.active && (
             <SquadBar
@@ -759,7 +777,59 @@ export const App: React.FC = () => {
             />
           )}
 
-          <div className="flex-1 min-w-0 min-h-0 flex">
+          {/* Center Session Breadcrumb Header (Matches reference screenshot: ← → Session Title ... Changes) */}
+          <div className="h-9 bg-[#000000] border-b border-zinc-900 flex items-center justify-between px-3 select-none flex-shrink-0">
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <div className="flex items-center space-x-0.5 text-zinc-500">
+                <button
+                  onClick={() => cycleTab(-1)}
+                  className="p-1 rounded hover:bg-zinc-900 hover:text-zinc-200 transition-colors"
+                  title="Previous Session"
+                >
+                  <ArrowLeft size={13} />
+                </button>
+                <button
+                  onClick={() => cycleTab(1)}
+                  className="p-1 rounded hover:bg-zinc-900 hover:text-zinc-200 transition-colors"
+                  title="Next Session"
+                >
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+
+              <span className="text-xs font-semibold text-zinc-200 truncate font-sans">
+                {currentTab?.title || 'Terminal Session'}
+              </span>
+
+              {activeSession && (
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+                  {activeSession.type}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setRightPanelOpen(!rightPanelOpen)}
+                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                  rightPanelOpen
+                    ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
+                }`}
+                title="Toggle Changes / Sandbox Split Panel"
+              >
+                <GitCompare size={12} />
+                <span className="hidden sm:inline">± Changes</span>
+                {gitFiles.length > 0 && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-zinc-800 text-zinc-300">
+                    +{gitFiles.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 min-w-0 min-h-0 flex bg-[#000000]">
             {currentTab && (
               <PaneGrid
                 tab={currentTab}
@@ -774,21 +844,47 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Git Diff Drawer */}
-        <DiffDrawer
-          isOpen={diffOpen}
-          onClose={() => setDiffOpen(false)}
-          diff={gitDiff}
-          filesChanged={gitFiles}
-          onRevert={handleRevertGit}
-          onSendDiffToAgent={handleSendDiffToAgent}
-        />
+        {/* Right Split Panel (Matches reference IDE layout: ± Changes | 🌐 Sandbox) */}
+        {rightPanelOpen && (
+          <RightPanel
+            isOpen={rightPanelOpen}
+            onClose={() => setRightPanelOpen(false)}
+            diff={gitDiff}
+            filesChanged={gitFiles}
+            gitBranch={gitBranch}
+            sandboxes={activeSandboxes}
+            onRevert={handleRevertGit}
+            onCommitAndPush={handleCommitAndPush}
+            onOpenTerminalInSandbox={handleOpenTerminalInSandbox}
+            onSendDiffToAgent={handleSendDiffToAgent}
+          />
+        )}
       </div>
 
-      {/* Bottom Command Dock */}
+      {/* Bottom Command Dock (Matches reference floating capsule & action chips) */}
       <BottomCommandDock
         activeSession={activeSession}
         onSendInput={handleSendInputToActive}
+        primaryModel={primaryModel}
+        onSelectModel={setPrimaryModel}
+        gitBranch={gitBranch}
+        cwd={cwd}
+        onContinueWorking={() => {
+          if (activeSession) handleSendInputToActive('\r');
+        }}
+        onCommitAndPush={() => {
+          setRightPanelOpen(true);
+        }}
+        onExplainActive={() => {
+          if (activeSession) {
+            handlePipeErrorToAgent('claude', 'Please diagnose recent terminal command output.');
+          }
+        }}
+        onFixActive={() => {
+          if (activeSession) {
+            handlePipeErrorToAgent('agy', 'Auto-fix detected error in terminal.');
+          }
+        }}
       />
 
       {/* Status Bar */}

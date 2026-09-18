@@ -23,6 +23,8 @@ export interface WarpApi {
   getGitDiff: (cwd?: string) => Promise<{ hasChanges: boolean; diff: string; filesChanged: string[] }>;
   revertGit: (cwd?: string) => Promise<boolean>;
   getGitBranch: (cwd?: string) => Promise<string | null>;
+  gitCommit: (message: string, cwd?: string) => Promise<boolean>;
+  gitPush: (remote?: string, branch?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;
   getCwd: () => Promise<string>;
 
   // Autonomous Agent Mesh
@@ -100,6 +102,8 @@ const api: WarpApi = {
   getGitDiff: (cwd?: string) => ipcRenderer.invoke('git:diff', { cwd }),
   revertGit: (cwd?: string) => ipcRenderer.invoke('git:revert', { cwd }),
   getGitBranch: (cwd?: string) => ipcRenderer.invoke('git:branch', { cwd }),
+  gitCommit: (message: string, cwd?: string) => ipcRenderer.invoke('git:commit', { message, cwd }),
+  gitPush: (remote?: string, branch?: string, cwd?: string) => ipcRenderer.invoke('git:push', { remote, branch, cwd }),
   getCwd: () => ipcRenderer.invoke('system:getCwd'),
 
   runAgentMesh: (options) => ipcRenderer.invoke('mesh:run', options),
