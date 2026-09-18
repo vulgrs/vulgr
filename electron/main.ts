@@ -66,6 +66,14 @@ async function createWindow() {
     console.error(`[Electron] Failed to load ${validatedURL}: [${errorCode}] ${errorDescription}`);
   });
 
+  mainWindow.webContents.on('preload-error', (_, preloadPath, error) => {
+    console.error(`[Electron] Preload Error in ${preloadPath}:`, error);
+  });
+
+  mainWindow.webContents.on('console-message', (_, level, message, line, sourceId) => {
+    console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+  });
+
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('[Electron] UI loaded successfully.');
     mainWindow?.show();

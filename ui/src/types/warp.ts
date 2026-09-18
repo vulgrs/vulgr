@@ -80,6 +80,65 @@ export interface TerminalCommandBlock {
   isExecuting: boolean;
 }
 
+export interface CommandSuggestion {
+  command: string;
+  explanation: string;
+  source: string;
+}
+
+export interface AutoSuggestItem {
+  input: string;
+  completion: string;
+  suffix: string;
+  source: 'history' | 'skill' | 'builtin';
+  description?: string;
+}
+
+export interface ReviewFinding {
+  severity: 'CRITICAL' | 'WARNING' | 'SUGGESTION';
+  title: string;
+  description: string;
+  recommendation?: string;
+  file?: string;
+  line?: number;
+}
+
+export interface ReviewReport {
+  reviewerName: string;
+  passed: boolean;
+  summary: string;
+  findings: ReviewFinding[];
+  diffAnalyzed?: string;
+}
+
+export interface CorrectionStatus {
+  status: 'PENDING' | 'PASSED' | 'FAILED';
+  attempt?: number;
+  maxRetries?: number;
+  error?: string;
+}
+
+export interface AiOrchestratorBlock {
+  id: string;
+  runId: string;
+  prompt?: string;
+  primaryModel: string;
+  dualEnabled?: boolean;
+  reviewerModel?: string;
+  status: 'GENERATING' | 'CORRECTING' | 'REVIEWING' | 'COMPLETED' | 'DISCARDED';
+  streamText?: string;
+  correctionStatus?: CorrectionStatus;
+  reviewReport?: ReviewReport;
+  userDecision?: 'APPROVE' | 'REQUEST_FIX' | 'DISCARD';
+  goal?: string;
+  streamLogs?: string[];
+  diff?: string;
+  errorSnippet?: string;
+  rounds?: number;
+  durationMs?: number;
+  timestamp?: string;
+}
+
 export type SkillCategory = 'git' | 'docker' | 'node' | 'system' | 'ai' | 'custom';
 
 export interface SkillParameter {

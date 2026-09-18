@@ -14,8 +14,10 @@ import {
   ArrowRight,
   X,
   Loader2,
+  Plus,
+  ChevronDown,
 } from 'lucide-react';
-import type { TerminalSession } from '../types/warp.js';
+import type { TerminalSession, CommandSuggestion, AutoSuggestItem } from '../types/warp.js';
 
 interface BottomCommandDockProps {
   activeSession: TerminalSession | null;

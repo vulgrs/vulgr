@@ -692,7 +692,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
             <div className="space-y-1">
               <label className="text-xs font-medium text-slate-300 flex items-center justify-between">
                 <span>Command Template (Shell)</span>
-                <span className="text-[10px] text-cyan-400 font-mono">e.g. kubectl apply -f ./k8s/{{environment}}.yaml</span>
+                <span className="text-[10px] text-cyan-400 font-mono">{'e.g. kubectl apply -f ./k8s/{{environment}}.yaml'}</span>
               </label>
               <textarea
                 required
