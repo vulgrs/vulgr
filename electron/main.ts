@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, basename, extname } from 'node:path';
 import { get as httpGet } from 'node:http';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync, readdirSync, statSync, readFileSync } from 'node:fs';
+import os from 'node:os';
 import { PtyManager } from './ptyManager.js';
 import { GitUtils } from '../src/git/gitUtils.js';
 import { ClaudeAdapter } from '../src/adapters/claude.js';
@@ -21,13 +22,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+let currentCwd = process.cwd();
 const configManager = new ConfigManager();
 const ptyManager = new PtyManager();
 ptyManager.setConfigManager(configManager);
 const skillsRegistry = new SharedSkillsRegistry();
-const memoryStore = new MemoryStore();
+let memoryStore = new MemoryStore(currentCwd);
 const worktreeManager = new WorktreeManager();
-const autoSuggestEngine = new AutoSuggestEngine(process.cwd(), memoryStore, skillsRegistry);
+let autoSuggestEngine = new AutoSuggestEngine(currentCwd, memoryStore, skillsRegistry);
 
 function canConnectToDevServer(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -44,6 +46,106 @@ function canConnectToDevServer(): Promise<boolean> {
 
 function resolveAppIcon(): string | undefined {
   return [join(__dirname, '../ui/icon.ico'), join(__dirname, '../../ui/public/icon.ico')].find((p) => existsSync(p));
+}
+
+const RECENT_PROJECTS_PATH = join(os.homedir(), '.vulgaris-recent-projects.json');
+
+function getRecentProjects(): string[] {
+  try {
+    if (existsSync(RECENT_PROJECTS_PATH)) {
+      const parsed = JSON.parse(readFileSync(RECENT_PROJECTS_PATH, 'utf-8'));
+      if (Array.isArray(parsed)) {
+        return parsed.filter((p) => typeof p === 'string' && existsSync(p));
+      }
+    }
+  } catch {}
+  return [currentCwd];
+}
+
+function addRecentProject(dir: string): void {
+  try {
+    const list = getRecentProjects().filter((p) => p !== dir);
+    list.unshift(dir);
+    writeFileSync(RECENT_PROJECTS_PATH, JSON.stringify(list.slice(0, 15), null, 2), 'utf-8');
+  } catch {}
+}
+
+const IGNORED_DIRS = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  '.cache',
+  '.next',
+  '.turbo',
+  'build',
+  'out',
+  '.idea',
+  '.vscode',
+  '.venv',
+  '__pycache__',
+]);
+
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  relativePath: string;
+  isDirectory: boolean;
+  size?: number;
+  ext?: string;
+  children?: FileTreeNode[];
+}
+
+function scanProjectDirectory(baseDir: string, currentPath: string, maxDepth = 3, currentDepth = 0): FileTreeNode[] {
+  if (currentDepth >= maxDepth) return [];
+  try {
+    const entries = readdirSync(currentPath, { withFileTypes: true });
+    const nodes: FileTreeNode[] = [];
+
+    const sorted = entries.sort((a, b) => {
+      if (a.isDirectory() && !b.isDirectory()) return -1;
+      if (!a.isDirectory() && b.isDirectory()) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    for (const entry of sorted) {
+      if (entry.name.startsWith('.') && entry.name !== '.env.example' && entry.name !== '.gitignore' && entry.name !== '.vulgaris-memory.json') {
+        if (entry.isDirectory()) continue;
+      }
+      if (entry.isDirectory() && IGNORED_DIRS.has(entry.name)) {
+        continue;
+      }
+
+      const fullPath = join(currentPath, entry.name);
+      const relativePath = fullPath.replace(baseDir, '').replace(/^[\\/]/, '');
+
+      if (entry.isDirectory()) {
+        nodes.push({
+          name: entry.name,
+          path: fullPath,
+          relativePath,
+          isDirectory: true,
+          children: scanProjectDirectory(baseDir, fullPath, maxDepth, currentDepth + 1),
+        });
+      } else {
+        let size = 0;
+        try {
+          size = statSync(fullPath).size;
+        } catch {}
+
+        nodes.push({
+          name: entry.name,
+          path: fullPath,
+          relativePath,
+          isDirectory: false,
+          size,
+          ext: extname(entry.name).toLowerCase(),
+        });
+      }
+    }
+    return nodes;
+  } catch {
+    return [];
+  }
 }
 
 async function createWindow() {
@@ -317,7 +419,74 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('system:getCwd', () => process.cwd());
+  // Project Workspace & File Explorer Handlers
+  ipcMain.handle('workspace:open-folder', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      title: 'Select Project Directory',
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    const chosenDir = result.filePaths[0];
+    currentCwd = chosenDir;
+    memoryStore = new MemoryStore(chosenDir);
+    autoSuggestEngine = new AutoSuggestEngine(chosenDir, memoryStore, skillsRegistry);
+    addRecentProject(chosenDir);
+    return {
+      path: chosenDir,
+      name: basename(chosenDir),
+      recentProjects: getRecentProjects(),
+    };
+  });
+
+  ipcMain.handle('workspace:set-cwd', async (_, targetDir: string) => {
+    if (existsSync(targetDir)) {
+      currentCwd = targetDir;
+      memoryStore = new MemoryStore(targetDir);
+      autoSuggestEngine = new AutoSuggestEngine(targetDir, memoryStore, skillsRegistry);
+      addRecentProject(targetDir);
+      return {
+        path: targetDir,
+        name: basename(targetDir),
+        recentProjects: getRecentProjects(),
+      };
+    }
+    return null;
+  });
+
+  ipcMain.handle('workspace:get-recent-projects', () => getRecentProjects());
+
+  ipcMain.handle('workspace:list-files', (_, { dir, maxDepth = 3 } = {}) => {
+    const targetDir = dir || currentCwd;
+    if (!existsSync(targetDir)) return [];
+    return scanProjectDirectory(targetDir, targetDir, maxDepth, 0);
+  });
+
+  ipcMain.handle('workspace:read-file', (_, filePath: string) => {
+    try {
+      if (existsSync(filePath)) {
+        const stats = statSync(filePath);
+        if (stats.size > 500 * 1024) {
+          return { error: 'File is too large to preview (>500KB)' };
+        }
+        const content = readFileSync(filePath, 'utf-8');
+        return { content, size: stats.size };
+      }
+      return { error: 'File does not exist' };
+    } catch (err: any) {
+      return { error: err.message };
+    }
+  });
+
+  ipcMain.handle('workspace:get-conversations', () => memoryStore.getConversations());
+  ipcMain.handle('workspace:save-conversation', (_, conv) => {
+    memoryStore.addConversation(conv);
+    return true;
+  });
+
+  ipcMain.handle('system:getCwd', () => currentCwd);
 }
 
 app.whenReady().then(async () => {

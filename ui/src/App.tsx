@@ -25,6 +25,9 @@ import type {
   SessionReportData,
   ReportCommandBlock,
   ContextTelemetry,
+  ProjectFileItem,
+  PastProjectConversation,
+  MemoryData,
 } from './types/warp.js';
 
 declare global {
@@ -82,6 +85,12 @@ export const App: React.FC = () => {
   const [contextTelemetry, setContextTelemetry] = useState<ContextTelemetry | null>(null);
   const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
 
+  // Project Workspace & Memory State
+  const [recentProjects, setRecentProjects] = useState<string[]>([]);
+  const [projectFiles, setProjectFiles] = useState<ProjectFileItem[]>([]);
+  const [pastConversations, setPastConversations] = useState<PastProjectConversation[]>([]);
+  const [projectMemory, setProjectMemory] = useState<MemoryData | null>(null);
+
   const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('warp.primaryModel', 'claude'));
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
   const [verifyCmd, setVerifyCmd] = useState(() => loadPersisted('warp.verifyCmd', 'npm test'));
@@ -121,10 +130,31 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  const refreshProjectData = useCallback(async (targetDir?: string) => {
+    if (!window.warpApi) return;
+    try {
+      const [files, recents, convs, mem] = await Promise.all([
+        window.warpApi.listProjectFiles ? window.warpApi.listProjectFiles(targetDir) : Promise.resolve([]),
+        window.warpApi.getRecentProjects ? window.warpApi.getRecentProjects() : Promise.resolve([]),
+        window.warpApi.getProjectConversations ? window.warpApi.getProjectConversations() : Promise.resolve([]),
+        window.warpApi.getMemory ? window.warpApi.getMemory() : Promise.resolve(null),
+      ]);
+      if (files) setProjectFiles(files);
+      if (recents) setRecentProjects(recents);
+      if (convs) setPastConversations(convs);
+      if (mem) setProjectMemory(mem);
+    } catch (err) {
+      console.warn('[Project] Failed to load project data:', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!window.warpApi) return;
 
-    window.warpApi.getCwd().then(setCwd);
+    window.warpApi.getCwd().then((initialCwd: string) => {
+      setCwd(initialCwd);
+      refreshProjectData(initialCwd);
+    });
     window.warpApi.getDoctorStatus().then(setDoctor);
 
     // Initial diff, branch, & context telemetry check
@@ -141,7 +171,7 @@ export const App: React.FC = () => {
       fetchContextTelemetry();
     }, 5000);
     return () => clearInterval(diffTimer);
-  }, [fetchContextTelemetry]);
+  }, [fetchContextTelemetry, refreshProjectData]);
 
   const refreshSandboxes = async () => {
     if (window.warpApi?.listSandboxes) {
@@ -521,6 +551,87 @@ export const App: React.FC = () => {
     }
   };
 
+  // Workspace Project Management & Memory Handlers
+  const handleOpenProjectFolder = async () => {
+    if (!window.warpApi?.openProjectFolder) return;
+    try {
+      const res = await window.warpApi.openProjectFolder();
+      if (res && res.path) {
+        setCwd(res.path);
+        if (res.recentProjects) setRecentProjects(res.recentProjects);
+        await refreshProjectData(res.path);
+        refreshGitDiff();
+        refreshGitBranch();
+      }
+    } catch (err) {
+      console.error('[Project] Error opening project folder:', err);
+    }
+  };
+
+  const handleSelectRecentProject = async (path: string) => {
+    if (!window.warpApi?.setProjectFolder) return;
+    try {
+      const res = await window.warpApi.setProjectFolder(path);
+      if (res && res.path) {
+        setCwd(res.path);
+        if (res.recentProjects) setRecentProjects(res.recentProjects);
+        await refreshProjectData(res.path);
+        refreshGitDiff();
+        refreshGitBranch();
+      }
+    } catch (err) {
+      console.error('[Project] Error switching project:', err);
+    }
+  };
+
+  const handleAddMemoryRule = async (rule: string) => {
+    if (!window.warpApi?.addMemoryRule) return;
+    try {
+      await window.warpApi.addMemoryRule(rule);
+      const mem = await window.warpApi.getMemory();
+      if (mem) setProjectMemory(mem);
+    } catch (err) {
+      console.error('[Memory] Error adding rule:', err);
+    }
+  };
+
+  const handleRemoveMemoryRule = async (rule: string) => {
+    if (!window.warpApi?.removeMemoryRule) return;
+    try {
+      await window.warpApi.removeMemoryRule(rule);
+      const mem = await window.warpApi.getMemory();
+      if (mem) setProjectMemory(mem);
+    } catch (err) {
+      console.error('[Memory] Error removing rule:', err);
+    }
+  };
+
+  const handleAddMemoryFact = async (key: string, value: string) => {
+    if (!window.warpApi?.setMemoryFact) return;
+    try {
+      await window.warpApi.setMemoryFact(key, value, 'user');
+      const mem = await window.warpApi.getMemory();
+      if (mem) setProjectMemory(mem);
+    } catch (err) {
+      console.error('[Memory] Error adding fact:', err);
+    }
+  };
+
+  const handleDeleteMemoryFact = async (key: string) => {
+    if (!window.warpApi?.deleteMemoryFact) return;
+    try {
+      await window.warpApi.deleteMemoryFact(key);
+      const mem = await window.warpApi.getMemory();
+      if (mem) setProjectMemory(mem);
+    } catch (err) {
+      console.error('[Memory] Error deleting fact:', err);
+    }
+  };
+
+  const handleInsertFilePath = (filePath: string) => {
+    handleSendInputToActive(filePath);
+  };
+
   // Registry of shell-pane "command submitted" handlers, one per XtermPane
   // currently mounted for a shell session, keyed by session id. Lets
   // handleSendInputToActive tell the right pane to inject a block header when
@@ -863,6 +974,23 @@ export const App: React.FC = () => {
             onOpenSkills={() => setSkillsModalOpen(true)}
             onOpenSettings={() => setSettingsModalOpen(true)}
             pastRuns={[]}
+            recentProjects={recentProjects}
+            onOpenProjectFolder={handleOpenProjectFolder}
+            onSelectRecentProject={handleSelectRecentProject}
+            projectFiles={projectFiles}
+            onRefreshFiles={() => refreshProjectData(cwd)}
+            onInsertFilePath={handleInsertFilePath}
+            pastConversations={pastConversations}
+            onSelectConversation={(conv) => {
+              if (conv.prompt) {
+                handlePipeErrorToAgent(conv.agent || 'claude', conv.prompt);
+              }
+            }}
+            projectMemory={projectMemory}
+            onAddMemoryRule={handleAddMemoryRule}
+            onRemoveMemoryRule={handleRemoveMemoryRule}
+            onAddMemoryFact={handleAddMemoryFact}
+            onDeleteMemoryFact={handleDeleteMemoryFact}
           />
         )}
 

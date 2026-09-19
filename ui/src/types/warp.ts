@@ -294,5 +294,23 @@ export interface ContextTelemetry {
   recentEvents: OptimizationEvent[];
 }
 
+export interface ProjectFileItem {
+  name: string;
+  path: string;
+  relativePath: string;
+  isDirectory: boolean;
+  size?: number;
+  ext?: string;
+  children?: ProjectFileItem[];
+}
 
-
+export interface PastProjectConversation {
+  id: string;
+  title: string;
+  agent: SessionType;
+  prompt: string;
+  summary?: string;
+  timestamp: string;
+  commandCount?: number;
+  exitCode?: number;
+}

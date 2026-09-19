@@ -82,6 +82,15 @@ export interface WarpApi {
   generateReport: (data: any, format: 'markdown' | 'html' | 'json', options?: any) => Promise<string>;
   saveReportToFile: (content: string, defaultName?: string, format?: 'markdown' | 'html' | 'json') => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
 
+  // Project Workspace & File Explorer
+  openProjectFolder: () => Promise<{ path: string; name: string; recentProjects: string[] } | null>;
+  setProjectFolder: (dir: string) => Promise<{ path: string; name: string; recentProjects: string[] } | null>;
+  getRecentProjects: () => Promise<string[]>;
+  listProjectFiles: (dir?: string, maxDepth?: number) => Promise<any[]>;
+  readProjectFile: (filePath: string) => Promise<{ content?: string; size?: number; error?: string }>;
+  getProjectConversations: () => Promise<any[]>;
+  saveProjectConversation: (conv: any) => Promise<boolean>;
+
   // Frameless Window Controls
   windowMinimize: () => void;
   windowMaximizeToggle: () => void;
@@ -165,6 +174,15 @@ const api: WarpApi = {
   generateReport: (data, format, options) => ipcRenderer.invoke('export:generate', { data, format, options }),
   saveReportToFile: (content, defaultName, format) =>
     ipcRenderer.invoke('export:save-file', { content, defaultName, format }),
+
+  // Project Workspace & File Explorer
+  openProjectFolder: () => ipcRenderer.invoke('workspace:open-folder'),
+  setProjectFolder: (dir) => ipcRenderer.invoke('workspace:set-cwd', dir),
+  getRecentProjects: () => ipcRenderer.invoke('workspace:get-recent-projects'),
+  listProjectFiles: (dir, maxDepth) => ipcRenderer.invoke('workspace:list-files', { dir, maxDepth }),
+  readProjectFile: (filePath) => ipcRenderer.invoke('workspace:read-file', filePath),
+  getProjectConversations: () => ipcRenderer.invoke('workspace:get-conversations'),
+  saveProjectConversation: (conv) => ipcRenderer.invoke('workspace:save-conversation', conv),
 
   // Frameless Window Controls
   windowMinimize: () => ipcRenderer.send('window:minimize'),
