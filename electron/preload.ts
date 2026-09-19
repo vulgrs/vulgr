@@ -81,6 +81,13 @@ export interface WarpApi {
   // Session Timeline & Technical Report Export
   generateReport: (data: any, format: 'markdown' | 'html' | 'json', options?: any) => Promise<string>;
   saveReportToFile: (content: string, defaultName?: string, format?: 'markdown' | 'html' | 'json') => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+
+  // Frameless Window Controls
+  windowMinimize: () => void;
+  windowMaximizeToggle: () => void;
+  windowClose: () => void;
+  windowIsMaximized: () => Promise<boolean>;
+  onWindowMaximizedChanged: (callback: (isMaximized: boolean) => void) => () => void;
 }
 
 const api: WarpApi = {
@@ -158,6 +165,17 @@ const api: WarpApi = {
   generateReport: (data, format, options) => ipcRenderer.invoke('export:generate', { data, format, options }),
   saveReportToFile: (content, defaultName, format) =>
     ipcRenderer.invoke('export:save-file', { content, defaultName, format }),
+
+  // Frameless Window Controls
+  windowMinimize: () => ipcRenderer.send('window:minimize'),
+  windowMaximizeToggle: () => ipcRenderer.send('window:maximize-toggle'),
+  windowClose: () => ipcRenderer.send('window:close'),
+  windowIsMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+  onWindowMaximizedChanged: (callback) => {
+    const handler = (_: any, isMaximized: boolean) => callback(isMaximized);
+    ipcRenderer.on('window:maximized-changed', handler);
+    return () => ipcRenderer.removeListener('window:maximized-changed', handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('warpApi', api);

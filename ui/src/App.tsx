@@ -1,22 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { TopBar } from './components/TopBar.js';
 import { PaneGrid } from './components/PaneGrid.js';
 import { BottomCommandDock } from './components/BottomCommandDock.js';
 import { RightPanel } from './components/RightPanel.js';
 import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
-import { CommandBlocksFeed, type StreamItem } from './components/CommandBlocksFeed.js';
-import {
-  ArrowLeft,
-  ArrowRight,
-  GitCompare,
-  Sparkles,
-  Shield,
-  Terminal,
-  SplitSquareHorizontal,
-  SplitSquareVertical,
-  Plus,
-} from 'lucide-react';
 import { CommandPalette } from './components/CommandPalette.js';
 import { AgentMeshModal } from './components/AgentMeshModal.js';
 import { SquadBar } from './components/SquadBar.js';
@@ -76,7 +64,7 @@ export const App: React.FC = () => {
   const [activeTabId, setActiveTabId] = useState('tab-1');
   const [doctor, setDoctor] = useState<DoctorStatus | null>(null);
   const [diffOpen, setDiffOpen] = useState(false);
-  const [rightPanelOpen, setRightPanelOpen] = useState(() => loadPersisted('warp.rightPanelOpen', false));
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => loadPersisted('warp.rightPanelOpen', true));
   const [gitDiff, setGitDiff] = useState('');
   const [gitFiles, setGitFiles] = useState<string[]>([]);
   const [gitBranch, setGitBranch] = useState<string | null>(null);
@@ -93,35 +81,6 @@ export const App: React.FC = () => {
   const [hudOpen, setHudOpen] = useState(false);
   const [contextTelemetry, setContextTelemetry] = useState<ContextTelemetry | null>(null);
   const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
-  const [centerViewMode, setCenterViewMode] = useState<'terminal' | 'stream' | 'split'>(() => {
-    const persisted = loadPersisted<'terminal' | 'stream' | 'split'>('warp.centerViewMode', 'terminal');
-    return persisted === 'stream' ? 'terminal' : persisted;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('warp.centerViewMode', JSON.stringify(centerViewMode));
-  }, [centerViewMode]);
-  const [streamFeed, setStreamFeed] = useState<StreamItem[]>([
-    {
-      id: 'stream-init',
-      userPrompt: 'Dexter AI Developer Environment initialized',
-      thoughtLog: 'Log verified: Working tree connected. Autonomous CLI mesh and PTY bridge ready.',
-      toolCapsule: 'Initialized: Shell & Agent Bridge',
-      commandBlock: {
-        id: 'blk-init',
-        command: 'git status',
-        stdout: 'On branch master\nYour branch is up to date with origin/master.\nnothing to commit, working tree clean',
-        stderr: '',
-        exitCode: 0,
-        isExecuting: false,
-        durationMs: 42,
-        timestamp: new Date().toISOString(),
-      },
-      durationMs: 42,
-      timestamp: '3m ago',
-      metaText: 'Ready for input',
-    },
-  ]);
 
   const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('warp.primaryModel', 'claude'));
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
@@ -141,9 +100,6 @@ export const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('warp.rightPanelOpen', JSON.stringify(rightPanelOpen));
   }, [rightPanelOpen]);
-  useEffect(() => {
-    localStorage.setItem('warp.centerViewMode', JSON.stringify(centerViewMode));
-  }, [centerViewMode]);
   useEffect(() => {
     localStorage.setItem('warp.primaryModel', JSON.stringify(primaryModel));
   }, [primaryModel]);
@@ -285,49 +241,85 @@ export const App: React.FC = () => {
     setSandboxDrawerOpen(false);
   };
 
-  // Launch an agent (Claude, AGY, Codex, Shell)
-  const handleLaunchAgent = (type: SessionType) => {
-    const id = `sess-${Date.now()}`;
-    let title = 'Shell';
-    let command = '';
+  // Agents (Claude / AGY / Codex) run inside a shell session, exactly like typing
+  // the command into the terminal: their own chat UI opens right where the shell
+  // prompt was and the dock steps aside until they exit.
+  const AGENT_TITLES: Partial<Record<SessionType, string>> = {
+    claude: 'Claude Code',
+    agy: 'AGY Engine',
+    codex: 'Codex CLI',
+  };
 
-    if (type === 'claude') {
-      title = 'Claude Code';
-      command = 'claude';
-    } else if (type === 'agy') {
-      title = 'AGY Engine';
-      command = 'agy';
-    } else if (type === 'codex') {
-      title = 'Codex CLI';
-      command = 'codex';
-    }
+  const buildAgentCommand = async (type: SessionType): Promise<string> => {
+    if (type !== 'claude') return type;
+    const flags: string[] = [];
+    try {
+      const claude = (await window.warpApi?.getConfig?.())?.claude;
+      if (claude?.skipPermissions) flags.push('--dangerously-skip-permissions');
+      if (claude?.model) flags.push('--model', claude.model);
+      if (Array.isArray(claude?.additionalFlags)) flags.push(...claude.additionalFlags);
+    } catch {}
+    return ['claude', ...flags].join(' ');
+  };
 
-    const newSession: TerminalSession = {
-      id,
+  // Commands waiting for a freshly created shell pane to register its handler.
+  const pendingShellCommands = useRef<Record<string, string>>({});
+  const dispatchToShell = (sessionId: string, command: string) => {
+    const handler = shellCommandHandlers.current[sessionId];
+    if (handler) handler(command);
+    else pendingShellCommands.current[sessionId] = command;
+  };
+
+  const createShellTab = (title: string, command?: string): string => {
+    const newTabId = `tab-${Date.now()}`;
+    const newSessionId = `sess-${Date.now()}`;
+    const newTab: WorkspaceTab = {
+      id: newTabId,
       title,
-      type,
-      command,
-      cwd,
-      createdAt: new Date().toISOString(),
+      layout: 'single',
+      activeSessionId: newSessionId,
+      sessions: [{ id: newSessionId, title, type: 'shell', cwd, createdAt: new Date().toISOString() }],
     };
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(newTabId);
+    if (command) pendingShellCommands.current[newSessionId] = command;
+    return newSessionId;
+  };
 
-    setTabs((prev) =>
-      prev.map((t) => {
-        if (t.id === activeTabId) {
+  // Returns the id of the shell session the agent is being started in.
+  const handleLaunchAgent = (type: SessionType): string | null => {
+    if (type === 'shell') {
+      const id = `sess-${Date.now()}`;
+      const newSession: TerminalSession = {
+        id,
+        title: 'Shell',
+        type,
+        command: '',
+        cwd,
+        createdAt: new Date().toISOString(),
+      };
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== activeTabId) return t;
           const sessions = [...t.sessions, newSession];
-          const layout = sessions.length > 1 ? 'split-h' : 'single';
           return {
             ...t,
             sessions,
-            layout,
+            layout: sessions.length > 1 ? 'split-h' : 'single',
             activeSessionId: id,
             paneSizes: undefined,
           };
-        }
-        return t;
-      })
-    );
-    setCenterViewMode('terminal');
+        })
+      );
+      return id;
+    }
+
+    const title = AGENT_TITLES[type] || 'Terminal';
+    const idleShell = currentTab?.sessions.find((s) => s.type === 'shell' && !sessionUi[s.id]?.busy);
+    const targetId = idleShell ? idleShell.id : createShellTab(title);
+    if (idleShell) handleSetActiveSession(idleShell.id);
+    buildAgentCommand(type).then((command) => dispatchToShell(targetId, command));
+    return targetId;
   };
 
   // Launch a 2-way Split Live Autonomous Squad
@@ -378,49 +370,17 @@ export const App: React.FC = () => {
 
     setTabs((prev) => [...prev, squadTab]);
     setActiveTabId(newTabId);
-    setCenterViewMode('terminal');
 
     startSquad(config, newTabId, builderSessionId, verifierSessionId);
   };
 
   // Tab management
   const handleAddTab = (type: SessionType = 'shell') => {
-    const newTabId = `tab-${Date.now()}`;
-    const newSessionId = `sess-${Date.now()}`;
-
-    let title = `Terminal ${tabs.length + 1}`;
-    let command = '';
-    if (type === 'claude') {
-      title = 'Claude Code';
-      command = 'claude';
-    } else if (type === 'agy') {
-      title = 'AGY Engine';
-      command = 'agy';
-    } else if (type === 'codex') {
-      title = 'Codex CLI';
-      command = 'codex';
+    const title = AGENT_TITLES[type] || `Terminal ${tabs.length + 1}`;
+    const sessionId = createShellTab(title);
+    if (type !== 'shell') {
+      buildAgentCommand(type).then((command) => dispatchToShell(sessionId, command));
     }
-
-    const newTab: WorkspaceTab = {
-      id: newTabId,
-      title,
-      layout: 'single',
-      activeSessionId: newSessionId,
-      sessions: [
-        {
-          id: newSessionId,
-          title,
-          type,
-          command,
-          cwd,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    };
-
-    setTabs((prev) => [...prev, newTab]);
-    setActiveTabId(newTabId);
-    setCenterViewMode('terminal');
   };
 
   const handleCloseTab = (tabId: string) => {
@@ -512,45 +472,34 @@ export const App: React.FC = () => {
     );
   };
 
-  // Pipe error to agent for Self-Correction
-  const handlePipeErrorToAgent = (targetType: SessionType, errorSnippet: string) => {
-    // Look for existing session of this type in current tab
-    let targetSession = currentTab?.sessions.find((s) => s.type === targetType);
-
-    if (!targetSession) {
-      // Spawn new pane for this agent
-      handleLaunchAgent(targetType);
-      // Wait a moment for terminal to initialize before writing
-      setTimeout(() => {
-        const prompt = `Compiler/Test error occurred:\n${errorSnippet}\nPlease diagnose and fix this error.\r`;
-        window.warpApi.writeTerminal('', prompt);
-      }, 1000);
+  // Hand a prompt to an agent. If a program already owns the terminal (an agent
+  // that's running) type straight into it; otherwise start the agent first.
+  const sendPromptToAgent = (targetType: SessionType, prompt: string) => {
+    const busyShell = currentTab?.sessions.find((s) => s.type === 'shell' && sessionUi[s.id]?.busy);
+    if (busyShell) {
+      handleSetActiveSession(busyShell.id);
+      window.warpApi.writeTerminal(busyShell.id, prompt);
       return;
     }
+    const sessionId = handleLaunchAgent(targetType);
+    if (sessionId) setTimeout(() => window.warpApi.writeTerminal(sessionId, prompt), 5000);
+  };
 
-    // Write into existing session
-    const prompt = `Compiler/Test error occurred:\n${errorSnippet}\nPlease diagnose and fix this error.\r`;
-    window.warpApi.writeTerminal(targetSession.id, prompt);
-    handleSetActiveSession(targetSession.id);
+  // Pipe error to agent for Self-Correction
+  const handlePipeErrorToAgent = (targetType: SessionType, errorSnippet: string) => {
+    sendPromptToAgent(
+      targetType,
+      `Compiler/Test error occurred:\n${errorSnippet}\nPlease diagnose and fix this error.\r`
+    );
   };
 
   // Cross-Model Adversarial Review from Git Diff
   const handleSendDiffToAgent = (targetType: SessionType) => {
-    let targetSession = currentTab?.sessions.find((s) => s.type === targetType);
     const instruction = `Please review this git diff for security vulnerabilities, memory leaks, and edge cases:\n\`\`\`diff\n${gitDiff.slice(
       0,
       3000
     )}\n\`\`\`\r`;
-
-    if (!targetSession) {
-      handleLaunchAgent(targetType);
-      setTimeout(() => {
-        window.warpApi.writeTerminal('', instruction);
-      }, 1000);
-    } else {
-      window.warpApi.writeTerminal(targetSession.id, instruction);
-      handleSetActiveSession(targetSession.id);
-    }
+    sendPromptToAgent(targetType, instruction);
 
     setDiffOpen(false);
   };
@@ -572,65 +521,75 @@ export const App: React.FC = () => {
     }
   };
 
+  // Registry of shell-pane "command submitted" handlers, one per XtermPane
+  // currently mounted for a shell session, keyed by session id. Lets
+  // handleSendInputToActive tell the right pane to inject a block header when
+  // a command comes in through BottomCommandDock (which writes straight to
+  // the PTY over IPC and never fires that pane's local term.onData).
+  const shellCommandHandlers = useRef<Record<string, (command: string) => void>>({});
+  const registerShellCommandHandler = useCallback(
+    (sessionId: string, handler: ((command: string) => void) | null) => {
+      if (handler) {
+        shellCommandHandlers.current[sessionId] = handler;
+        const pending = pendingShellCommands.current[sessionId];
+        if (pending) {
+          delete pendingShellCommands.current[sessionId];
+          handler(pending);
+        }
+      } else delete shellCommandHandlers.current[sessionId];
+    },
+    []
+  );
+
+  // Per-shell-session UI state reported by XtermPane: whether a command is
+  // currently running (dock hides so the program's own UI owns the terminal)
+  // and the shell's current directory.
+  const [sessionUi, setSessionUi] = useState<Record<string, { busy: boolean; cwd: string; agent?: boolean }>>({});
+  const handleSessionState = useCallback(
+    (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => {
+      setSessionUi((prev) => {
+        const cur = prev[sessionId];
+        if (cur && cur.busy === state.busy && cur.cwd === state.cwd && cur.agent === state.agent) return prev;
+        return { ...prev, [sessionId]: state };
+      });
+    },
+    []
+  );
+  const activeSessionUi = activeSession ? sessionUi[activeSession.id] : undefined;
+  // While an agent CLI runs, Dexter's own input area is removed entirely.
+  const dockSlotVisible =
+    (!activeSession || activeSession.type === 'shell') && !(activeSessionUi?.busy && activeSessionUi?.agent);
+  const dockVisible = dockSlotVisible && !activeSessionUi?.busy;
+
+  // While a command owns the terminal the dock is swapped for a strip of the
+  // same height. Keeping the slot size constant means the PTY is never resized
+  // when a command starts/ends, which would make ConPTY repaint and shift the
+  // block headers drawn over the scrollback.
+  const dockSlotRef = useRef<HTMLDivElement>(null);
+  const [dockHeight, setDockHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const el = dockSlotRef.current;
+    if (!el || !dockVisible) return;
+    const measure = () => setDockHeight(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [dockVisible, dockSlotVisible]);
+
   const handleSendInputToActive = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // Append to Command Blocks Feed
-    const blockId = `blk-${Date.now()}`;
-    const startTime = Date.now();
-    const isAiQuery = trimmed.startsWith('#');
-
-    const newStreamItem: StreamItem = {
-      id: `stream-${Date.now()}`,
-      userPrompt: trimmed,
-      thoughtLog: isAiQuery
-        ? `Dexter AI Search: Translating query into executable CLI pipeline...`
-        : `Terminal Execution: Running command in active shell (${activeSession?.title || 'Shell'})...`,
-      toolCapsule: `Command: ${trimmed.slice(0, 45)}`,
-      commandBlock: {
-        id: blockId,
-        command: trimmed,
-        stdout: '',
-        stderr: '',
-        exitCode: null,
-        isExecuting: true,
-        timestamp: new Date().toISOString(),
-      },
-      durationMs: undefined,
-      timestamp: 'just now',
-      metaText: 'Executing...',
-    };
-
-    setStreamFeed((prev) => [...prev, newStreamItem]);
-
     if (window.warpApi && activeSession) {
-      window.warpApi.writeTerminal(activeSession.id, text);
+      // Shell sessions are chat-style: the pane runs the command in its own
+      // PowerShell session. Agent sessions still take raw PTY input.
+      if (activeSession.type === 'shell') {
+        shellCommandHandlers.current[activeSession.id]?.(trimmed);
+      } else {
+        window.warpApi.writeTerminal(activeSession.id, text);
+      }
     }
-
-    // Mark completion after execution for block display
-    setTimeout(() => {
-      setStreamFeed((prev) =>
-        prev.map((item) => {
-          if (item.commandBlock?.id === blockId && item.commandBlock.isExecuting) {
-            const elapsed = Date.now() - startTime;
-            return {
-              ...item,
-              durationMs: elapsed,
-              metaText: 'Execution completed',
-              commandBlock: {
-                ...item.commandBlock,
-                isExecuting: false,
-                exitCode: 0,
-                stdout: item.commandBlock.stdout || `[Process completed with exit code 0]`,
-                durationMs: elapsed,
-              },
-            };
-          }
-          return item;
-        })
-      );
-    }, 1000);
   };
 
   // Command Palette: catalog of every action a power user might reach for
@@ -867,15 +826,9 @@ export const App: React.FC = () => {
   }, [activeSession, activeTabId, cycleTab]);
 
   return (
-    <div className="flex flex-col h-screen w-screen ambient-background overflow-hidden select-none font-sans text-slate-200">
+    <div className="flex flex-col h-screen w-screen ambient-background overflow-hidden select-none font-sans text-zinc-200">
       {/* Top Bar: Tabs & Quick Agent Launchers */}
       <TopBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onSelectTab={setActiveTabId}
-        onAddTab={handleAddTab}
-        onCloseTab={handleCloseTab}
-        onLaunchAgent={handleLaunchAgent}
         onToggleDiff={() => {
           refreshGitDiff();
           setRightPanelOpen(!rightPanelOpen);
@@ -893,10 +846,11 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content: Sidebar + Center Workspace + Right Panel */}
-      <div className="flex-1 w-full min-h-0 relative flex bg-[#000000]">
+      <div className="flex-1 w-full min-h-0 relative flex bg-base-app">
         {sidebarOpen && (
           <Sidebar
             isOpen={sidebarOpen}
+            onToggleSidebar={() => setSidebarOpen((v) => !v)}
             cwd={cwd}
             gitBranch={gitBranch}
             tabs={tabs}
@@ -912,7 +866,7 @@ export const App: React.FC = () => {
           />
         )}
 
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-[#000000]">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-base-app">
           {/* Live Squad Status Banner (if active on current tab) */}
           {squad && squad.tabId === activeTabId && squad.active && (
             <SquadBar
@@ -923,170 +877,11 @@ export const App: React.FC = () => {
             />
           )}
 
-          {/* Center Session Breadcrumb Header (Matches reference screenshot: ← → Session Title ... Changes) */}
-          <div className="h-9 bg-[#000000] border-b border-zinc-900 flex items-center justify-between px-3 select-none flex-shrink-0">
-            <div className="flex items-center space-x-2.5 min-w-0">
-              <div className="flex items-center space-x-0.5 text-zinc-500">
-                <button
-                  onClick={() => cycleTab(-1)}
-                  className="p-1 rounded hover:bg-zinc-900 hover:text-zinc-200 transition-colors"
-                  title="Previous Session"
-                >
-                  <ArrowLeft size={13} />
-                </button>
-                <button
-                  onClick={() => cycleTab(1)}
-                  className="p-1 rounded hover:bg-zinc-900 hover:text-zinc-200 transition-colors"
-                  title="Next Session"
-                >
-                  <ArrowRight size={13} />
-                </button>
-              </div>
-
-              <span className="text-xs font-semibold text-zinc-200 truncate font-sans">
-                {currentTab?.title || 'Terminal Session'}
-              </span>
-
-              {activeSession && (
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
-                  {activeSession.type}
-                </span>
-              )}
-            </div>
-
-            {/* Quick 1-Click Launchers Bar (Direct Terminal / CLI access) */}
-            <div className="flex items-center space-x-1.5">
-              <button
-                onClick={() => handleLaunchAgent('claude')}
-                className="flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-zinc-950/40 text-zinc-300 border border-zinc-800/50 hover:bg-zinc-900/50 hover:text-zinc-100 transition-all shadow-xs"
-                title="Launch Claude Code interactive CLI in split pane"
-              >
-                <Sparkles size={11} className="text-zinc-400" />
-                <span>+ Claude</span>
-              </button>
-              <button
-                onClick={() => handleLaunchAgent('agy')}
-                className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-zinc-900 text-zinc-300 border border-zinc-700/80 hover:bg-zinc-800 hover:text-white transition-all shadow-xs"
-                title="Launch AGY Engine interactive CLI in split pane"
-              >
-                <Shield size={11} className="text-zinc-300" />
-                <span>+ AGY</span>
-              </button>
-              <button
-                onClick={() => handleLaunchAgent('shell')}
-                className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800 hover:text-zinc-200 transition-all shadow-xs"
-                title="Launch PowerShell / Bash Shell in split pane"
-              >
-                <Terminal size={11} />
-                <span>+ Shell</span>
-              </button>
-
-              <div className="h-3 w-px bg-zinc-850 mx-0.5" />
-
-              <button
-                onClick={() => activeSession && handleSplitSession(activeSession.id, 'h')}
-                className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
-                title="Split Horizontal (Ctrl+D)"
-              >
-                <SplitSquareHorizontal size={12} />
-              </button>
-              <button
-                onClick={() => activeSession && handleSplitSession(activeSession.id, 'v')}
-                className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
-                title="Split Vertical (Ctrl+E)"
-              >
-                <SplitSquareVertical size={12} />
-              </button>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              {/* Token & Context Optimizer Badge */}
-              <button
-                onClick={() => setHudOpen(true)}
-                className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono bg-zinc-950/80 border border-emerald-900/50 text-emerald-400 hover:bg-emerald-950/40 hover:border-emerald-700/60 transition-all shadow-sm"
-                title="Open Token & Context Optimizer HUD (Ctrl+Shift+O)"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>{contextTelemetry?.savingsPercentage ?? 68}% saved</span>
-                <span className="text-zinc-600">|</span>
-                <span className="text-zinc-300">{(contextTelemetry?.savedTokensTotal ?? 3300).toLocaleString()} tk</span>
-              </button>
-
-              {/* View Switcher: Terminal vs Split vs Blocks */}
-              <div className="flex items-center bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 text-[11px] font-sans">
-                <button
-                  onClick={() => setCenterViewMode('terminal')}
-                  className={`px-2.5 py-0.5 rounded-md transition-all ${
- centerViewMode === 'terminal'
- ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
- : 'text-zinc-500 hover:text-zinc-300'
- }`}
-                  title="Full-Screen PTY Terminal Grid"
-                >
-                  Terminal
-                </button>
-                <button
-                  onClick={() => setCenterViewMode('split')}
-                  className={`px-2.5 py-0.5 rounded-md transition-all ${
- centerViewMode === 'split'
- ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
- : 'text-zinc-500 hover:text-zinc-300'
- }`}
-                  title="Split Stream & Terminal Side-by-Side"
-                >
-                  Split
-                </button>
-                <button
-                  onClick={() => setCenterViewMode('stream')}
-                  className={`px-2.5 py-0.5 rounded-md transition-all ${
- centerViewMode === 'stream'
- ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
- : 'text-zinc-500 hover:text-zinc-300'
- }`}
-                  title="Command Blocks & Agent Stream Feed"
-                >
-                  Blocks
-                </button>
-              </div>
-
-              <button
-                onClick={() => setRightPanelOpen(!rightPanelOpen)}
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
- rightPanelOpen
- ? 'bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
- : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
- }`}
-                title="Toggle Changes / Sandbox Split Panel"
-              >
-                <GitCompare size={12} />
-                <span className="hidden sm:inline">Changes</span>
-                {gitFiles.length > 0 && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-zinc-800 text-zinc-300">
-                    +{gitFiles.length}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 min-w-0 min-h-0 flex bg-[#000000]">
-            {/* Mode 1: Command Blocks Stream (Cursor / Windsurf style) */}
-            {centerViewMode === 'stream' && (
-              <CommandBlocksFeed
-                items={streamFeed}
-                onExplainWithClaude={(cmd, out) =>
-                  handlePipeErrorToAgent('claude', `Explain command: ${cmd}\nOutput: ${out}`)
-                }
-                onFixWithAgy={(cmd, err) =>
-                  handlePipeErrorToAgent('agy', `Fix error in: ${cmd}\nError: ${err}`)
-                }
-                onRerunCommand={(cmd) => handleSendInputToActive(cmd + '\r')}
-                onQuickPrompt={(p) => handleSendInputToActive(p + '\r')}
-              />
-            )}
-
-            {/* Mode 2: Pure Multi-Pane PTY Terminal */}
-            {centerViewMode === 'terminal' && currentTab && (
+          {/* Full-bleed terminal canvas — no chrome, no header. The active CLI
+              (Claude/AGY/Codex/Shell) renders edge-to-edge with zero app-level
+              decoration on top of it. */}
+          <div className="flex-1 min-w-0 min-h-0 flex bg-base-app">
+            {currentTab && (
               <PaneGrid
                 tab={currentTab}
                 onSetActiveSession={handleSetActiveSession}
@@ -1095,39 +890,57 @@ export const App: React.FC = () => {
                 onPipeErrorToAgent={handlePipeErrorToAgent}
                 onResizePanes={handleResizePanes}
                 onLaunchAgent={handleLaunchAgent}
+                onRegisterCommandHandler={registerShellCommandHandler}
+                onSessionState={handleSessionState}
               />
             )}
+          </div>
 
-            {/* Mode 3: Split Both (Blocks on Left, Terminal on Right) */}
-            {centerViewMode === 'split' && currentTab && (
-              <div className="flex-1 w-full h-full flex flex-row min-w-0 min-h-0 divide-x divide-zinc-800/80">
-                <div className="flex-1 min-w-0 min-h-0 flex">
-                  <CommandBlocksFeed
-                    items={streamFeed}
-                    onExplainWithClaude={(cmd, out) =>
-                      handlePipeErrorToAgent('claude', `Explain command: ${cmd}\nOutput: ${out}`)
-                    }
-                    onFixWithAgy={(cmd, err) =>
-                      handlePipeErrorToAgent('agy', `Fix error in: ${cmd}\nError: ${err}`)
-                    }
-                    onRerunCommand={(cmd) => handleSendInputToActive(cmd + '\r')}
-                    onQuickPrompt={(p) => handleSendInputToActive(p + '\r')}
-                  />
-                </div>
-                <div className="flex-1 min-w-0 min-h-0 flex">
-                  <PaneGrid
-                    tab={currentTab}
-                    onSetActiveSession={handleSetActiveSession}
-                    onCloseSession={handleCloseSession}
-                    onSplitSession={handleSplitSession}
-                    onPipeErrorToAgent={handlePipeErrorToAgent}
-                    onResizePanes={handleResizePanes}
-                    onLaunchAgent={handleLaunchAgent}
-                  />
-                </div>
+          {/* Bottom Command Dock — scoped to the center column only, so it never
+              slides underneath the sidebar. Only for plain shell sessions: agent
+              CLIs (Claude/AGY/Codex) render their own full-height chat/input
+              inside the PTY itself, so showing our own input bar on top of
+              theirs would duplicate it. */}
+          {dockSlotVisible && (
+            <div
+              ref={dockSlotRef}
+              className="flex-shrink-0"
+              style={!dockVisible && dockHeight ? { height: dockHeight } : undefined}
+            >
+            {dockVisible ? (
+            <BottomCommandDock
+              activeSession={activeSession}
+              onSendInput={handleSendInputToActive}
+              primaryModel={primaryModel}
+              onSelectModel={setPrimaryModel}
+              gitBranch={gitBranch}
+              cwd={activeSessionUi?.cwd || cwd}
+              onContinueWorking={() => {
+                if (activeSession) handleSendInputToActive('\r');
+              }}
+              onCommitAndPush={() => {
+                setRightPanelOpen(true);
+              }}
+              onExplainActive={() => {
+                if (activeSession) {
+                  handlePipeErrorToAgent('claude', 'Please diagnose recent terminal command output.');
+                }
+              }}
+              onFixActive={() => {
+                if (activeSession) {
+                  handlePipeErrorToAgent('agy', 'Auto-fix detected error in terminal.');
+                }
+              }}
+              onOpenHud={() => setHudOpen(true)}
+              tokenSavingsText={`${contextTelemetry?.savingsPercentage ?? 68}% saved`}
+            />
+            ) : (
+              <div className="h-full bg-base-app border-t border-zinc-900/70 px-4 pt-3 text-[11px] font-mono text-zinc-600 select-none">
+                Program running — keyboard input goes to the terminal · Ctrl+C to interrupt
               </div>
             )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Right Split Panel: Changes / Sandbox */}
@@ -1146,34 +959,6 @@ export const App: React.FC = () => {
           />
         )}
       </div>
-
-      {/* Bottom Command Dock (Matches reference floating capsule & action chips) */}
-      <BottomCommandDock
-        activeSession={activeSession}
-        onSendInput={handleSendInputToActive}
-        primaryModel={primaryModel}
-        onSelectModel={setPrimaryModel}
-        gitBranch={gitBranch}
-        cwd={cwd}
-        onContinueWorking={() => {
-          if (activeSession) handleSendInputToActive('\r');
-        }}
-        onCommitAndPush={() => {
-          setRightPanelOpen(true);
-        }}
-        onExplainActive={() => {
-          if (activeSession) {
-            handlePipeErrorToAgent('claude', 'Please diagnose recent terminal command output.');
-          }
-        }}
-        onFixActive={() => {
-          if (activeSession) {
-            handlePipeErrorToAgent('agy', 'Auto-fix detected error in terminal.');
-          }
-        }}
-        onOpenHud={() => setHudOpen(true)}
-        tokenSavingsText={`${contextTelemetry?.savingsPercentage ?? 68}% saved`}
-      />
 
       {/* Status Bar */}
       <StatusBar
@@ -1229,9 +1014,7 @@ export const App: React.FC = () => {
         isOpen={skillsModalOpen}
         onClose={() => setSkillsModalOpen(false)}
         onRunInTerminal={(command) => {
-          if (activeSession && window.warpApi?.writeTerminal) {
-            window.warpApi.writeTerminal(activeSession.id, command + '\r');
-          }
+          if (activeSession) handleSendInputToActive(command);
         }}
         onInsertIntoInput={(command) => {
           handleSendInputToActive(command);
