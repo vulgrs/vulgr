@@ -51,6 +51,27 @@ export class PtyManager {
       }
     }
 
+    // Plain shell sessions (no explicit command): replace the shell's own
+    // prompt with an invisible OSC 633;D marker (exit code + cwd) followed by a
+    // newline. The UI uses it to know when a command finished and where the
+    // next block starts, and paints its own block header on the reserved row.
+    const isPlainShellSession = !options.command;
+    if (isPlainShellSession && /(^|[\\/])(powershell|pwsh)(\.exe)?$/i.test(file)) {
+      const promptFn =
+        'function global:prompt { $ok = $?; $code = if ($ok) { 0 } else { 1 }; ' +
+        '"$([char]27)]633;D;$code;$($PWD.Path)$([char]7)`n" }; ' +
+        // Everything is bottom-anchored: the prompt starts on the last rows of the pane
+        // and output scrolls up from there. clear/cls wipes the screen + scrollback, drops
+        // the cursor near the bottom, tells the UI (OSC 633;E) where the clear block's
+        // header goes (2 rows) and leaves room for the next prompt (2 rows).
+        'function global:Clear-Host { $e = [char]27; ' +
+        '$pad = [Math]::Max(0, $Host.UI.RawUI.WindowSize.Height - 4); ' +
+        '[Console]::Write("${e}[2J${e}[3J${e}[H" + ("`r`n" * $pad) + "${e}]633;E$([char]7)`r`n`r`n") }; ' +
+        // First prompt: start on the last two rows (header row + echo row).
+        '[Console]::Write("`r`n" * [Math]::Max(0, $Host.UI.RawUI.WindowSize.Height - 2))';
+      args = ['-NoLogo', '-NoExit', '-Command', promptFn];
+    }
+
     const cwd = options.cwd || process.cwd();
     const cols = options.cols || 80;
     const rows = options.rows || 24;
@@ -68,6 +89,12 @@ export class PtyManager {
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
     } as { [key: string]: string };
+
+    if (isPlainShellSession && !isWindows) {
+      // bash/zsh: same OSC 633;D marker as the PowerShell prompt above.
+      env['PS1'] = '';
+      env['PROMPT_COMMAND'] = 'printf "\\033]633;D;%s;%s\\007\\n" "$?" "$PWD"';
+    }
 
     const pathKey = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
     const currentPath = process.env[pathKey] || '';
