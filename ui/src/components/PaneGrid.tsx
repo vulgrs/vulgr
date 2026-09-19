@@ -11,6 +11,8 @@ interface PaneGridProps {
   onPipeErrorToAgent: (targetType: SessionType, errorSnippet: string) => void;
   onResizePanes: (sizes: number[]) => void;
   onLaunchAgent?: (type: SessionType) => void;
+  onRegisterCommandHandler?: (sessionId: string, handler: ((command: string) => void) | null) => void;
+  onSessionState?: (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => void;
 }
 
 const MIN_PANE_PCT = 12;
@@ -23,6 +25,8 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
   onPipeErrorToAgent,
   onResizePanes,
   onLaunchAgent,
+  onRegisterCommandHandler,
+  onSessionState,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{ index: number; startPos: number; sizes: number[]; axis: 'x' | 'y' } | null>(
@@ -170,7 +174,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
   );
 
   return (
-    <div ref={containerRef} className={`flex-1 w-full h-full p-2 min-h-0 min-w-0 ${containerClass}`}>
+    <div ref={containerRef} className={`flex-1 w-full h-full min-h-0 min-w-0 ${containerClass}`}>
       {tab.sessions.map((session, i) => (
         <React.Fragment key={session.id}>
           <div
@@ -184,13 +188,16 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
             }
           >
             <XtermPane
-              session={session}
-              isActive={session.id === tab.activeSessionId}
-              onFocus={() => onSetActiveSession(session.id)}
-              onClose={() => onCloseSession(session.id)}
-              onSplit={(dir) => onSplitSession(session.id, dir)}
-              onPipeErrorToAgent={onPipeErrorToAgent}
-            />
+                session={session}
+                isActive={session.id === tab.activeSessionId}
+                isSplitView={isSplit}
+                onFocus={() => onSetActiveSession(session.id)}
+                onClose={() => onCloseSession(session.id)}
+                onSplit={(dir) => onSplitSession(session.id, dir)}
+                onPipeErrorToAgent={onPipeErrorToAgent}
+                onRegisterCommandHandler={onRegisterCommandHandler}
+                onSessionState={onSessionState}
+              />
           </div>
 
           {isSplit && i < count - 1 && (
