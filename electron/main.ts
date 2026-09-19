@@ -57,6 +57,7 @@ async function createWindow() {
     backgroundColor: '#0c0d12',
     show: true,
     autoHideMenuBar: true,
+    frame: false,
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -66,6 +67,12 @@ async function createWindow() {
   });
 
   ptyManager.setWindow(mainWindow);
+
+  const broadcastMaximizedState = () => {
+    mainWindow?.webContents.send('window:maximized-changed', mainWindow.isMaximized());
+  };
+  mainWindow.on('maximize', broadcastMaximizedState);
+  mainWindow.on('unmaximize', broadcastMaximizedState);
 
   mainWindow.webContents.on('did-fail-load', (_, errorCode, errorDescription, validatedURL) => {
     console.error(`[Electron] Failed to load ${validatedURL}: [${errorCode}] ${errorDescription}`);
@@ -105,6 +112,22 @@ async function createWindow() {
 }
 
 function setupIpcHandlers() {
+  // Custom Frameless Window Controls
+  ipcMain.on('window:minimize', () => {
+    mainWindow?.minimize();
+  });
+  ipcMain.on('window:maximize-toggle', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    else mainWindow.maximize();
+  });
+  ipcMain.on('window:close', () => {
+    mainWindow?.close();
+  });
+  ipcMain.handle('window:is-maximized', () => {
+    return mainWindow?.isMaximized() ?? false;
+  });
+
   // PTY IPC Handlers
   ipcMain.handle('pty:create', async (_, options) => {
     return ptyManager.createTerminal(options);
@@ -121,6 +144,7 @@ function setupIpcHandlers() {
   ipcMain.on('pty:kill', (_, { id }) => {
     ptyManager.kill(id);
   });
+
 
   // Diagnostics & Doctor
   ipcMain.handle('system:doctor', async () => {

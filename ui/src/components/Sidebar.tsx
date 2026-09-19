@@ -1,12 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Search,
-  Zap,
-  Sliders,
-  FolderGit2,
-  ChevronDown,
-  ChevronRight,
   Terminal,
   Sparkles,
   Shield,
@@ -14,14 +9,13 @@ import {
   Settings,
   Clock,
   User,
-  GitBranch,
-  Users,
 } from 'lucide-react';
 import type { WorkspaceTab, SessionType } from '../types/warp.js';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose?: () => void;
+  onToggleSidebar?: () => void;
   cwd: string;
   gitBranch: string | null;
   tabs: WorkspaceTab[];
@@ -36,24 +30,29 @@ interface SidebarProps {
   pastRuns?: any[];
 }
 
+const typeMeta: Record<SessionType, { icon: React.ReactNode; chip: string; label: string }> = {
+  claude: { icon: <Sparkles size={11} className="text-white" />, chip: 'bg-orange-600/90', label: 'Claude Code' },
+  agy: { icon: <Shield size={11} className="text-white" />, chip: 'bg-blue-600/90', label: 'AGY Engine' },
+  codex: { icon: <Bot size={11} className="text-white" />, chip: 'bg-emerald-600/90', label: 'Codex CLI' },
+  shell: { icon: <Terminal size={11} className="text-white" />, chip: 'bg-zinc-600', label: 'Terminal' },
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
+  onToggleSidebar,
   cwd,
-  gitBranch,
   tabs,
   activeTabId,
   onSelectTab,
   onNewSession,
-  onLaunchAgent,
   onOpenPalette,
   onOpenSquads,
   onOpenSkills,
   onOpenSettings,
   pastRuns = [],
 }) => {
-  const [reposExpanded, setReposExpanded] = useState(true);
-  const [projectsExpanded, setProjectsExpanded] = useState(true);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     const handleOutside = () => setNewMenuOpen(false);
@@ -63,323 +62,139 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [newMenuOpen]);
 
+  const filteredTabs = useMemo(() => {
+    if (!query.trim()) return tabs;
+    const q = query.toLowerCase();
+    return tabs.filter((t) => t.title.toLowerCase().includes(q));
+  }, [tabs, query]);
+
   if (!isOpen) return null;
 
-  const repoName = cwd ? cwd.split(/[\\/]/).pop() || 'cli' : 'cli';
-
   return (
-    <div className="w-60 bg-[#000000] border-r border-zinc-800/80 flex flex-col h-full select-none text-xs text-zinc-300 z-20 flex-shrink-0 animate-in slide-in-from-left-2 duration-150">
-      {/* Top Action Button & Quick CLI Launchers */}
-      <div className="p-3 border-b border-zinc-900 space-y-2">
-        <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div className="w-60 bg-base-app border-r border-zinc-900 flex flex-col h-full select-none text-xs text-zinc-300 z-20 flex-shrink-0 animate-slide-in-left">
+      {/* Search + New Session */}
+      <div className="h-10 px-2 flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 min-w-0">
+          <Search size={12} className="text-zinc-500 flex-shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tabs..."
+            className="flex-1 min-w-0 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none"
+          />
+        </div>
+
+        <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setNewMenuOpen(!newMenuOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-100 font-medium text-xs transition-all shadow-sm hover:border-zinc-700 active:scale-[0.99]"
+            className="p-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
+            title="New Session"
           >
-            <div className="flex items-center space-x-2">
-              <Plus size={14} className="text-zinc-400" />
-              <span>New Session</span>
-            </div>
-            <ChevronDown size={12} className={`text-zinc-500 transition-transform ${newMenuOpen ? 'rotate-180' : ''}`} />
+            <Plus size={13} />
           </button>
 
-          {/* New Session Dropdown Picker */}
           {newMenuOpen && (
-            <div className="absolute left-0 right-0 mt-1.5 rounded-xl bg-[#09090b] border border-zinc-800 shadow-2xl p-1.5 z-50 text-xs font-sans animate-in fade-in slide-in-from-top-1">
+            <div className="absolute right-0 mt-1.5 w-52 rounded-xl bg-base-elevated border border-zinc-800 shadow-2xl p-1.5 z-50 text-xs font-sans animate-slide-in-up">
               <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
                 Start Terminal CLI
               </div>
 
-              <button
-                onClick={() => {
-                  onNewSession('claude');
-                  setNewMenuOpen(false);
-                }}
-                className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
-              >
-                <div className="p-1 rounded-md bg-zinc-950/60 text-zinc-400 border border-zinc-800/60 group-hover:bg-zinc-900/60">
-                  <Sparkles size={13} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-zinc-200">Claude Code</div>
-                  <div className="text-[10px] text-zinc-500 truncate">Anthropic AI Terminal CLI</div>
-                </div>
-                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850">
-                  claude
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  onNewSession('agy');
-                  setNewMenuOpen(false);
-                }}
-                className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
-              >
-                <div className="p-1 rounded-md bg-zinc-900 text-zinc-300 border border-zinc-750 group-hover:bg-zinc-800">
-                  <Shield size={13} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-zinc-200">AGY Engine</div>
-                  <div className="text-[10px] text-zinc-500 truncate">Antigravity 2.0 CLI</div>
-                </div>
-                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850">
-                  agy
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  onNewSession('shell');
-                  setNewMenuOpen(false);
-                }}
-                className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
-              >
-                <div className="p-1 rounded-md bg-zinc-900 text-zinc-400 border border-zinc-800 group-hover:bg-zinc-800">
-                  <Terminal size={13} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-zinc-200">Interactive Shell</div>
-                  <div className="text-[10px] text-zinc-500 truncate">PowerShell / Bash PTY</div>
-                </div>
-                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850">
-                  pwsh
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  onNewSession('codex');
-                  setNewMenuOpen(false);
-                }}
-                className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
-              >
-                <div className="p-1 rounded-md bg-zinc-900 text-emerald-400 border border-emerald-900/60 group-hover:bg-zinc-800">
-                  <Bot size={13} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-zinc-200">Codex CLI</div>
-                  <div className="text-[10px] text-zinc-500 truncate">OpenAI Terminal CLI</div>
-                </div>
-                <span className="text-[9px] font-mono text-zinc-600 bg-zinc-950 px-1 py-0.5 rounded border border-zinc-850">
-                  codex
-                </span>
-              </button>
-
-              <div className="my-1 border-t border-zinc-850" />
-
-              <button
-                onClick={() => {
-                  onOpenSquads();
-                  setNewMenuOpen(false);
-                }}
-                className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-900 text-left transition-colors"
-              >
-                <Users size={13} className="text-zinc-500" />
-                <span className="text-xs">Dual Squad (Claude + AGY)...</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* 1-Click Quick Launcher Row */}
-        <div className="grid grid-cols-3 gap-1.5 pt-0.5">
-          <button
-            onClick={() => onNewSession('claude')}
-            className="flex items-center justify-center space-x-1 py-1 rounded-md bg-zinc-950/30 hover:bg-zinc-900/40 border border-zinc-800/40 text-zinc-300 text-[11px] font-medium transition-all"
-            title="Start new Claude Code session"
-          >
-            <Sparkles size={11} className="text-zinc-400" />
-            <span>Claude</span>
-          </button>
-          <button
-            onClick={() => onNewSession('agy')}
-            className="flex items-center justify-center space-x-1 py-1 rounded-md bg-zinc-900/80 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 text-[11px] font-medium transition-all"
-            title="Start new AGY Engine session"
-          >
-            <Shield size={11} className="text-zinc-300" />
-            <span>AGY</span>
-          </button>
-          <button
-            onClick={() => onNewSession('shell')}
-            className="flex items-center justify-center space-x-1 py-1 rounded-md bg-zinc-900/80 hover:bg-zinc-850 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-[11px] font-medium transition-all"
-            title="Start new Shell session"
-          >
-            <Terminal size={11} />
-            <span>Shell</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Navigation Links (Matches Reference: Search, Automations, Customize) */}
-      <div className="px-2 py-2 border-b border-zinc-900 space-y-0.5">
-        <button
-          onClick={onOpenPalette}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 text-xs transition-all"
-        >
-          <div className="flex items-center space-x-2">
-            <Search size={13} className="text-zinc-500" />
-            <span>Search</span>
-          </div>
-          <span className="text-[10px] font-mono text-zinc-600 bg-zinc-900 border border-zinc-800 rounded px-1">
-            ^P
-          </span>
-        </button>
-
-        <button
-          onClick={onOpenSquads}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 text-xs transition-all"
-        >
-          <div className="flex items-center space-x-2">
-            <Zap size={13} className="text-zinc-500" />
-            <span>Automations</span>
-          </div>
-          <span className="text-[9px] font-mono text-zinc-500">Squad</span>
-        </button>
-
-        <button
-          onClick={onOpenSkills}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 text-xs transition-all"
-        >
-          <div className="flex items-center space-x-2">
-            <Sliders size={13} className="text-zinc-500" />
-            <span>Customize</span>
-          </div>
-          <span className="text-[9px] font-mono text-zinc-500">Skills</span>
-        </button>
-      </div>
-
-      {/* Tree Section (Matches Reference: Projects & Repositories with session history) */}
-      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-3 font-sans">
-        {/* Projects header */}
-        <div>
-          <div
-            onClick={() => setProjectsExpanded(!projectsExpanded)}
-            className="flex items-center justify-between px-1.5 py-1 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider cursor-pointer hover:text-zinc-300"
-          >
-            <div className="flex items-center space-x-1">
-              {projectsExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-              <span>Projects</span>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onNewSession();
-              }}
-              className="p-0.5 rounded hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300"
-            >
-              <Plus size={12} />
-            </button>
-          </div>
-
-          {projectsExpanded && (
-            <div className="mt-1 space-y-0.5 pl-1.5">
-              <div className="flex items-center justify-between px-2 py-1 rounded-md text-xs text-zinc-300 bg-zinc-900/50 border border-zinc-800/60 font-medium">
-                <div className="flex items-center space-x-2 truncate">
-                  <FolderGit2 size={12} className="text-zinc-500 flex-shrink-0" />
-                  <span className="truncate">{repoName}</span>
-                </div>
-                {gitBranch && (
-                  <span className="text-[9px] font-mono text-zinc-500 truncate max-w-[60px]">
-                    {gitBranch}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Repositories & Sessions List (Exact layout from reference image) */}
-        <div>
-          <div
-            onClick={() => setReposExpanded(!reposExpanded)}
-            className="flex items-center justify-between px-1.5 py-1 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider cursor-pointer hover:text-zinc-300"
-          >
-            <div className="flex items-center space-x-1">
-              {reposExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-              <span>Repositories</span>
-            </div>
-          </div>
-
-          {reposExpanded && (
-            <div className="mt-1 space-y-1">
-              {/* Repository Title Item */}
-              <div className="flex items-center space-x-2 px-2 py-1 text-xs text-zinc-400 font-medium">
-                <FolderGit2 size={12} className="text-zinc-500" />
-                <span className="truncate">{repoName}</span>
-              </div>
-
-              {/* Active Workspace Tabs / Sessions */}
-              <div className="space-y-0.5 pl-3 border-l border-zinc-800/60 ml-2.5">
-                {tabs.map((tab) => {
-                  const isActive = tab.id === activeTabId;
-                  const firstSession = tab.sessions[0];
-                  const sessionType = firstSession?.type || 'shell';
-
-                  return (
-                    <div
-                      key={tab.id}
-                      onClick={() => onSelectTab(tab.id)}
-                      className={`flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer text-xs transition-all ${
- isActive
- ? 'bg-zinc-800 text-zinc-100 font-medium shadow-sm'
- : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
- }`}
-                    >
-                      <div className="flex items-center space-x-2 truncate min-w-0">
-                        {sessionType === 'claude' ? (
-                          <Sparkles size={11} className="text-zinc-400 flex-shrink-0" />
-                        ) : sessionType === 'agy' ? (
-                          <Shield size={11} className="text-zinc-300 flex-shrink-0" />
-                        ) : sessionType === 'codex' ? (
-                          <Bot size={11} className="text-emerald-400 flex-shrink-0" />
-                        ) : (
-                          <Terminal size={11} className="text-zinc-500 flex-shrink-0" />
-                        )}
-                        <span className="truncate">{tab.title}</span>
-                      </div>
-
-                      <span className="text-[10px] font-mono text-zinc-600 flex-shrink-0 ml-1">
-                        {isActive ? 'now' : 'idle'}
-                      </span>
-                    </div>
-                  );
-                })}
-
-                {/* Additional Past Sessions from history */}
-                {pastRuns.slice(0, 4).map((run) => (
-                  <div
-                    key={run.runId}
-                    className="flex items-center justify-between px-2 py-1 rounded-md text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40 cursor-pointer transition-all"
+              {(['claude', 'agy', 'shell', 'codex'] as SessionType[]).map((type) => {
+                const meta = typeMeta[type];
+                return (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      onNewSession(type);
+                      setNewMenuOpen(false);
+                    }}
+                    className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
                   >
-                    <div className="flex items-center space-x-2 truncate min-w-0">
-                      <Clock size={10} className="text-zinc-600 flex-shrink-0" />
-                      <span className="truncate">{run.prompt || run.runId}</span>
+                    <div className={`w-5 h-5 rounded flex items-center justify-center ${meta.chip}`}>
+                      {meta.icon}
                     </div>
-                    <span className="text-[9px] font-mono text-zinc-600">3h</span>
-                  </div>
-                ))}
-              </div>
+                    <span className="text-xs font-medium text-zinc-200">{meta.label}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* Bottom Profile / Machine & Settings Bar (Matches Reference) */}
-      <div className="p-2.5 border-t border-zinc-900 bg-zinc-950/60 flex items-center justify-between text-xs">
+      {/* Flat Session List */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5 font-sans">
+        {/* Pinned "new agent conversation" entry */}
+        <button
+          onClick={() => setNewMenuOpen(true)}
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60 transition-all text-left"
+        >
+          <div className="w-5 h-5 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0">
+            <Plus size={11} className="text-zinc-400" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[11px] font-medium truncate">New agent conversation</div>
+          </div>
+        </button>
+
+        {filteredTabs.map((tab) => {
+          const isActive = tab.id === activeTabId;
+          const firstSession = tab.sessions[0];
+          const sessionType = firstSession?.type || 'shell';
+          const meta = typeMeta[sessionType];
+
+          return (
+            <div
+              key={tab.id}
+              onClick={() => onSelectTab(tab.id)}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
+                isActive ? 'bg-zinc-900 border border-zinc-800' : 'border border-transparent hover:bg-zinc-900/50'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${meta.chip}`}>
+                {meta.icon}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className={`text-[11px] truncate ${isActive ? 'text-zinc-100 font-medium' : 'text-zinc-400'}`}>
+                  {tab.title}
+                </div>
+                <div className="text-[10px] text-zinc-600 truncate font-mono">~</div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Additional past sessions from history */}
+        {pastRuns.slice(0, 4).map((run) => (
+          <div
+            key={run.runId}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40 cursor-pointer transition-all"
+          >
+            <div className="w-5 h-5 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-center flex-shrink-0">
+              <Clock size={10} className="text-zinc-600" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] truncate">{run.prompt || run.runId}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom Profile / Settings Bar */}
+      <div className="p-2.5 border-t border-zinc-900 flex items-center justify-between text-xs flex-shrink-0">
         <div className="flex items-center space-x-2 min-w-0">
           <div className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] text-zinc-300">
             <User size={11} />
           </div>
-          <span className="text-zinc-400 truncate text-[11px] font-mono">
-            {gitBranch || 'master'}
+          <span className="text-zinc-500 truncate text-[11px] font-mono">
+            {cwd ? cwd.split(/[\\/]/).pop() : '~'}
           </span>
         </div>
 
         <button
           onClick={onOpenSettings}
           className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-          title="Settings"
+          title="Settings (Ctrl+,)"
         >
           <Settings size={13} />
         </button>
@@ -387,4 +202,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </div>
   );
 };
-
