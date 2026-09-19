@@ -201,7 +201,7 @@ export const App: React.FC = () => {
   };
 
   const reportData: SessionReportData = useMemo(() => ({
-    title: currentTab?.title || 'Dexter Terminal Session',
+    title: currentTab?.title || 'Vulgaris Terminal Session',
     workspacePath: cwd,
     branch: gitBranch,
     timestamp: new Date().toLocaleString(),
@@ -556,7 +556,7 @@ export const App: React.FC = () => {
     []
   );
   const activeSessionUi = activeSession ? sessionUi[activeSession.id] : undefined;
-  // While an agent CLI runs, Dexter's own input area is removed entirely.
+  // While an agent CLI runs, Vulgaris's own input area is removed entirely.
   const dockSlotVisible =
     (!activeSession || activeSession.type === 'shell') && !(activeSessionUi?.busy && activeSessionUi?.agent);
   const dockVisible = dockSlotVisible && !activeSessionUi?.busy;
@@ -1027,7 +1027,7 @@ export const App: React.FC = () => {
         onClose={() => setSettingsModalOpen(false)}
       />
 
-      {/* Dexter Session Timeline & Technical Report Modal */}
+      {/* Vulgaris Session Timeline & Technical Report Modal */}
       <ExportReportModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}

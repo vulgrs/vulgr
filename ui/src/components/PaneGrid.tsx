@@ -36,7 +36,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
   if (tab.sessions.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 select-none font-sans">
-        <img src="./logo.png" alt="Dexter" className="w-20 h-20 object-contain mb-4" draggable={false} />
+        <img src="./logo.png" alt="Vulgaris" className="w-20 h-20 object-contain mb-4" draggable={false} />
 
         <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">Workspace Ready</h2>
         <p className="text-xs text-zinc-500 mt-1 max-w-sm text-center leading-relaxed">

@@ -158,8 +158,8 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
   const skillsUsage = memory?.skillsUsage || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl h-[680px] bg-[#09090b] border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-zinc-100 font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4 animate-overlay-in">
+      <div className="relative w-full max-w-4xl h-[680px] modal-surface flex flex-col overflow-hidden animate-modal-in text-zinc-100 font-sans">
         {/* Top Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-black/40">
           <div className="flex items-center gap-3">
@@ -252,7 +252,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 px-6 pt-3 border-b border-zinc-800 bg-[#09090b]">
+        <div className="flex items-center gap-2 px-6 pt-3 border-b border-zinc-800 bg-base-elevated">
           <button
             onClick={() => setActiveTab('savings')}
             className={`flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
@@ -552,7 +552,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                   <div>
                     <h3 className="text-xs font-semibold text-zinc-200">Local CLI Subprocesses & Terminal Buffer Guard</h3>
                     <p className="text-[11px] text-zinc-300/80">
-                      Dexter operates 100% via local CLI tools and terminal subprocesses. Zero external HTTP API keys or cloud connections required. Prevents terminal buffer overflows.
+                      Vulgaris operates 100% via local CLI tools and terminal subprocesses. Zero external HTTP API keys or cloud connections required. Prevents terminal buffer overflows.
                     </p>
                   </div>
                 </div>
@@ -680,7 +680,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
         <div className="flex items-center justify-between px-6 py-3 border-t border-zinc-800 bg-zinc-950 text-xs text-zinc-500">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Dexter Context & Token Guardian Active</span>
+            <span>Vulgaris Context & Token Guardian Active</span>
           </div>
           <button
             onClick={onClose}

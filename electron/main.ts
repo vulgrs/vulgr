@@ -53,7 +53,7 @@ async function createWindow() {
     height: 880,
     minWidth: 900,
     minHeight: 600,
-    title: 'Dexter - AI Terminal Orchestrator',
+    title: 'Vulgaris - AI Terminal Orchestrator',
     backgroundColor: '#0c0d12',
     show: true,
     autoHideMenuBar: true,
@@ -300,8 +300,8 @@ function setupIpcHandlers() {
         : [{ name: 'Markdown Document', extensions: ['md', 'markdown'] }];
 
     const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Save Dexter Technical Report',
-      defaultPath: defaultName || `dexter-report-${Date.now()}.${ext}`,
+      title: 'Save Vulgaris Technical Report',
+      defaultPath: defaultName || `vulgaris-report-${Date.now()}.${ext}`,
       filters,
     });
 

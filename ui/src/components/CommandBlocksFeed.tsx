@@ -75,7 +75,7 @@ export const CommandBlocksFeed: React.FC<CommandBlocksFeedProps> = ({
   };
 
   return (
-    <div className="flex-1 w-full h-full overflow-y-auto px-6 py-6 space-y-6 select-text font-sans bg-[#000000]">
+    <div className="flex-1 w-full h-full overflow-y-auto px-6 py-6 space-y-6 select-text font-sans bg-base-app">
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-center py-16 select-none">
           <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 mb-3 shadow-sm">

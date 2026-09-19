@@ -61,12 +61,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 z-[100] flex items-start justify-center pt-[15vh] select-none"
+      className="fixed inset-0 modal-overlay z-[100] flex items-start justify-center pt-[15vh] select-none animate-overlay-in"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl bg-[#09090b] rounded-xl shadow-2xl border border-zinc-800 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+        className="w-full max-w-xl bg-base-elevated rounded-xl shadow-2xl border border-zinc-800 overflow-hidden animate-modal-in"
       >
         <div className="flex items-center px-4 py-3 border-b border-zinc-800 bg-zinc-950">
           <Search size={15} className="text-zinc-400 mr-2.5 flex-shrink-0" />
