@@ -6,3 +6,5 @@ dist/
 .DS_Store
 .warp-worktrees/
 .warp-memory.json
+.vulgaris-memory.json
+.warp-config.json

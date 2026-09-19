@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   GitCompare,
-  Globe,
+  FlaskConical,
   Plus,
   X,
   RotateCcw,
@@ -99,8 +99,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({
  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40'
  }`}
           >
-            <Globe size={13} className="text-zinc-400" />
-            <span>Browser / Sandbox</span>
+            <FlaskConical size={13} className="text-zinc-400" />
+            <span>Sandboxes</span>
             {sandboxes.length > 0 && (
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
                 {sandboxes.length}
@@ -122,8 +122,13 @@ export const RightPanel: React.FC<RightPanelProps> = ({
       {activeTab === 'changes' && (
         <div className="px-3.5 py-2.5 bg-zinc-950 border-b border-zinc-900 flex items-center justify-between flex-shrink-0 text-xs font-sans">
           <div className="flex items-center space-x-2">
-            <span className="text-zinc-400 font-medium text-xs">
-              Uncommitted {filesChanged.length > 0 ? `+${filesChanged.length}` : '0'}
+            <span
+              className="text-zinc-400 font-medium text-xs"
+              title="Files changed since your last git commit"
+            >
+              {filesChanged.length === 0
+                ? 'No changes'
+                : `${filesChanged.length} file${filesChanged.length === 1 ? '' : 's'} changed`}
             </span>
 
             {gitBranch && (
@@ -139,7 +144,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               onClick={onRevert}
               disabled={filesChanged.length === 0}
               className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-              title="Revert working tree changes"
+              title="Discard all uncommitted changes (cannot be undone)"
             >
               <RotateCcw size={13} />
             </button>
@@ -154,6 +159,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 }
               }}
               disabled={filesChanged.length === 0 || isCommitting}
+              title="Commit all changes with a message, then push to the remote"
               className="btn-accent flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {isCommitting ? (
@@ -212,7 +218,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
             {filesChanged.length > 0 && onSendDiffToAgent && (
               <div className="mt-4 pt-3 border-t border-zinc-900 space-y-2">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 font-mono">
-                  Send Diff to Agent:
+                  Ask an agent to review these changes
                 </span>
                 <div className="grid grid-cols-3 gap-1.5">
                   <button
@@ -245,16 +251,18 @@ export const RightPanel: React.FC<RightPanelProps> = ({
           <div className="space-y-3">
             <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1.5">
               <span className="text-xs font-semibold text-zinc-200">
-                Git Worktree Sandboxes
+                Sandboxes (safe copies of your project)
               </span>
               <p className="text-[11px] text-zinc-500 leading-relaxed">
-                Isolated directories where AI agents experiment without touching your working tree.
+                When an agent run uses sandbox isolation, it works in its own git branch and folder, so your
+                real files stay untouched until you review and merge the result.
               </p>
             </div>
 
             {sandboxes.length === 0 ? (
               <div className="p-8 text-center text-xs text-zinc-600">
-                No active agent worktrees. Run an autonomous squad with sandbox isolation enabled.
+                No sandboxes yet. Start an Auto Mesh or Squad run with "sandbox isolation" turned on and it will
+                show up here.
               </div>
             ) : (
               sandboxes.map((sb) => (

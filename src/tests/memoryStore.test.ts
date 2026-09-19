@@ -80,4 +80,25 @@ describe('MemoryStore Suite', () => {
     assert.ok(snippet.includes('test_runner: node:test'));
     assert.ok(snippet.includes('Use strict TypeScript'));
   });
+
+  it('stores and retrieves past project conversations', () => {
+    const memory = new MemoryStore(process.cwd(), testFileName);
+    memory.addConversation({
+      id: 'conv-1',
+      title: 'Fix React render error',
+      agent: 'claude',
+      prompt: 'Refactor useEffect dependency array',
+      timestamp: new Date().toISOString(),
+      exitCode: 0,
+    });
+
+    const convs = memory.getConversations();
+    assert.strictEqual(convs.length, 1);
+    assert.strictEqual(convs[0].agent, 'claude');
+    assert.strictEqual(convs[0].title, 'Fix React render error');
+
+    const single = memory.getConversation('conv-1');
+    assert.ok(single);
+    assert.strictEqual(single?.prompt, 'Refactor useEffect dependency array');
+  });
 });

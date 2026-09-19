@@ -93,8 +93,11 @@ export const SquadBar: React.FC<SquadBarProps> = ({
           <div className="w-5 h-5 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-accent">
             <Users size={11} />
           </div>
-          <span className="font-semibold text-xs text-zinc-100 font-sans tracking-wide">
-            LIVE SQUAD
+          <span
+            className="font-semibold text-xs text-zinc-100 font-sans tracking-wide"
+            title="Two agents cooperating: the Builder writes code, the Verifier tests it and sends fixes back until tests pass"
+          >
+            Squad running
           </span>
         </div>
 
@@ -140,24 +143,24 @@ export const SquadBar: React.FC<SquadBarProps> = ({
           title={squad.phase === 'paused' ? 'Resume Autonomous Loop' : 'Pause Loop to Intervene'}
         >
           {squad.phase === 'paused' ? <Play size={11} /> : <Pause size={11} />}
-          <span>{squad.phase === 'paused' ? 'Resume' : 'Pause'}</span>
+          <span>{squad.phase === 'paused' ? 'Resume' : 'Pause to type'}</span>
         </button>
 
         {squad.phase !== 'consensus' && (
           <button
             onClick={onForceHandoff}
             className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-accent-muted hover:bg-accent-muted border border-accent-border text-accent-hover text-xs font-medium transition-all"
-            title="Force immediate handoff to partner CLI"
+            title="Don't wait — pass the work to the other agent right now"
           >
             <FastForward size={11} />
-            <span>Handoff</span>
+            <span>Pass to {getAgentLabel(squad.phase === 'building' ? squad.verifierType : squad.builderType)}</span>
           </button>
         )}
 
         <button
           onClick={onStopSquad}
           className="p-1 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-          title="Exit Squad Mode"
+          title="Stop the squad and close this bar"
         >
           <X size={14} />
         </button>

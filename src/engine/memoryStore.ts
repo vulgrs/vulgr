@@ -16,11 +16,24 @@ export interface CommandMemory {
   timestamp: string;
 }
 
+export interface ProjectConversation {
+  id: string;
+  title: string;
+  agent: 'claude' | 'agy' | 'codex' | 'shell';
+  prompt: string;
+  summary?: string;
+  timestamp: string;
+  commandCount?: number;
+  exitCode?: number;
+  contextUsed?: string[];
+}
+
 export interface MemoryData {
   workspaceDir: string;
   facts: Record<string, WorkspaceFact>;
   rules: string[];
   recentCommands: CommandMemory[];
+  conversations: ProjectConversation[];
   skillsUsage: Record<string, number>;
   lastUpdated: string;
 }
@@ -30,9 +43,23 @@ export class MemoryStore {
   private data: MemoryData;
   private readonly maxRecentCommands: number = 30;
   private readonly maxRules: number = 20;
+  private readonly maxConversations: number = 50;
 
-  constructor(workspaceDir: string = process.cwd(), memoryFileName = '.warp-memory.json') {
-    this.filePath = join(workspaceDir, memoryFileName);
+  constructor(workspaceDir: string = process.cwd(), memoryFileName?: string) {
+    if (memoryFileName) {
+      this.filePath = join(workspaceDir, memoryFileName);
+    } else {
+      const vulgarisPath = join(workspaceDir, '.vulgaris-memory.json');
+      const warpPath = join(workspaceDir, '.warp-memory.json');
+
+      if (existsSync(vulgarisPath)) {
+        this.filePath = vulgarisPath;
+      } else if (existsSync(warpPath)) {
+        this.filePath = warpPath;
+      } else {
+        this.filePath = join(workspaceDir, '.vulgaris-memory.json');
+      }
+    }
     this.data = this.loadInitial(workspaceDir);
   }
 
@@ -46,6 +73,7 @@ export class MemoryStore {
           facts: parsed.facts || {},
           rules: Array.isArray(parsed.rules) ? parsed.rules : [],
           recentCommands: Array.isArray(parsed.recentCommands) ? parsed.recentCommands : [],
+          conversations: Array.isArray(parsed.conversations) ? parsed.conversations : [],
           skillsUsage: parsed.skillsUsage || {},
           lastUpdated: parsed.lastUpdated || new Date().toISOString(),
         };
@@ -65,6 +93,7 @@ export class MemoryStore {
         'Verify TypeScript types with npx tsc before final review',
       ],
       recentCommands: [],
+      conversations: [],
       skillsUsage: {},
       lastUpdated: new Date().toISOString(),
     };
@@ -159,6 +188,25 @@ export class MemoryStore {
     return this.data.recentCommands.slice(0, limit);
   }
 
+  addConversation(conv: ProjectConversation): void {
+    if (!this.data.conversations) {
+      this.data.conversations = [];
+    }
+    this.data.conversations.unshift(conv);
+    if (this.data.conversations.length > this.maxConversations) {
+      this.data.conversations.pop();
+    }
+    this.persist();
+  }
+
+  getConversations(limit = 20): ProjectConversation[] {
+    return (this.data.conversations || []).slice(0, limit);
+  }
+
+  getConversation(id: string): ProjectConversation | undefined {
+    return (this.data.conversations || []).find((c) => c.id === id);
+  }
+
   recordSkillUsage(skillId: string): void {
     const count = this.data.skillsUsage[skillId] || 0;
     this.data.skillsUsage[skillId] = count + 1;
@@ -186,7 +234,11 @@ export class MemoryStore {
       ? this.data.rules.slice(0, 4).map((r) => `- ${r}`).join('\n')
       : '- none';
 
-    return `[Project Memory & Rules]\nFacts:\n${factsStr}\nRules:\n${rulesStr}`.trim();
+    const lastConv = this.data.conversations && this.data.conversations.length > 0
+      ? `\nLast Goal: ${this.data.conversations[0].prompt.slice(0, 80)} (${this.data.conversations[0].agent})`
+      : '';
+
+    return `[Project Memory & Rules]\nFacts:\n${factsStr}\nRules:\n${rulesStr}${lastConv}`.trim();
   }
 
   clear(): void {
@@ -195,6 +247,7 @@ export class MemoryStore {
       facts: {},
       rules: [],
       recentCommands: [],
+      conversations: [],
       skillsUsage: {},
       lastUpdated: new Date().toISOString(),
     };
