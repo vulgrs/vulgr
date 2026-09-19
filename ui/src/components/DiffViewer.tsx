@@ -185,7 +185,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) =>
         return (
           <div
             key={file.filename}
-            className="rounded-xl border border-zinc-800/90 bg-[#050507] overflow-hidden shadow-sm"
+            className="rounded-xl border border-zinc-800/90 bg-base-app overflow-hidden shadow-sm"
           >
             {/* File Header Bar (Matches screenshot: .gitignore +2) */}
             <div className="px-3 py-2 bg-zinc-950 border-b border-zinc-800/80 flex items-center justify-between select-none">
@@ -239,7 +239,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) =>
 
             {/* Hunks & Lines */}
             {!isCollapsed && (
-              <div className="font-mono text-xs overflow-x-auto bg-[#000000]">
+              <div className="font-mono text-xs overflow-x-auto bg-base-app">
                 {file.hunks.map((hunk, hIdx) => (
                   <div key={hIdx} className="border-b border-zinc-900/60 last:border-b-0">
                     {/* Collapsible Unmodified Lines Indicator (From screenshot: "31 unmodified lines") */}

@@ -44,8 +44,8 @@ export const TerminalBlock: React.FC<TerminalBlockProps> = ({
     <div
       className={`rounded-xl border shadow-sm overflow-hidden transition-all duration-150 ${
  isFailed
- ? 'border-red-900/50 bg-[#070505]'
- : 'border-zinc-800 hover:border-zinc-700 bg-[#050505]'
+ ? 'border-red-900/50 bg-base-app'
+ : 'border-zinc-800 hover:border-zinc-700 bg-base-app'
  }`}
     >
       {/* Block Header (Warp Style) */}
@@ -138,7 +138,7 @@ export const TerminalBlock: React.FC<TerminalBlockProps> = ({
 
       {/* Block Output */}
       {!collapsed && (
-        <div className="p-3 font-mono text-xs text-zinc-200 bg-[#000000] overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[420px] select-text">
+        <div className="p-3 font-mono text-xs text-zinc-200 bg-base-app overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-[420px] select-text">
           {block.stdout && <div>{block.stdout}</div>}
           {block.stderr && <div className="text-red-300 mt-1">{block.stderr}</div>}
 

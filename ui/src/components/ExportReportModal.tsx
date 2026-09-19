@@ -91,7 +91,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
     setSaveStatus(null);
     try {
       const ext = format === 'html' ? 'html' : format === 'json' ? 'json' : 'md';
-      const defaultFilename = `dexter-report-${new Date().toISOString().slice(0, 10)}.${ext}`;
+      const defaultFilename = `vulgaris-report-${new Date().toISOString().slice(0, 10)}.${ext}`;
       const res = await window.warpApi.saveReportToFile(generatedContent, defaultFilename, format);
       if (res.success && res.filePath) {
         setSaveStatus(`Saved: ${res.filePath.split(/[\\/]/).pop()}`);
@@ -111,21 +111,21 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4 animate-overlay-in">
       <div
-        className="relative w-full max-w-4xl max-h-[85vh] flex flex-col rounded-2xl bg-[#090b11] border border-white/[0.1] shadow-2xl overflow-hidden font-sans text-slate-200"
+        className="relative w-full max-w-4xl max-h-[85vh] flex flex-col modal-surface overflow-hidden animate-modal-in font-sans text-zinc-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-white/[0.02]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-base-surface">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-zinc-500 to-zinc-400 flex items-center justify-center text-black shadow-[0_0_15px_rgba(168,85,247,0.3)]">
               <FileDown size={17} className="text-black fill-current" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-sm font-bold text-white tracking-wide">
-                  Dexter Technical Session Report
+                <h2 className="text-sm font-bold text-zinc-100 tracking-wide">
+                  Vulgaris Technical Session Report
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-zinc-500/10 text-zinc-300 border border-zinc-500/25">
                   {totalCmds} commands
@@ -136,7 +136,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-0.5 flex items-center space-x-2 font-mono">
+              <p className="text-xs text-zinc-400 mt-0.5 flex items-center space-x-2 font-mono">
                 <span>{reportData.workspacePath || 'Current Workspace'}</span>
                 {reportData.branch && (
                   <>
@@ -153,7 +153,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-all"
             title="Close (Esc)"
           >
             <X size={17} />
@@ -161,14 +161,14 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
         </div>
 
         {/* Tab Switcher & Option Bar */}
-        <div className="px-6 py-2.5 bg-white/[0.01] border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-3 text-xs">
-          <div className="flex items-center space-x-1 p-1 bg-white/[0.03] border border-white/[0.08] rounded-xl">
+        <div className="px-6 py-2.5 bg-base-surface border-b border-zinc-900 flex items-center justify-between flex-wrap gap-3 text-xs">
+          <div className="flex items-center space-x-1 p-1 bg-base-surface border border-zinc-800 rounded-xl">
             <button
               onClick={() => setActiveTab('timeline')}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
  activeTab === 'timeline'
  ? 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/40 shadow-sm'
- : 'text-slate-400 hover:text-slate-200'
+ : 'text-zinc-400 hover:text-zinc-200'
  }`}
             >
               <Clock size={13} />
@@ -180,7 +180,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-medium transition-all ${
  activeTab === 'preview'
  ? 'bg-zinc-500/20 text-zinc-300 border border-zinc-500/40 shadow-sm'
- : 'text-slate-400 hover:text-slate-200'
+ : 'text-zinc-400 hover:text-zinc-200'
  }`}
             >
               <FileCode size={13} />
@@ -190,13 +190,13 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
 
           {/* Format Selector Pills (shown when in preview tab) */}
           <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-1 bg-white/[0.03] border border-white/[0.08] rounded-xl p-1">
+            <div className="flex items-center space-x-1 bg-base-surface border border-zinc-800 rounded-xl p-1">
               <button
                 onClick={() => setFormat('markdown')}
                 className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all ${
  format === 'markdown'
- ? 'bg-white/[0.1] text-white font-semibold'
- : 'text-slate-400 hover:text-slate-200'
+ ? 'bg-white/[0.1] text-zinc-100 font-semibold'
+ : 'text-zinc-400 hover:text-zinc-200'
  }`}
               >
                 Markdown (.md)
@@ -205,8 +205,8 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                 onClick={() => setFormat('html')}
                 className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all ${
  format === 'html'
- ? 'bg-white/[0.1] text-white font-semibold'
- : 'text-slate-400 hover:text-slate-200'
+ ? 'bg-white/[0.1] text-zinc-100 font-semibold'
+ : 'text-zinc-400 hover:text-zinc-200'
  }`}
               >
                 HTML (.html)
@@ -215,8 +215,8 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                 onClick={() => setFormat('json')}
                 className={`px-2.5 py-1 rounded-lg font-mono text-[11px] transition-all ${
  format === 'json'
- ? 'bg-white/[0.1] text-white font-semibold'
- : 'text-slate-400 hover:text-slate-200'
+ ? 'bg-white/[0.1] text-zinc-100 font-semibold'
+ : 'text-zinc-400 hover:text-zinc-200'
  }`}
               >
                 JSON (.json)
@@ -224,12 +224,12 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             </div>
 
             {/* Options Checkboxes */}
-            <label className="flex items-center space-x-1.5 text-slate-300 cursor-pointer select-none text-[11px]">
+            <label className="flex items-center space-x-1.5 text-zinc-300 cursor-pointer select-none text-[11px]">
               <input
                 type="checkbox"
                 checked={includeDiff}
                 onChange={(e) => setIncludeDiff(e.target.checked)}
-                className="rounded border-white/[0.2] bg-white/[0.05] text-zinc-500 focus:ring-0"
+                className="rounded border-white/[0.2] bg-zinc-900 text-zinc-500 focus:ring-0"
               />
               <span>Include Diff</span>
             </label>
@@ -241,7 +241,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           {activeTab === 'timeline' ? (
             <div className="space-y-3">
               {reportData.commands.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">
+                <div className="text-center py-12 text-zinc-500 text-xs">
                   No terminal commands recorded yet in this workspace session.
                 </div>
               ) : (
@@ -251,7 +251,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                   return (
                     <div
                       key={cmd.id || idx}
-                      className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 hover:border-white/[0.14] transition-all"
+                      className="rounded-xl border border-white/[0.07] bg-base-surface p-3 hover:border-white/[0.14] transition-all"
                     >
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-2.5">
@@ -260,7 +260,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                           ) : (
                             <AlertCircle size={15} className="text-rose-400 flex-shrink-0" />
                           )}
-                          <code className="font-mono text-xs text-white font-medium">
+                          <code className="font-mono text-xs text-zinc-100 font-medium">
                             $ {cmd.command}
                           </code>
                           <span
@@ -274,14 +274,14 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                           </span>
                         </div>
 
-                        <div className="flex items-center space-x-2 text-[11px] font-mono text-slate-400">
+                        <div className="flex items-center space-x-2 text-[11px] font-mono text-zinc-400">
                           <span>{cmd.timestamp}</span>
                           {cmd.durationMs && <span>({cmd.durationMs}ms)</span>}
                         </div>
                       </div>
 
                       {outputSnippet && (
-                        <div className="mt-2.5 pt-2 border-t border-white/[0.05] text-[11px] font-mono text-slate-400 bg-black/40 rounded-lg p-2.5 max-h-32 overflow-y-auto whitespace-pre-wrap select-text">
+                        <div className="mt-2.5 pt-2 border-t border-white/[0.05] text-[11px] font-mono text-zinc-400 bg-black/40 rounded-lg p-2.5 max-h-32 overflow-y-auto whitespace-pre-wrap select-text">
                           {outputSnippet}
                         </div>
                       )}
@@ -292,7 +292,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             </div>
           ) : (
             <div className="relative h-full">
-              <pre className="p-4 rounded-xl bg-black/60 border border-white/[0.08] font-mono text-xs text-slate-300 overflow-x-auto max-h-[50vh] whitespace-pre select-text">
+              <pre className="p-4 rounded-xl bg-black/60 border border-zinc-800 font-mono text-xs text-zinc-300 overflow-x-auto max-h-[50vh] whitespace-pre select-text">
                 {generatedContent}
               </pre>
             </div>
@@ -300,10 +300,10 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
         </div>
 
         {/* Modal Footer / Action Bar */}
-        <div className="px-6 py-3.5 bg-white/[0.02] border-t border-white/[0.08] flex items-center justify-between">
-          <div className="flex items-center space-x-2 text-xs text-slate-400 font-mono">
+        <div className="px-6 py-3.5 bg-base-surface border-t border-zinc-800 flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-xs text-zinc-400 font-mono">
             {saveStatus && (
-              <span className="text-emerald-400 flex items-center space-x-1 animate-in fade-in">
+              <span className="text-emerald-400 flex items-center space-x-1 animate-overlay-in">
                 <Check size={13} />
                 <span>{saveStatus}</span>
               </span>
@@ -313,7 +313,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           <div className="flex items-center space-x-2.5">
             <button
               onClick={handleCopy}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl border border-white/[0.12] bg-white/[0.04] text-slate-200 hover:text-white hover:bg-white/[0.08] text-xs font-medium transition-all"
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-200 hover:text-zinc-100 hover:bg-zinc-800 text-xs font-medium transition-all"
             >
               {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
               <span>{copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}</span>
@@ -322,7 +322,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             <button
               onClick={handleSaveToDisk}
               disabled={isSaving}
-              className="flex items-center space-x-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-zinc-600 to-zinc-600 hover:from-zinc-500 hover:to-zinc-500 text-white text-xs font-semibold shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              className="flex items-center space-x-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-zinc-600 to-zinc-600 hover:from-zinc-500 hover:to-zinc-500 text-zinc-100 text-xs font-semibold shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
               <FileDown size={13} />
               <span>{isSaving ? 'Saving...' : 'Save to File...'}</span>

@@ -10,6 +10,7 @@ import {
   Play,
   CheckCircle2,
 } from 'lucide-react';
+
 import type { SessionType } from '../types/warp.js';
 
 interface LiveSquadModalProps {
@@ -52,33 +53,30 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 select-none">
-      <div className="w-[640px] glass-modal rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/[0.1] overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 select-none animate-overlay-in">
+      <div className="w-[640px] modal-surface overflow-hidden animate-modal-in">
         {/* Header */}
-        <div className="h-14 px-5 bg-white/[0.03] border-b border-white/[0.08] flex items-center justify-between">
+        <div className="h-14 px-5 modal-header flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-zinc-400 via-zinc-500 to-zinc-500 flex items-center justify-center font-bold text-sm text-black shadow-[0_0_15px_rgba(0,216,255,0.3)]">
-              👥
+            <div className="w-8 h-8 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-accent">
+              <Users size={15} />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-bold text-sm text-slate-100 font-sans tracking-wide">
+                <span className="font-semibold text-sm text-zinc-100 font-sans tracking-wide">
                   Live Autonomous Squad
                 </span>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-zinc-500/15 border border-zinc-500/30 text-zinc-300">
+                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400">
                   2-Way Split Screen
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-mono">
+              <p className="text-[11px] text-zinc-500 font-mono">
                 Interactive real-time terminal handoff & self-repair loop
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
-          >
+          <button onClick={onClose} className="modal-close-btn p-1.5">
             <X size={16} />
           </button>
         </div>
@@ -87,24 +85,24 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {/* Goal Input */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+            <label className="text-xs font-semibold text-zinc-300 flex items-center space-x-1.5">
               <span>Task / Engineering Goal:</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-zinc-400 font-mono text-xs select-none">❯</span>
+              <span className="absolute left-3 top-2.5 text-zinc-500 font-mono text-xs select-none">❯</span>
               <input
                 type="text"
                 autoFocus
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 placeholder="e.g. Implement JWT refresh token service and run tests..."
-                className="w-full glass-input rounded-xl pl-7 pr-3 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none"
+                className="w-full glass-input pl-7 pr-3 py-2 text-xs font-mono text-zinc-100 placeholder:text-zinc-600"
               />
             </div>
           </div>
 
           {/* Model Roles */}
-          <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+          <div className="grid grid-cols-2 gap-3 p-3.5 rounded-lg bg-base-surface border border-zinc-900">
             {/* Builder Selection */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-semibold text-zinc-300 flex items-center space-x-1.5">
@@ -114,13 +112,13 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
               <select
                 value={builder}
                 onChange={(e) => setBuilder(e.target.value as SessionType)}
-                className="w-full bg-[#0c0d16] border border-white/[0.1] rounded-lg px-2.5 py-1.5 text-zinc-300 font-mono text-xs focus:outline-none focus:border-zinc-500/50"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
               >
                 <option value="claude">Claude Code (Official)</option>
                 <option value="agy">AGY Engine (Official)</option>
                 <option value="codex">Codex CLI (Official)</option>
               </select>
-              <p className="text-[10px] text-slate-500">Writes code in Left Terminal Pane</p>
+              <p className="text-[10px] text-zinc-500">Writes code in Left Terminal Pane</p>
             </div>
 
             {/* Verifier Selection */}
@@ -132,36 +130,36 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
               <select
                 value={verifier}
                 onChange={(e) => setVerifier(e.target.value as SessionType)}
-                className="w-full bg-[#0c0d16] border border-white/[0.1] rounded-lg px-2.5 py-1.5 text-zinc-300 font-mono text-xs focus:outline-none focus:border-zinc-500/50"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
               >
                 <option value="agy">AGY Engine (Official)</option>
                 <option value="claude">Claude Code (Official)</option>
                 <option value="codex">Codex CLI (Official)</option>
                 <option value="shell">Native Shell (Bash / PTY)</option>
               </select>
-              <p className="text-[10px] text-slate-500">Runs tests in Right Terminal Pane</p>
+              <p className="text-[10px] text-zinc-500">Runs tests in Right Terminal Pane</p>
             </div>
           </div>
 
           {/* Verification Command & Rounds */}
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-1">
-              <label className="text-[11px] font-medium text-slate-400">Verification Command</label>
+              <label className="text-[11px] font-medium text-zinc-400">Verification Command</label>
               <input
                 type="text"
                 value={verifyCmd}
                 onChange={(e) => setVerifyCmd(e.target.value)}
                 placeholder="npm test"
-                className="w-full glass-input rounded-lg px-2.5 py-1.5 text-slate-200 text-xs font-mono focus:outline-none"
+                className="w-full glass-input px-2.5 py-1.5 text-zinc-200 text-xs font-mono"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-400">Max Auto-Fix Rounds</label>
+              <label className="text-[11px] font-medium text-zinc-400">Max Auto-Fix Rounds</label>
               <select
                 value={maxRounds}
                 onChange={(e) => setMaxRounds(Number(e.target.value))}
-                className="w-full bg-[#0c0d16] border border-white/[0.1] rounded-lg px-2.5 py-1.5 text-slate-200 font-mono text-xs focus:outline-none"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-zinc-200 font-mono text-xs focus:outline-none focus:border-accent-border"
               >
                 <option value={2}>2 Rounds</option>
                 <option value={3}>3 Rounds</option>
@@ -171,10 +169,10 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
           </div>
 
           {/* Workflow Summary Explanation */}
-          <div className="p-3 rounded-xl bg-zinc-500/[0.04] border border-zinc-500/20 text-slate-300 text-xs flex items-start space-x-2.5">
-            <CheckCircle2 size={15} className="text-zinc-400 flex-shrink-0 mt-0.5" />
+          <div className="p-3 rounded-lg bg-accent-muted border border-accent-border text-zinc-300 text-xs flex items-start space-x-2.5">
+            <CheckCircle2 size={15} className="text-accent flex-shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">
-              <span className="font-semibold text-slate-200">How the live loop works: </span>
+              <span className="font-semibold text-zinc-200">How the live loop works: </span>
               A split-view tab opens. Claude receives the task and types code live. When done, AGY triggers the tests on the right. If any test fails, the stack trace is automatically piped back to Claude to self-repair. You can intervene or pause at any second.
             </div>
           </div>
@@ -184,7 +182,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.05] transition-all text-xs font-medium"
+              className="btn-ghost px-4 py-2 text-xs font-medium border-transparent hover:border-zinc-800"
             >
               Cancel
             </button>
@@ -192,7 +190,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
             <button
               type="submit"
               disabled={!goal.trim()}
-              className="flex items-center space-x-2 px-5 py-2 rounded-xl bg-gradient-to-r from-zinc-500 via-zinc-600 to-zinc-600 hover:from-zinc-400 hover:via-zinc-500 hover:to-zinc-500 text-white font-semibold text-xs transition-all shadow-[0_0_20px_rgba(0,216,255,0.25)] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-accent flex items-center space-x-2 px-5 py-2 font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Play size={13} className="fill-current" />
               <span>Launch Live Squad</span>

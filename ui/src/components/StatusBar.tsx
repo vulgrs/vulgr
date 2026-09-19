@@ -28,7 +28,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   const shortCwd = cwd ? cwd.split(/[\\/]/).slice(-2).join('/') : 'workspace';
 
   return (
-    <div className="h-6 bg-[#000000] border-t border-zinc-900 flex items-center justify-between px-3 select-none flex-shrink-0 text-[10px] font-mono text-zinc-500">
+    <div className="h-6 bg-base-app border-t border-zinc-900 flex items-center justify-between px-3 select-none flex-shrink-0 text-[10px] font-mono text-zinc-500">
       <div className="flex items-center space-x-3 min-w-0">
         <span className="flex items-center space-x-1.5 text-zinc-400 hover:text-zinc-200 transition-colors" title={cwd}>
           <FolderGit2 size={11} className="text-zinc-400" />

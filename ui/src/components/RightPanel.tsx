@@ -70,9 +70,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   };
 
   return (
-    <div className="w-[460px] lg:w-[500px] h-full bg-[#050507] border-l border-zinc-800/80 flex flex-col select-none z-20 flex-shrink-0 animate-in slide-in-from-right-2 duration-150">
+    <div className="w-[340px] lg:w-[380px] h-full bg-base-elevated border-l border-zinc-800 flex flex-col select-none z-20 flex-shrink-0 animate-slide-in-right shadow-modal">
       {/* Top Tabs: Changes / Sandbox */}
-      <div className="h-10 bg-[#000000] border-b border-zinc-900 flex items-center justify-between px-2 flex-shrink-0">
+      <div className="h-10 bg-base-app border-b border-zinc-900 flex items-center justify-between px-2 flex-shrink-0">
         <div className="flex items-center space-x-1">
           <button
             onClick={() => setActiveTab('changes')}
@@ -154,7 +154,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 }
               }}
               disabled={filesChanged.length === 0 || isCommitting}
-              className="flex items-center space-x-1.5 px-3 py-1 rounded-md bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold shadow-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="btn-accent flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {isCommitting ? (
                 <Loader2 size={12} className="animate-spin" />
@@ -171,7 +171,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
 
       {/* Floating Commit Message Input Drawer */}
       {showCommitInput && (
-        <div className="p-3 bg-zinc-950 border-b border-zinc-800/80 animate-in slide-in-from-top-1 duration-150 flex-shrink-0">
+        <div className="p-3 bg-zinc-950 border-b border-zinc-800/80 animate-slide-in-up flex-shrink-0">
           <div className="flex items-center space-x-2">
             <input
               type="text"
@@ -183,12 +183,12 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 if (e.key === 'Escape') setShowCommitInput(false);
               }}
               placeholder="Commit message (e.g. fix: update config)..."
-              className="flex-1 bg-black border border-zinc-800 rounded-md px-2.5 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-zinc-600 font-sans"
+              className="flex-1 bg-black border border-zinc-800 rounded-md px-2.5 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent-border font-sans"
             />
             <button
               onClick={handleCommitPush}
               disabled={isCommitting}
-              className="px-2.5 py-1 rounded-md bg-zinc-200 hover:bg-white text-zinc-950 text-xs font-semibold"
+              className="btn-accent px-2.5 py-1 text-xs font-semibold"
             >
               Commit
             </button>
@@ -203,7 +203,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-[#000000]">
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-base-app">
         {activeTab === 'changes' ? (
           <div>
             <DiffViewer diff={diff} onRevertFile={onRevert} />
@@ -243,7 +243,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         ) : (
           /* Sandbox & Isolated Worktrees View */
           <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-1.5">
+            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1.5">
               <span className="text-xs font-semibold text-zinc-200">
                 Git Worktree Sandboxes
               </span>
@@ -260,7 +260,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               sandboxes.map((sb) => (
                 <div
                   key={sb.runId}
-                  className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2"
+                  className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-2"
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs text-zinc-300 font-semibold truncate max-w-[200px]">

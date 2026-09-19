@@ -193,7 +193,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                 <Sparkles size={13} />
               </div>
               <span className="font-semibold text-xs text-zinc-100 font-sans tracking-wide">
-                Dexter AI Command Search
+                Vulgaris AI Command Search
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
                 Natural Language ➔ Shell
@@ -300,7 +300,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               disabled={!activeSession}
               placeholder={
                 activeSession
-                  ? "Dexter'a bir şey sor, örn. Python testlerim CI'da neden başarısız oluyor"
+                  ? "Vulgaris'e bir şey sor, örn. Python testlerim CI'da neden başarısız oluyor"
                   : 'Önce bir terminal seçin'
               }
               className="w-full bg-transparent text-zinc-100 text-[13px] font-mono placeholder:text-zinc-600 focus:outline-none outline-none relative z-10"
