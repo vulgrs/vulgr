@@ -42,8 +42,13 @@ function canConnectToDevServer(): Promise<boolean> {
   });
 }
 
+function resolveAppIcon(): string | undefined {
+  return [join(__dirname, '../ui/icon.ico'), join(__dirname, '../../ui/public/icon.ico')].find((p) => existsSync(p));
+}
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
+    icon: resolveAppIcon(),
     width: 1360,
     height: 880,
     minWidth: 900,

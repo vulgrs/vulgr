@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { XtermPane } from './XtermPane.js';
-import { Sparkles, Shield, Bot, Terminal, Zap } from 'lucide-react';
+import { Sparkles, Shield, Bot, Terminal } from 'lucide-react';
 import type { WorkspaceTab, SessionType } from '../types/warp.js';
 
 interface PaneGridProps {
@@ -32,9 +32,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
   if (tab.sessions.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 select-none font-sans">
-        <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-100 shadow-sm mb-4">
-          <Zap size={22} className="text-zinc-100 fill-current" />
-        </div>
+        <img src="./logo.png" alt="Dexter" className="w-20 h-20 object-contain mb-4" draggable={false} />
 
         <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">Workspace Ready</h2>
         <p className="text-xs text-zinc-500 mt-1 max-w-sm text-center leading-relaxed">
