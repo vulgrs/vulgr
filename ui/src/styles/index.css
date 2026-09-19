@@ -8,47 +8,147 @@
   body {
     font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
     color: #e4e4e7;
-    background-color: #000000;
+    background-color: #08080a;
     overflow: hidden;
     user-select: none;
     -webkit-font-smoothing: antialiased;
   }
 }
 
-/* Modern Minimalist Pure Black & Subtle Vignette */
+/* ==========================================================================
+   Design tokens (elevation + accent). Single source of truth for the
+   monochrome-with-one-accent surface system used across every component.
+   ========================================================================== */
+:root {
+  --bg-app: #08080a;
+  --bg-surface: #0c0c0f;
+  --bg-elevated: #131316;
+  --bg-hover: rgba(255, 255, 255, 0.055);
+  --bg-active: rgba(255, 255, 255, 0.09);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+
+  --accent: #4d8dff;
+  --accent-hover: #6ba1ff;
+  --accent-muted: rgba(77, 141, 255, 0.14);
+  --accent-border: rgba(77, 141, 255, 0.4);
+}
+
+/* Ambient app background: near-black with a faint top vignette. */
 .ambient-background {
-  background-color: #000000;
+  background-color: var(--bg-app);
   background-image: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(255, 255, 255, 0.035), transparent 70%);
 }
 
+/* Surface = bars/panels/sidebars (TopBar, Sidebar, StatusBar, docks). */
+.surface-panel {
+  background: var(--bg-surface);
+  border-color: var(--border-subtle);
+}
+
+/* Card = an elevated block inside a panel (list rows, blocks, tiles). */
+.surface-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.surface-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+}
+
+/* Modal chrome shared by every dialog in the app. */
+.modal-overlay {
+  background: rgba(4, 4, 6, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.modal-surface {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.7);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-close-btn {
+  color: var(--text-tertiary);
+  border-radius: 8px;
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+
+.modal-close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* Legacy aliases kept so any untouched component still resolves. */
 .glass-surface {
-  background: #0a0a0b;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
 }
 
 .glass-card {
-  background: #111113;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
 }
 
 .glass-modal {
-  background: #09090b;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.85);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.7);
 }
 
 .glass-input {
-  background: #09090b;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.15s ease;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .glass-input:focus {
-  border-color: rgba(255, 255, 255, 0.25);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+  outline: none;
 }
 
-/* Custom Minimalist Monochrome Scrollbar */
+/* Shared primary/secondary button treatments. */
+.btn-accent {
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: 8px;
+  transition: background-color 0.12s ease;
+}
+
+.btn-accent:hover {
+  background: var(--accent-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  transition: all 0.12s ease;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* Custom minimalist monochrome scrollbar. */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -67,8 +167,85 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Active terminal subtle border */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Active terminal / focus ring, unified with the accent token. */
 .active-terminal-border {
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 1px var(--accent-muted);
+}
+
+/* Shell command block header, drawn by XtermPane as an xterm decoration over the
+   rows the shell reserves for a command: "<cwd> (elapsed)" + the command itself.
+   --dx-row is one terminal row in px, set from JS. */
+.dx-block-header {
+  box-sizing: border-box;
+  border-top: 1px solid #232326;
+  color: #52525b;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* Our own command text replaces the shell's echo, so cover it. */
+.dx-block-header.has-cmd {
+  background: #000;
+}
+
+.dx-block-header.is-failed {
+  border-top-color: rgba(239, 68, 68, 0.4);
+}
+
+.dx-block-header .dx-label {
+  height: var(--dx-row, 50%);
+  display: flex;
+  align-items: center;
+}
+
+.dx-block-header .dx-cmd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--dx-row, 50%);
+  line-height: var(--dx-row, 17px);
+  color: #f2efe0;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.dx-block-header .dx-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: var(--dx-row, 50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 12px;
+  pointer-events: auto;
+}
+
+.dx-block-header .dx-actions button {
+  display: flex;
+  align-items: center;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #71717a;
+  font: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dx-block-header .dx-actions button:hover {
+  color: #f4f4f5;
+  background: rgba(255, 255, 255, 0.08);
 }
