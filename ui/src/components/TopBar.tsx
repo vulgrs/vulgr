@@ -9,6 +9,7 @@ import {
   FileDown,
   Settings,
   Zap,
+  Sparkles,
   Minus,
   Square,
   Copy,
@@ -23,6 +24,7 @@ interface TopBarProps {
   onOpenSkillsModal: () => void;
   onOpenSettings: () => void;
   onOpenExportReport: () => void;
+  onOpenChat: () => void;
   doctor: DoctorStatus | null;
   hasUncommittedDiff: boolean;
   sidebarOpen: boolean;
@@ -62,6 +64,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenSkillsModal,
   onOpenSettings,
   onOpenExportReport,
+  onOpenChat,
   doctor,
   hasUncommittedDiff,
   sidebarOpen,
@@ -117,6 +120,13 @@ export const TopBar: React.FC<TopBarProps> = ({
           icon={<Zap size={13} />}
           label="Auto Mesh"
           title="Agent Mesh — give one goal and a Builder, Verifier and Auditor agent work on it automatically, without terminals"
+        />
+        <ToolButton
+          onClick={onOpenChat}
+          icon={<Sparkles size={13} />}
+          label="Chat"
+          highlight
+          title="Claude Code Chat — talk to Claude Code and watch its output as chat, with a live diff panel"
         />
       </div>
 

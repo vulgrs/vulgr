@@ -3,6 +3,7 @@ import { TopBar } from './components/TopBar.js';
 import { PaneGrid } from './components/PaneGrid.js';
 import { BottomCommandDock } from './components/BottomCommandDock.js';
 import { RightPanel } from './components/RightPanel.js';
+import { ClaudeChatView } from './components/ClaudeChatView.js';
 import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
@@ -81,6 +82,7 @@ export const App: React.FC = () => {
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [chatModeOpen, setChatModeOpen] = useState(false);
   const [hudOpen, setHudOpen] = useState(false);
   const [contextTelemetry, setContextTelemetry] = useState<ContextTelemetry | null>(null);
   const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
@@ -954,6 +956,7 @@ export const App: React.FC = () => {
         onOpenSkillsModal={() => setSkillsModalOpen(true)}
         onOpenSettings={() => setSettingsModalOpen(true)}
         onOpenExportReport={handleOpenExportModal}
+        onOpenChat={() => setChatModeOpen(true)}
       />
 
       {/* Main Content: Sidebar + Center Workspace + Right Panel */}
@@ -1086,6 +1089,14 @@ export const App: React.FC = () => {
             onSendDiffToAgent={handleSendDiffToAgent}
           />
         )}
+
+        {/* Claude Code Chat — structured stream-json chat overlay with live diff */}
+        <ClaudeChatView
+          isOpen={chatModeOpen}
+          onClose={() => setChatModeOpen(false)}
+          cwd={cwd}
+          gitBranch={gitBranch}
+        />
       </div>
 
       {/* Status Bar */}

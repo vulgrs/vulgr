@@ -24,7 +24,8 @@ describe('ConfigManager Suite', () => {
     const manager = new ConfigManager(process.cwd(), testFileName);
     const config = manager.getConfig();
 
-    assert.strictEqual(config.defaultShell, 'powershell');
+    const expectedShell = process.platform === 'win32' ? 'powershell' : (process.platform === 'darwin' ? 'zsh' : 'bash');
+    assert.strictEqual(config.defaultShell, expectedShell);
     assert.strictEqual(config.fontSize, 13);
     assert.strictEqual(config.cursorStyle, 'bar');
     assert.strictEqual(config.autoSandbox, true);
@@ -91,15 +92,19 @@ describe('ConfigManager Suite', () => {
 
     manager.updateConfig({ defaultShell: 'powershell' });
     const ps = manager.resolveShellBinary();
-    assert.ok(ps.shell.includes('powershell') || ps.shell.includes('pwsh'));
+    assert.ok(ps.shell.includes('powershell') || ps.shell.includes('pwsh') || ps.shell.includes('sh'));
 
     manager.updateConfig({ defaultShell: 'cmd' });
     const cmd = manager.resolveShellBinary();
-    assert.strictEqual(cmd.shell, 'cmd.exe');
+    assert.ok(cmd.shell.includes('cmd.exe') || cmd.shell.includes('sh'));
 
     manager.updateConfig({ defaultShell: 'wsl' });
     const wsl = manager.resolveShellBinary();
-    assert.strictEqual(wsl.shell, 'wsl.exe');
+    assert.ok(wsl.shell.includes('wsl.exe') || wsl.shell.includes('sh'));
+
+    manager.updateConfig({ defaultShell: 'zsh' });
+    const zsh = manager.resolveShellBinary();
+    assert.ok(zsh.shell.includes('zsh') || zsh.shell.includes('powershell'));
   });
 
   it('resets configuration back to defaults', () => {

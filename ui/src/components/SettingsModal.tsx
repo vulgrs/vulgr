@@ -336,10 +336,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }
                     className="w-full glass-input rounded-md px-3 py-2 text-xs text-zinc-100 font-mono"
                   >
-                    <option value="powershell">Windows PowerShell (powershell.exe)</option>
+                    <option value="zsh">Zsh (macOS Default /bin/zsh)</option>
+                    <option value="bash">Bash (/bin/bash)</option>
+                    <option value="powershell">Windows PowerShell (powershell.exe / pwsh)</option>
                     <option value="cmd">Command Prompt (cmd.exe)</option>
                     <option value="wsl">WSL Bash (wsl.exe)</option>
-                    <option value="bash">Git Bash / POSIX (bash.exe)</option>
                   </select>
                 </div>
 

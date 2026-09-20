@@ -202,7 +202,7 @@ export interface SandboxMergeResult {
   error?: string;
 }
 
-export type ShellType = 'powershell' | 'cmd' | 'wsl' | 'bash';
+export type ShellType = 'powershell' | 'cmd' | 'wsl' | 'bash' | 'zsh' | 'default';
 export type CursorStyleType = 'block' | 'underline' | 'bar';
 
 export interface ClaudeConfig {
@@ -292,6 +292,49 @@ export interface ContextTelemetry {
   cleanedAnsiCount: number;
   squashedLinesCount: number;
   recentEvents: OptimizationEvent[];
+}
+
+/**
+ * Structured chat messages derived from Claude Code's stream-json events.
+ * Each event kind becomes its own bubble in the chat view.
+ */
+export type ChatMessageKind =
+  | 'user'        // the human prompt
+  | 'assistant'   // Claude's natural-language reply
+  | 'thinking'    // Claude's extended-thinking / reasoning block
+  | 'tool_use'    // Claude invoking a tool (Edit, Bash, Write, Read, ...)
+  | 'tool_result' // the tool's output
+  | 'result'      // final turn summary (cost, duration)
+  | 'system'      // session init / metadata
+  | 'error';      // stderr / fatal / max-turns
+
+export interface ChatMessage {
+  id: string;
+  kind: ChatMessageKind;
+  /** Primary text body (already normalized to a string). */
+  text: string;
+  /** For tool_use: the tool name (e.g. "Bash", "Edit"). */
+  toolName?: string;
+  /** For tool_use: a short human-readable summary of the input. */
+  toolInput?: string;
+  /** For tool_result: whether the tool reported an error. */
+  isError?: boolean;
+  /** For tool_result: the id of the tool_use it answers, used to pair them. */
+  toolUseId?: string;
+  /** Whether this bubble is still streaming in. */
+  streaming?: boolean;
+  /** For user messages: data-URI previews of attached images. */
+  images?: string[];
+  timestamp: string;
+}
+
+export interface ChatSessionMeta {
+  claudeSessionId?: string;
+  model?: string;
+  cwd?: string;
+  totalCostUsd?: number;
+  numTurns?: number;
+  durationMs?: number;
 }
 
 export interface ProjectFileItem {

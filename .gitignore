@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.env
+.env.local
 .ai-bridge/runs/
 .test-mesh-workspace/
 *.log
