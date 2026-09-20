@@ -18,6 +18,18 @@ export interface WarpApi {
   onTerminalData: (callback: (event: { id: string; data: string }) => void) => () => void;
   onTerminalExit: (callback: (event: { id: string; exitCode: number; signal?: number }) => void) => () => void;
 
+  // Structured Claude Code Chat (stream-json)
+  startClaudeChat: (options: { id: string; prompt: string; cwd?: string; model?: string; effort?: string; images?: Array<{ mediaType: string; data: string }>; resumeSessionId?: string }) => Promise<{ id: string; pid: number; error?: string }>;
+  sendClaudeChat: (id: string, text: string, images?: Array<{ mediaType: string; data: string }>) => void;
+  stopClaudeChat: (id: string) => void;
+  onClaudeChatEvent: (callback: (payload: { id: string; event: any }) => void) => () => void;
+  onClaudeChatExit: (callback: (payload: { id: string; code: number }) => void) => () => void;
+
+  // Deterministic System 1 JSON compiler
+  runSystemOne: (options: { taskId?: string; targetFile: string; prompt: string; slot: number; rules: string; model?: string }) => Promise<{ ok: boolean; result?: any; error?: string }>;
+  writeProjectFile: (filePath: string, content: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+  typecheckProject: (cwd?: string) => Promise<{ clean: boolean; exitCode: number; output: string }>;
+
   // System & Git
   getDoctorStatus: () => Promise<any>;
   getGitDiff: (cwd?: string) => Promise<{ hasChanges: boolean; diff: string; filesChanged: string[] }>;
@@ -26,6 +38,7 @@ export interface WarpApi {
   gitCommit: (message: string, cwd?: string) => Promise<boolean>;
   gitPush: (remote?: string, branch?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;
   getCwd: () => Promise<string>;
+  getHostname: () => Promise<string>;
 
   // Autonomous Agent Mesh
   runAgentMesh: (options: {
@@ -116,6 +129,23 @@ const api: WarpApi = {
     return () => ipcRenderer.removeListener('pty:exit', handler);
   },
 
+  startClaudeChat: (options) => ipcRenderer.invoke('claudechat:start', options),
+  sendClaudeChat: (id, text, images) => ipcRenderer.send('claudechat:send', { id, text, images }),
+  stopClaudeChat: (id) => ipcRenderer.send('claudechat:stop', { id }),
+  runSystemOne: (options) => ipcRenderer.invoke('system1:run', options),
+  writeProjectFile: (filePath, content) => ipcRenderer.invoke('workspace:write-file', { filePath, content }),
+  typecheckProject: (cwd) => ipcRenderer.invoke('system1:typecheck', { cwd }),
+  onClaudeChatEvent: (callback) => {
+    const handler = (_: any, payload: { id: string; event: any }) => callback(payload);
+    ipcRenderer.on('claudechat:event', handler);
+    return () => ipcRenderer.removeListener('claudechat:event', handler);
+  },
+  onClaudeChatExit: (callback) => {
+    const handler = (_: any, payload: { id: string; code: number }) => callback(payload);
+    ipcRenderer.on('claudechat:exit', handler);
+    return () => ipcRenderer.removeListener('claudechat:exit', handler);
+  },
+
   getDoctorStatus: () => ipcRenderer.invoke('system:doctor'),
   getGitDiff: (cwd?: string) => ipcRenderer.invoke('git:diff', { cwd }),
   revertGit: (cwd?: string) => ipcRenderer.invoke('git:revert', { cwd }),
@@ -123,6 +153,7 @@ const api: WarpApi = {
   gitCommit: (message: string, cwd?: string) => ipcRenderer.invoke('git:commit', { message, cwd }),
   gitPush: (remote?: string, branch?: string, cwd?: string) => ipcRenderer.invoke('git:push', { remote, branch, cwd }),
   getCwd: () => ipcRenderer.invoke('system:getCwd'),
+  getHostname: () => ipcRenderer.invoke('system:hostname'),
 
   runAgentMesh: (options) => ipcRenderer.invoke('mesh:run', options),
   onMeshEvent: (callback) => {

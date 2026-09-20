@@ -16,7 +16,8 @@
     "start:app": "electron dist/electron/main.js",
     "dev:app": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron dist/electron/main.js\"",
     "dev:ui": "vite",
-    "test": "node --test dist/src/tests/**/*.test.js"
+    "test": "node --test dist/src/tests/**/*.test.js",
+    "postinstall": "node -e \"if (process.platform !== 'win32') { const fs = require('fs'), glob = ['prebuilds/darwin-arm64/spawn-helper', 'prebuilds/darwin-x64/spawn-helper']; glob.forEach(p => { const full = 'node_modules/node-pty/' + p; if (fs.existsSync(full)) { try { fs.chmodSync(full, 0o755); } catch {} } }); }\""
   },
   "keywords": [
     "warp",
@@ -37,8 +38,13 @@
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/xterm": "^6.0.0",
     "commander": "^13.1.0",
+    "dotenv": "^18.0.1",
     "node-pty": "^1.1.0",
-    "picocolors": "^1.1.1"
+    "openai": "^7.20.0",
+    "picocolors": "^1.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -50,7 +56,7 @@
     "autoprefixer": "^10.4.21",
     "clsx": "^2.1.1",
     "concurrently": "^9.1.2",
-    "electron": "^35.0.0",
+    "electron": "^44.4.3",
     "lucide-react": "^0.477.0",
     "postcss": "^8.5.3",
     "react": "^19.0.0",

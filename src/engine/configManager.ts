@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
-export type ShellType = 'powershell' | 'cmd' | 'wsl' | 'bash';
+export type ShellType = 'powershell' | 'cmd' | 'wsl' | 'bash' | 'zsh' | 'default';
 export type CursorStyleType = 'block' | 'underline' | 'bar';
 
 export interface ClaudeConfig {
@@ -39,11 +39,22 @@ export interface WarpConfig {
   // Autonomy & Safety Settings
   autoSandbox: boolean;         // Always run autonomous agents inside Git Worktree Sandboxes
   defaultVerifyCmd: string;     // Default command to verify builds (e.g. 'npm test')
+
+  // OpenRouter API access (used by the deterministic "System 1" JSON compiler)
+  openRouterApiKey: string;     // sk-or-... ; empty falls back to OPENROUTER_API_KEY env
+  systemOneModel: string;       // OpenRouter model id for System 1
+
   lastUpdated: string;
 }
 
+const getDefaultShellForPlatform = (): ShellType => {
+  if (process.platform === 'win32') return 'powershell';
+  if (process.platform === 'darwin') return 'zsh';
+  return 'bash';
+};
+
 export const DEFAULT_CONFIG: WarpConfig = {
-  defaultShell: 'powershell',
+  defaultShell: getDefaultShellForPlatform(),
   fontSize: 13,
   fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace",
   cursorStyle: 'bar',
@@ -68,6 +79,8 @@ export const DEFAULT_CONFIG: WarpConfig = {
 
   autoSandbox: true,
   defaultVerifyCmd: 'npm test',
+  openRouterApiKey: '',
+  systemOneModel: 'poolside/laguna-s-2.1-20260720:free',
   lastUpdated: new Date().toISOString(),
 };
 
@@ -157,18 +170,32 @@ export class ConfigManager {
    */
   resolveShellBinary(): { shell: string; args: string[] } {
     const isWindows = process.platform === 'win32';
+    const isMac = process.platform === 'darwin';
 
     switch (this.config.defaultShell) {
       case 'powershell':
-        return { shell: isWindows ? 'powershell.exe' : 'pwsh', args: ['-NoLogo'] };
+        if (isWindows) {
+          return { shell: 'powershell.exe', args: ['-NoLogo'] };
+        }
+        if (existsSync('/usr/local/bin/pwsh')) return { shell: '/usr/local/bin/pwsh', args: ['-NoLogo'] };
+        if (existsSync('/opt/homebrew/bin/pwsh')) return { shell: '/opt/homebrew/bin/pwsh', args: ['-NoLogo'] };
+        return { shell: process.env.SHELL || (isMac ? '/bin/zsh' : '/bin/bash'), args: [] };
+
       case 'cmd':
-        return { shell: 'cmd.exe', args: [] };
+        return { shell: isWindows ? 'cmd.exe' : (process.env.SHELL || '/bin/zsh'), args: [] };
+
       case 'wsl':
-        return { shell: 'wsl.exe', args: [] };
+        return { shell: isWindows ? 'wsl.exe' : (process.env.SHELL || '/bin/zsh'), args: [] };
+
+      case 'zsh':
+        return { shell: isWindows ? 'powershell.exe' : (existsSync('/bin/zsh') ? '/bin/zsh' : (process.env.SHELL || 'zsh')), args: [] };
+
       case 'bash':
-        return { shell: isWindows ? 'bash.exe' : (process.env.SHELL || 'bash'), args: [] };
+        return { shell: isWindows ? 'bash.exe' : (existsSync('/bin/bash') ? '/bin/bash' : (process.env.SHELL || 'bash')), args: [] };
+
+      case 'default':
       default:
-        return { shell: isWindows ? 'powershell.exe' : 'bash', args: [] };
+        return { shell: isWindows ? 'powershell.exe' : (process.env.SHELL || (isMac ? '/bin/zsh' : '/bin/bash')), args: isWindows ? ['-NoLogo'] : [] };
     }
   }
 }

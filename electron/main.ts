@@ -1,10 +1,14 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import 'dotenv/config';
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename, extname } from 'node:path';
 import { get as httpGet } from 'node:http';
+import { execSync, exec } from 'node:child_process';
 import { existsSync, writeFileSync, readdirSync, statSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import { PtyManager } from './ptyManager.js';
+import { ClaudeChatManager } from './claudeChatManager.js';
+import { SystemOneCompiler } from './systemOneCompiler.js';
 import { GitUtils } from '../src/git/gitUtils.js';
 import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
@@ -21,11 +25,35 @@ import { SessionExporter } from '../src/engine/sessionExporter.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Augment PATH with standard macOS / Linux binary directories
+if (process.platform !== 'win32') {
+  const home = os.homedir();
+  const extraPaths = [
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/local/bin',
+    '/usr/local/sbin',
+    join(home, '.local', 'bin'),
+    join(home, '.cargo', 'bin'),
+    join(home, '.npm-global', 'bin'),
+    join(home, 'bin'),
+  ];
+  const pathKey = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
+  const currentPath = process.env[pathKey] || '';
+  const updatedPath = [...extraPaths, currentPath].filter(Boolean).join(':');
+  process.env[pathKey] = updatedPath;
+  process.env.PATH = updatedPath;
+}
+
 let mainWindow: BrowserWindow | null = null;
 let currentCwd = process.cwd();
 const configManager = new ConfigManager();
 const ptyManager = new PtyManager();
 ptyManager.setConfigManager(configManager);
+const claudeChatManager = new ClaudeChatManager();
+claudeChatManager.setConfigManager(configManager);
+const systemOneCompiler = new SystemOneCompiler();
+systemOneCompiler.setConfigManager(configManager);
 const skillsRegistry = new SharedSkillsRegistry();
 let memoryStore = new MemoryStore(currentCwd);
 const worktreeManager = new WorktreeManager();
@@ -169,6 +197,15 @@ async function createWindow() {
   });
 
   ptyManager.setWindow(mainWindow);
+  claudeChatManager.setWindow(mainWindow);
+
+  // Open external links (markdown link clicks) in the OS browser, never in-app.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 
   const broadcastMaximizedState = () => {
     mainWindow?.webContents.send('window:maximized-changed', mainWindow.isMaximized());
@@ -245,6 +282,70 @@ function setupIpcHandlers() {
 
   ipcMain.on('pty:kill', (_, { id }) => {
     ptyManager.kill(id);
+  });
+
+  // Structured Claude Code Chat (stream-json headless session)
+  ipcMain.handle('claudechat:start', async (_, options) => {
+    return claudeChatManager.start({ ...options, cwd: options?.cwd || currentCwd });
+  });
+  ipcMain.on('claudechat:send', (_, { id, text, images }) => {
+    claudeChatManager.send(id, text, images);
+  });
+  ipcMain.on('claudechat:stop', (_, { id }) => {
+    claudeChatManager.stop(id);
+  });
+
+  // Deterministic System 1 JSON compiler (direct Anthropic API)
+  ipcMain.handle('system1:run', async (_, options) => {
+    return systemOneCompiler.run({
+      taskId: options?.taskId || `task-${Date.now()}`,
+      targetFile: options?.targetFile || '',
+      prompt: options?.prompt || '',
+      slot: typeof options?.slot === 'number' ? options.slot : 0,
+      rules: options?.rules || '',
+      model: options?.model,
+    });
+  });
+
+  // Run the local TypeScript compiler for the System 1 Auto-Fix loop.
+  ipcMain.handle('system1:typecheck', async (_, { cwd } = {}) => {
+    const targetCwd = cwd || currentCwd;
+    return new Promise((resolve) => {
+      exec(
+        'npx tsc --noEmit',
+        { cwd: targetCwd, env: process.env, maxBuffer: 10 * 1024 * 1024, timeout: 180_000 },
+        (err: any, stdout, stderr) => {
+          const output = `${stdout || ''}${stderr || ''}`.trim();
+          if (!err) {
+            resolve({ clean: true, exitCode: 0, output });
+          } else {
+            resolve({
+              clean: false,
+              exitCode: typeof err.code === 'number' ? err.code : 1,
+              output: output || err.message || 'Type check failed.',
+            });
+          }
+        }
+      );
+    });
+  });
+
+  // Write file to disk (used to apply a System 1 compilation result)
+  ipcMain.handle('workspace:write-file', async (_, { filePath, content }) => {
+    try {
+      if (!filePath) return { success: false, error: 'No file path' };
+      const abs = filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)
+        ? filePath
+        : join(currentCwd, filePath);
+      const dir = dirname(abs);
+      if (!existsSync(dir)) {
+        (await import('node:fs')).mkdirSync(dir, { recursive: true });
+      }
+      writeFileSync(abs, content ?? '', 'utf-8');
+      return { success: true, filePath: abs };
+    } catch (err: any) {
+      return { success: false, error: err?.message || String(err) };
+    }
   });
 
 
@@ -487,6 +588,15 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('system:getCwd', () => currentCwd);
+
+  ipcMain.handle('system:hostname', () => {
+    if (process.platform === 'darwin') {
+      try {
+        return execSync('scutil --get ComputerName', { encoding: 'utf-8', timeout: 2000 }).trim();
+      } catch {}
+    }
+    return os.hostname().replace(/\.local$/, '');
+  });
 }
 
 app.whenReady().then(async () => {
@@ -500,6 +610,7 @@ app.whenReady().then(async () => {
 
 app.on('will-quit', () => {
   ptyManager.killAll();
+  claudeChatManager.killAll();
 });
 
 app.on('window-all-closed', () => {
