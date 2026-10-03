@@ -37,6 +37,22 @@ function ensureSpawnHelperPermissions(): void {
   } catch {}
 }
 
+function resolveBinary(binaryName: string, extraPaths: string[]): string {
+  if (path.isAbsolute(binaryName)) return binaryName;
+  const pathKey = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
+  const allPaths = [...extraPaths, ...(process.env[pathKey] || '').split(path.delimiter)].filter(Boolean);
+  for (const dir of allPaths) {
+    const candidate = path.join(dir, binaryName);
+    if (fs.existsSync(candidate)) {
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return candidate;
+      } catch {}
+    }
+  }
+  return binaryName;
+}
+
 function getManagedZshDir(): string {
   const zshDir = path.join(os.homedir(), '.vulgaris', 'shell', 'zsh');
   if (!fs.existsSync(zshDir)) {
@@ -45,11 +61,12 @@ function getManagedZshDir(): string {
   const zshrcPath = path.join(zshDir, '.zshrc');
   const zshrcContent = [
     '# Vulgaris Terminal Integration for ZSH',
+    'set +e',
     'if [ -f "$HOME/.zprofile" ]; then',
-    '  source "$HOME/.zprofile"',
+    '  source "$HOME/.zprofile" 2>/dev/null || true',
     'fi',
     'if [ -f "$HOME/.zshrc" ]; then',
-    '  ZDOTDIR="$HOME" source "$HOME/.zshrc"',
+    '  ZDOTDIR="$HOME" source "$HOME/.zshrc" 2>/dev/null || true',
     'fi',
     'PROMPT_EOL_MARK=""',
     'PROMPT=""',
@@ -96,6 +113,7 @@ function getManagedBashrcPath(): string {
 
 export class PtyManager {
   private terminals = new Map<string, pty.IPty>();
+  private buffers = new Map<string, string>();
   private window: BrowserWindow | null = null;
   private configManager: ConfigManager | null = null;
 
@@ -114,34 +132,25 @@ export class PtyManager {
   createTerminal(options: PtyCreateOptions) {
     ensureSpawnHelperPermissions();
 
+    if (this.terminals.has(options.id)) {
+      const existing = this.terminals.get(options.id)!;
+      console.log(`[PtyManager] Reusing active terminal (${options.id}, pid=${existing.pid})`);
+      const buffered = this.buffers.get(options.id);
+      if (buffered && this.window && !this.window.isDestroyed()) {
+        setTimeout(() => {
+          if (this.window && !this.window.isDestroyed()) {
+            this.window.webContents.send('pty:data', {
+              id: options.id,
+              data: buffered,
+            });
+          }
+        }, 20);
+      }
+      return { id: options.id, pid: existing.pid };
+    }
+
     const isWindows = process.platform === 'win32';
     const isMac = process.platform === 'darwin';
-
-    const shellResolution = this.configManager ? this.configManager.resolveShellBinary() : {
-      shell: isWindows ? 'powershell.exe' : (process.env.SHELL || (isMac ? '/bin/zsh' : '/bin/bash')),
-      args: isWindows ? ['-NoLogo'] : [],
-    };
-
-    let file = options.command || shellResolution.shell;
-    let args: string[] = options.args ? [...options.args] : [...(shellResolution.args || [])];
-
-    // If launching specific CLI like Claude, append flags
-    if (options.command && options.command !== 'powershell.exe' && options.command !== 'cmd.exe' && options.command !== 'wsl.exe') {
-      const claudeFlags = (options.command === 'claude' && this.configManager)
-        ? this.configManager.getClaudeCliFlags()
-        : [];
-
-      if (isWindows) {
-        let invocation = options.command;
-        if (claudeFlags.length > 0) {
-          invocation = `claude ${claudeFlags.join(' ')}`;
-        }
-        file = 'powershell.exe';
-        args = ['-NoLogo', '-NoExit', '-Command', invocation];
-      } else if (options.command === 'claude' && claudeFlags.length > 0) {
-        args = [...claudeFlags, ...args];
-      }
-    }
 
     const home = os.homedir();
     const extraPaths = isWindows
@@ -161,6 +170,34 @@ export class PtyManager {
           path.join(home, '.npm-global', 'bin'),
           path.join(home, 'bin'),
         ];
+
+    const shellResolution = this.configManager ? this.configManager.resolveShellBinary() : {
+      shell: isWindows ? 'powershell.exe' : (process.env.SHELL || (isMac ? '/bin/zsh' : '/bin/bash')),
+      args: isWindows ? ['-NoLogo'] : [],
+    };
+
+    let file = options.command || shellResolution.shell;
+    let args: string[] = options.args ? [...options.args] : [...(shellResolution.args || [])];
+
+    file = resolveBinary(file, extraPaths);
+
+    // If launching specific CLI like Claude, append flags
+    if (options.command && options.command !== 'powershell.exe' && options.command !== 'cmd.exe' && options.command !== 'wsl.exe') {
+      const claudeFlags = (options.command === 'claude' && this.configManager)
+        ? this.configManager.getClaudeCliFlags()
+        : [];
+
+      if (isWindows) {
+        let invocation = options.command;
+        if (claudeFlags.length > 0) {
+          invocation = `claude ${claudeFlags.join(' ')}`;
+        }
+        file = 'powershell.exe';
+        args = ['-NoLogo', '-NoExit', '-Command', invocation];
+      } else if (options.command === 'claude' && claudeFlags.length > 0) {
+        args = [...claudeFlags, ...args];
+      }
+    }
 
     const env = {
       ...process.env,
@@ -217,6 +254,7 @@ export class PtyManager {
     env['Path'] = updatedPath;
 
     try {
+      console.log(`[PtyManager] Spawning terminal (${options.id}): ${file} ${JSON.stringify(args)} in ${cwd}`);
       const ptyProcess = pty.spawn(file, args, {
         name: 'xterm-256color',
         cols,
@@ -228,6 +266,8 @@ export class PtyManager {
       this.terminals.set(options.id, ptyProcess);
 
       ptyProcess.onData((data: string) => {
+        const prev = this.buffers.get(options.id) || '';
+        this.buffers.set(options.id, (prev + data).slice(-65536));
         if (this.window && !this.window.isDestroyed()) {
           this.window.webContents.send('pty:data', {
             id: options.id,
@@ -237,7 +277,9 @@ export class PtyManager {
       });
 
       ptyProcess.onExit(({ exitCode, signal }) => {
+        console.log(`[PtyManager] onExit (${options.id}): exitCode=${exitCode}, signal=${signal}`);
         this.terminals.delete(options.id);
+        this.buffers.delete(options.id);
         if (this.window && !this.window.isDestroyed()) {
           this.window.webContents.send('pty:exit', {
             id: options.id,
@@ -284,11 +326,15 @@ export class PtyManager {
   }
 
   kill(id: string) {
+    console.log(`[PtyManager] kill (${id})`);
     const term = this.terminals.get(id);
     if (term) {
-      term.kill();
+      try {
+        term.kill();
+      } catch {}
       this.terminals.delete(id);
     }
+    this.buffers.delete(id);
   }
 
   killAll() {
@@ -298,5 +344,6 @@ export class PtyManager {
       } catch {}
       this.terminals.delete(id);
     }
+    this.buffers.clear();
   }
 }

@@ -500,7 +500,8 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         submitCommandRef.current = null;
         unsubscribeData();
         resizeObserver.disconnect();
-        window.warpApi.killTerminal(session.id);
+        // NOTE: Do not killTerminal here. Session process lifecycle is managed by App.tsx
+        // (handleCloseTab and handleCloseSession). Unmounting only disposes the DOM renderer.
         term.dispose();
       };
     }
