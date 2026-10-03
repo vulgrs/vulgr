@@ -32,9 +32,10 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
 }) => {
   const [goal, setGoal] = useState('');
   const [builder, setBuilder] = useState<SessionType>('claude');
-  const [verifier, setVerifier] = useState<SessionType>('agy');
+  const [verifier, setVerifier] = useState<SessionType>('shell');
   const [verifyCmd, setVerifyCmd] = useState('npm test');
   const [maxRounds, setMaxRounds] = useState(3);
+
 
   if (!isOpen) return null;
 
@@ -114,11 +115,9 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
                 onChange={(e) => setBuilder(e.target.value as SessionType)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
               >
-                <option value="claude">Claude Code (Official)</option>
-                <option value="agy">AGY Engine (Official)</option>
-                <option value="codex">Codex CLI (Official)</option>
+                <option value="claude">Claude Code (Installed & Active)</option>
               </select>
-              <p className="text-[10px] text-zinc-500">Writes code in Left Terminal Pane</p>
+              <p className="text-[10px] text-zinc-500">Writes code autonomously in Left Terminal Pane</p>
             </div>
 
             {/* Verifier Selection */}
@@ -132,14 +131,13 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
                 onChange={(e) => setVerifier(e.target.value as SessionType)}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
               >
-                <option value="agy">AGY Engine (Official)</option>
-                <option value="claude">Claude Code (Official)</option>
-                <option value="codex">Codex CLI (Official)</option>
-                <option value="shell">Native Shell (Bash / PTY)</option>
+                <option value="shell">Native Shell (Run verify command in PTY)</option>
+                <option value="claude">Claude Code (Verifier instance)</option>
               </select>
-              <p className="text-[10px] text-zinc-500">Runs tests in Right Terminal Pane</p>
+              <p className="text-[10px] text-zinc-500">Runs tests & verification in Right Terminal Pane</p>
             </div>
           </div>
+
 
           {/* Verification Command & Rounds */}
           <div className="grid grid-cols-3 gap-3">

@@ -32,7 +32,10 @@ interface ClaudeChatViewProps {
   onClose: () => void;
   cwd: string;
   gitBranch: string | null;
+  initialPrompt?: string;
+  onClearInitialPrompt?: () => void;
 }
+
 
 /** Icon for a given tool_use bubble. */
 function toolIcon(name?: string) {
@@ -173,7 +176,14 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   );
 };
 
-export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({ isOpen, onClose, cwd, gitBranch }) => {
+export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
+  isOpen,
+  onClose,
+  cwd,
+  gitBranch,
+  initialPrompt,
+  onClearInitialPrompt,
+}) => {
   const [state, setState] = useState<ChatReducerState>(initialChatState);
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
@@ -222,22 +232,34 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({ isOpen, onClose,
     if (isOpen) refreshDiff();
   }, [isOpen, refreshDiff]);
 
-  const handleSend = useCallback(() => {
-    const text = input.trim();
-    if (!text || running) return;
+  const sendPrompt = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || running) return;
     setInput('');
-    setState((prev) => appendUserMessage(prev, text));
+    setState((prev) => appendUserMessage(prev, trimmed));
     setRunning(true);
 
     if (!started) {
       const id = `chat-${Date.now()}`;
       sessionIdRef.current = id;
       setStarted(true);
-      api?.startClaudeChat({ id, prompt: text, cwd });
+      api?.startClaudeChat({ id, prompt: trimmed, cwd });
     } else {
-      api?.sendClaudeChat(sessionIdRef.current, text);
+      api?.sendClaudeChat(sessionIdRef.current, trimmed);
     }
-  }, [input, running, started, api, cwd]);
+  }, [running, started, api, cwd]);
+
+  useEffect(() => {
+    if (isOpen && initialPrompt && initialPrompt.trim()) {
+      sendPrompt(initialPrompt);
+      onClearInitialPrompt?.();
+    }
+  }, [isOpen, initialPrompt, sendPrompt, onClearInitialPrompt]);
+
+  const handleSend = useCallback(() => {
+    sendPrompt(input);
+  }, [input, sendPrompt]);
+
 
   const handleStop = useCallback(() => {
     if (sessionIdRef.current) api?.stopClaudeChat(sessionIdRef.current);

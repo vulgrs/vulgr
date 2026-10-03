@@ -83,6 +83,7 @@ export const App: React.FC = () => {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [chatModeOpen, setChatModeOpen] = useState(false);
+  const [chatInitialPrompt, setChatInitialPrompt] = useState('');
   const [hudOpen, setHudOpen] = useState(false);
   const [contextTelemetry, setContextTelemetry] = useState<ContextTelemetry | null>(null);
   const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
@@ -278,12 +279,13 @@ export const App: React.FC = () => {
   // prompt was and the dock steps aside until they exit.
   const AGENT_TITLES: Partial<Record<SessionType, string>> = {
     claude: 'Claude Code',
-    agy: 'AGY Engine',
-    codex: 'Codex CLI',
+    agy: 'Claude Code (Verifier)',
+    codex: 'Claude Code (Auditor)',
   };
 
   const buildAgentCommand = async (type: SessionType): Promise<string> => {
-    if (type !== 'claude') return type;
+    const resolvedType = (type === 'agy' || type === 'codex') ? 'claude' : type;
+    if (resolvedType !== 'claude') return resolvedType;
     const flags: string[] = [];
     try {
       const claude = (await window.warpApi?.getConfig?.())?.claude;
@@ -293,6 +295,7 @@ export const App: React.FC = () => {
     } catch {}
     return ['claude', ...flags].join(' ');
   };
+
 
   // Commands waiting for a freshly created shell pane to register its handler.
   const pendingShellCommands = useRef<Record<string, string>>({});
@@ -519,22 +522,24 @@ export const App: React.FC = () => {
 
   // Pipe error to agent for Self-Correction
   const handlePipeErrorToAgent = (targetType: SessionType, errorSnippet: string) => {
-    sendPromptToAgent(
-      targetType,
-      `Compiler/Test error occurred:\n${errorSnippet}\nPlease diagnose and fix this error.\r`
+    setChatInitialPrompt(
+      `Compiler/Test error occurred in the terminal:\n\`\`\`\n${errorSnippet}\n\`\`\`\nPlease diagnose the root cause and provide or apply the fix.`
     );
+    setChatModeOpen(true);
   };
 
   // Cross-Model Adversarial Review from Git Diff
   const handleSendDiffToAgent = (targetType: SessionType) => {
-    const instruction = `Please review this git diff for security vulnerabilities, memory leaks, and edge cases:\n\`\`\`diff\n${gitDiff.slice(
-      0,
-      3000
-    )}\n\`\`\`\r`;
-    sendPromptToAgent(targetType, instruction);
-
+    setChatInitialPrompt(
+      `Please review this git diff for security vulnerabilities, bugs, and edge cases:\n\`\`\`diff\n${gitDiff.slice(
+        0,
+        4000
+      )}\n\`\`\``
+    );
+    setChatModeOpen(true);
     setDiffOpen(false);
   };
+
 
   const handleRevertGit = async () => {
     if (window.warpApi) {
@@ -957,7 +962,9 @@ export const App: React.FC = () => {
         onOpenSettings={() => setSettingsModalOpen(true)}
         onOpenExportReport={handleOpenExportModal}
         onOpenChat={() => setChatModeOpen(true)}
+        onLaunchClaude={() => handleLaunchAgent('claude')}
       />
+
 
       {/* Main Content: Sidebar + Center Workspace + Right Panel */}
       <div className="flex-1 w-full min-h-0 relative flex bg-base-app">
@@ -1059,8 +1066,12 @@ export const App: React.FC = () => {
               }}
               onFixActive={() => {
                 if (activeSession) {
-                  handlePipeErrorToAgent('agy', 'Auto-fix detected error in terminal.');
+                  handlePipeErrorToAgent('claude', 'Auto-fix detected error in terminal.');
                 }
+              }}
+              onAskClaude={(prompt) => {
+                setChatInitialPrompt(prompt);
+                setChatModeOpen(true);
               }}
               onOpenHud={() => setHudOpen(true)}
               tokenSavingsText={`${contextTelemetry?.savingsPercentage ?? 68}% saved`}
@@ -1096,8 +1107,11 @@ export const App: React.FC = () => {
           onClose={() => setChatModeOpen(false)}
           cwd={cwd}
           gitBranch={gitBranch}
+          initialPrompt={chatInitialPrompt}
+          onClearInitialPrompt={() => setChatInitialPrompt('')}
         />
       </div>
+
 
       {/* Status Bar */}
       <StatusBar

@@ -623,36 +623,16 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
           </div>
 
           <div className="flex items-center space-x-1.5 flex-shrink-0">
-            <span className="text-[10px] text-amber-400/80 font-sans mr-0.5">Repair with:</span>
             <button
               onClick={() => {
                 onPipeErrorToAgent('claude', detectedError);
                 setDetectedError(null);
               }}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-zinc-600/30 hover:bg-zinc-600/50 border border-zinc-500/50 text-zinc-200 text-[10px] font-semibold transition-all shadow-sm"
+              className="flex items-center space-x-1 px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 text-[11px] font-semibold transition-all shadow-sm"
+              title="Send this error trace directly to Claude Code to fix"
             >
-              <Sparkles size={10} />
-              <span>Claude</span>
-            </button>
-            <button
-              onClick={() => {
-                onPipeErrorToAgent('agy', detectedError);
-                setDetectedError(null);
-              }}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-zinc-600/30 hover:bg-zinc-600/50 border border-zinc-500/50 text-zinc-200 text-[10px] font-semibold transition-all shadow-sm"
-            >
-              <Shield size={10} />
-              <span>AGY</span>
-            </button>
-            <button
-              onClick={() => {
-                onPipeErrorToAgent('codex', detectedError);
-                setDetectedError(null);
-              }}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-emerald-200 text-[10px] font-semibold transition-all shadow-sm"
-            >
-              <Bot size={10} />
-              <span>Codex</span>
+              <Sparkles size={11} />
+              <span>Fix with Claude Code</span>
             </button>
             <button
               onClick={() => setDetectedError(null)}
