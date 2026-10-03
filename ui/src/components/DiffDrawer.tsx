@@ -91,31 +91,14 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
           <span className="text-[10px] text-zinc-500 font-mono">Pipes diff to target CLI</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            onClick={() => onSendDiffToAgent('claude')}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold transition-all"
-          >
-            <Sparkles size={13} className="text-zinc-400" />
-            <span>Audit Claude</span>
-          </button>
+        <button
+          onClick={() => onSendDiffToAgent('claude')}
+          className="w-full flex items-center justify-center space-x-2 px-3 py-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold transition-all shadow-sm group"
+        >
+          <Sparkles size={14} className="text-violet-400 group-hover:scale-110 transition-transform" />
+          <span>Audit Diff with Claude Code</span>
+        </button>
 
-          <button
-            onClick={() => onSendDiffToAgent('agy')}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold transition-all"
-          >
-            <Shield size={13} className="text-zinc-400" />
-            <span>Audit AGY</span>
-          </button>
-
-          <button
-            onClick={() => onSendDiffToAgent('codex')}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-200 text-xs font-semibold transition-all"
-          >
-            <Bot size={13} className="text-emerald-400" />
-            <span>Audit Codex</span>
-          </button>
-        </div>
 
         <button
           onClick={onRevert}

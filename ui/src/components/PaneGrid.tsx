@@ -50,37 +50,11 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
               className="flex items-center space-x-3 p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 text-left transition-all group"
             >
               <div className="p-2 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 group-hover:scale-105 transition-transform">
-                <Sparkles size={16} />
+                <Sparkles size={16} className="text-violet-400" />
               </div>
               <div>
                 <div className="text-xs font-semibold text-zinc-200">Claude Code</div>
                 <div className="text-[10px] text-zinc-500">Anthropic AI CLI</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => onLaunchAgent('agy')}
-              className="flex items-center space-x-3 p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 text-left transition-all group"
-            >
-              <div className="p-2 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 group-hover:scale-105 transition-transform">
-                <Shield size={16} />
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-zinc-200">AGY Engine</div>
-                <div className="text-[10px] text-zinc-500">Antigravity 2.0 CLI</div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => onLaunchAgent('codex')}
-              className="flex items-center space-x-3 p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800/80 hover:border-zinc-700 text-left transition-all group"
-            >
-              <div className="p-2 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 group-hover:scale-105 transition-transform">
-                <Bot size={16} />
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-zinc-200">Codex CLI</div>
-                <div className="text-[10px] text-zinc-500">OpenAI Terminal CLI</div>
               </div>
             </button>
 
@@ -93,7 +67,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
               </div>
               <div>
                 <div className="text-xs font-semibold text-zinc-200">Interactive Shell</div>
-                <div className="text-[10px] text-zinc-500">Bash / PowerShell PTY</div>
+                <div className="text-[10px] text-zinc-500">macOS Zsh Terminal</div>
               </div>
             </button>
           </div>

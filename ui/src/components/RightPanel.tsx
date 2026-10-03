@@ -218,33 +218,18 @@ export const RightPanel: React.FC<RightPanelProps> = ({
             {filesChanged.length > 0 && onSendDiffToAgent && (
               <div className="mt-4 pt-3 border-t border-zinc-900 space-y-2">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 font-mono">
-                  Ask an agent to review these changes
+                  Autonomous Code Review
                 </span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    onClick={() => onSendDiffToAgent('claude')}
-                    className="flex items-center justify-center space-x-1 px-2 py-1.5 rounded-md bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] font-medium transition-all"
-                  >
-                    <Sparkles size={11} className="text-zinc-400" />
-                    <span>Claude</span>
-                  </button>
-                  <button
-                    onClick={() => onSendDiffToAgent('agy')}
-                    className="flex items-center justify-center space-x-1 px-2 py-1.5 rounded-md bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] font-medium transition-all"
-                  >
-                    <Shield size={11} className="text-zinc-400" />
-                    <span>AGY Engine</span>
-                  </button>
-                  <button
-                    onClick={() => onSendDiffToAgent('codex')}
-                    className="flex items-center justify-center space-x-1 px-2 py-1.5 rounded-md bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] font-medium transition-all"
-                  >
-                    <Bot size={11} className="text-zinc-400" />
-                    <span>Codex</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => onSendDiffToAgent('claude')}
+                  className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold transition-all shadow-sm group"
+                >
+                  <Sparkles size={13} className="text-violet-400 group-hover:scale-110 transition-transform" />
+                  <span>Review & Audit with Claude Code</span>
+                </button>
               </div>
             )}
+
           </div>
         ) : (
           /* Sandbox & Isolated Worktrees View */

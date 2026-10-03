@@ -1,5 +1,6 @@
 import { BaseCliAdapter } from './base.js';
-import type { CliAdapterConfig, CliExecutionOptions } from '../types/index.js';
+import { ClaudeAdapter } from './claude.js';
+import type { CliAdapterConfig, CliExecutionOptions, CliExecutionResult } from '../types/index.js';
 
 export class AgyAdapter extends BaseCliAdapter {
   readonly name = 'agy';
@@ -24,4 +25,18 @@ export class AgyAdapter extends BaseCliAdapter {
 
     return args;
   }
+
+  override async execute(prompt: string, options: CliExecutionOptions = {}): Promise<CliExecutionResult> {
+    if (!(await this.isAvailable())) {
+      const claude = new ClaudeAdapter({
+        defaultTimeoutMs: this.defaultTimeoutMs,
+        maxBufferBytes: this.maxBufferBytes,
+        env: this.defaultEnv,
+        extraArgs: this.extraArgs,
+      });
+      return claude.execute(`[Role: AGY Engine / Verifier]\n${prompt}`, options);
+    }
+    return super.execute(prompt, options);
+  }
 }
+

@@ -38,8 +38,9 @@ interface AgentMeshModalProps {
 export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose }) => {
   const [goal, setGoal] = useState('');
   const [builder, setBuilder] = useState('claude');
-  const [verifier, setVerifier] = useState('agy');
-  const [auditor, setAuditor] = useState('gemini');
+  const [verifier, setVerifier] = useState('claude');
+  const [auditor, setAuditor] = useState('claude');
+
   const [isRunning, setIsRunning] = useState(false);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -266,10 +267,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose 
                 disabled={isRunning}
                 className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
               >
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Official)</option>
-                <option value="agy" className="bg-base-elevated text-zinc-300">AGY Engine (Official)</option>
-                <option value="gemini" className="bg-base-elevated text-emerald-300">Gemini (Official)</option>
-                <option value="codex" className="bg-base-elevated text-zinc-300">Codex CLI (Official)</option>
+                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Builder)</option>
                 <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
               </select>
             </div>
@@ -284,9 +282,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose 
                 disabled={isRunning}
                 className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
               >
-                <option value="agy" className="bg-base-elevated text-zinc-300">AGY Engine (Official)</option>
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Official)</option>
-                <option value="codex" className="bg-base-elevated text-zinc-300">Codex CLI (Official)</option>
+                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Verifier)</option>
                 <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
               </select>
             </div>
@@ -301,13 +297,12 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose 
                 disabled={isRunning}
                 className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-emerald-300 font-mono text-xs focus:outline-none focus:border-emerald-500/50"
               >
-                <option value="gemini" className="bg-base-elevated text-emerald-300">Gemini (Official)</option>
-                <option value="codex" className="bg-base-elevated text-zinc-300">Codex CLI (Official)</option>
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Official)</option>
+                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Auditor)</option>
                 <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
               </select>
             </div>
           </div>
+
         </div>
 
         {/* Live Inter-CLI Communication Timeline */}

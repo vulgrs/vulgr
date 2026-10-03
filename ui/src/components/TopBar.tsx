@@ -10,8 +10,10 @@ import {
   Settings,
   Zap,
   Sparkles,
+  Terminal,
   Minus,
   Square,
+
   Copy,
   X,
 } from 'lucide-react';
@@ -25,12 +27,14 @@ interface TopBarProps {
   onOpenSettings: () => void;
   onOpenExportReport: () => void;
   onOpenChat: () => void;
+  onLaunchClaude?: () => void;
   doctor: DoctorStatus | null;
   hasUncommittedDiff: boolean;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   onOpenPalette: () => void;
 }
+
 
 const noDrag: React.CSSProperties = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
 
@@ -65,6 +69,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenSettings,
   onOpenExportReport,
   onOpenChat,
+  onLaunchClaude,
   doctor,
   hasUncommittedDiff,
   sidebarOpen,
@@ -103,11 +108,20 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           {sidebarOpen ? <PanelLeftClose size={13} /> : <PanelLeft size={13} />}
         </button>
+        {onLaunchClaude && (
+          <ToolButton
+            onClick={onLaunchClaude}
+            icon={<Terminal size={13} />}
+            label="Claude CLI"
+            title="Launch interactive Claude Code session in terminal (Ctrl+Shift+C)"
+          />
+        )}
         <ToolButton
-          onClick={onOpenSkillsModal}
-          icon={<Sliders size={13} />}
-          label="Skills & Memory"
-          title="Skills & Memory (Ctrl+Shift+K) — saved command templates, plus facts and rules every agent should remember about your project"
+          onClick={onOpenChat}
+          icon={<Sparkles size={13} />}
+          label="Claude Chat"
+          highlight
+          title="Claude Code Chat — talk to Claude Code and watch its output as chat, with a live diff panel"
         />
         <ToolButton
           onClick={onOpenSquadModal}
@@ -122,13 +136,13 @@ export const TopBar: React.FC<TopBarProps> = ({
           title="Agent Mesh — give one goal and a Builder, Verifier and Auditor agent work on it automatically, without terminals"
         />
         <ToolButton
-          onClick={onOpenChat}
-          icon={<Sparkles size={13} />}
-          label="Chat"
-          highlight
-          title="Claude Code Chat — talk to Claude Code and watch its output as chat, with a live diff panel"
+          onClick={onOpenSkillsModal}
+          icon={<Sliders size={13} />}
+          label="Skills & Memory"
+          title="Skills & Memory (Ctrl+Shift+K) — saved command templates, plus facts and rules every agent should remember about your project"
         />
       </div>
+
 
       {/* Center: Search Omnibar */}
       <button
