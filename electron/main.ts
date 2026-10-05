@@ -270,7 +270,7 @@ function setupIpcHandlers() {
   // Git Diff & Revert
   ipcMain.handle('git:diff', (_, { cwd = process.cwd() }) => {
     const git = new GitUtils(cwd);
-    return git.getDiff();
+    return git.getDiffAsync();
   });
 
   ipcMain.handle('git:revert', (_, { cwd = process.cwd() }) => {
@@ -281,7 +281,7 @@ function setupIpcHandlers() {
 
   ipcMain.handle('git:branch', (_, { cwd = process.cwd() } = {}) => {
     const git = new GitUtils(cwd);
-    return git.getBranch();
+    return git.getBranchAsync();
   });
 
   ipcMain.handle('git:commit', (_, { message, cwd = process.cwd() }) => {
@@ -317,7 +317,7 @@ function setupIpcHandlers() {
     return worktreeManager.createSandbox(runId, baseBranch);
   });
   ipcMain.handle('sandbox:list', async () => {
-    return worktreeManager.listSandboxes();
+    return worktreeManager.listSandboxesAsync();
   });
   ipcMain.handle('sandbox:diff', async (_, { worktreePath, baseBranch }) => {
     return worktreeManager.getSandboxDiff(worktreePath, baseBranch);

@@ -12,7 +12,11 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./ui/src/*"]
+    }
   },
   "include": ["src/**/*", "electron/**/*"],
   "exclude": ["node_modules", "dist", "ui"]

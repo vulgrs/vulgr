@@ -1,8 +1,11 @@
-import { execSync } from 'node:child_process';
+import { execSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { GitUtils, type GitDiffResult } from './gitUtils.js';
+
+const execFileAsync = promisify(execFile);
 
 export interface SandboxSession {
   id: string;
@@ -246,37 +249,54 @@ export class WorktreeManager {
         cwd: this.mainCwd,
         encoding: 'utf-8',
       });
-
-      const lines = output.split('\n');
-      const sessions: SandboxSession[] = [];
-      let currentPath = '';
-      let currentBranch = '';
-
-      for (const line of lines) {
-        if (line.startsWith('worktree ')) {
-          currentPath = line.substring(9).trim();
-        } else if (line.startsWith('branch ')) {
-          currentBranch = line.substring(7).replace('refs/heads/', '').trim();
-        } else if (line.trim().length === 0 && currentPath) {
-          if (currentPath.includes('.warp-worktrees') || currentBranch.startsWith('warp-agent/')) {
-            const id = currentPath.split(/[/\\]/).pop() || currentBranch;
-            sessions.push({
-              id,
-              branchName: currentBranch,
-              baseBranch: 'HEAD',
-              worktreePath: currentPath,
-              createdAt: new Date().toISOString(),
-              active: true,
-            });
-          }
-          currentPath = '';
-          currentBranch = '';
-        }
-      }
-
-      return sessions;
+      return this.parseWorktreeList(output);
     } catch {
       return [];
     }
+  }
+
+  /** Non-blocking listSandboxes(), for the UI's periodic refresh. */
+  async listSandboxesAsync(): Promise<SandboxSession[]> {
+    try {
+      const { stdout } = await execFileAsync('git', ['worktree', 'list', '--porcelain'], {
+        cwd: this.mainCwd,
+        encoding: 'utf-8',
+        windowsHide: true,
+      });
+      return this.parseWorktreeList(stdout);
+    } catch {
+      return [];
+    }
+  }
+
+  private parseWorktreeList(output: string): SandboxSession[] {
+    const lines = output.split('\n');
+    const sessions: SandboxSession[] = [];
+    let currentPath = '';
+    let currentBranch = '';
+
+    for (const line of lines) {
+      if (line.startsWith('worktree ')) {
+        currentPath = line.substring(9).trim();
+      } else if (line.startsWith('branch ')) {
+        currentBranch = line.substring(7).replace('refs/heads/', '').trim();
+      } else if (line.trim().length === 0 && currentPath) {
+        if (currentPath.includes('.warp-worktrees') || currentBranch.startsWith('warp-agent/')) {
+          const id = currentPath.split(/[/\\]/).pop() || currentBranch;
+          sessions.push({
+            id,
+            branchName: currentBranch,
+            baseBranch: 'HEAD',
+            worktreePath: currentPath,
+            createdAt: new Date().toISOString(),
+            active: true,
+          });
+        }
+        currentPath = '';
+        currentBranch = '';
+      }
+    }
+
+    return sessions;
   }
 }

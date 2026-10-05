@@ -1,6 +1,9 @@
-import { execSync } from 'node:child_process';
+import { execSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+
+const execFileAsync = promisify(execFile);
 
 export interface GitDiffResult {
   hasChanges: boolean;
@@ -28,6 +31,61 @@ export class GitUtils {
       return res.trim() === 'true';
     } catch {
       return false;
+    }
+  }
+
+  /** Runs a git command without blocking the event loop (Electron main process). */
+  private async git(args: string[]): Promise<string> {
+    const { stdout } = await execFileAsync('git', args, {
+      cwd: this.cwd,
+      encoding: 'utf-8',
+      maxBuffer: 10 * 1024 * 1024,
+      windowsHide: true,
+    });
+    return stdout;
+  }
+
+  /**
+   * Non-blocking getDiff(): same result, with the git commands run in parallel.
+   * `git status` failing doubles as the "not a repo" check.
+   */
+  async getDiffAsync(): Promise<GitDiffResult> {
+    try {
+      const filesRaw = await this.git(['status', '--porcelain']);
+      const [unstaged, staged, untracked] = await Promise.all([
+        this.git(['diff']),
+        this.git(['diff', '--cached']),
+        this.git(['ls-files', '--others', '--exclude-standard']).then((s) => s.trim()),
+      ]);
+
+      let combinedDiff = [staged, unstaged].filter(Boolean).join('\n');
+      if (untracked) {
+        const untrackedNotes = untracked
+          .split('\n')
+          .filter(Boolean)
+          .map((f) => `--- /dev/null\n+++ b/${f}\n@@ -0,0 +1 @@\n+[New untracked file: ${f}]`)
+          .join('\n');
+        combinedDiff = combinedDiff ? `${combinedDiff}\n${untrackedNotes}` : untrackedNotes;
+      }
+
+      const filesChanged = filesRaw
+        .split('\n')
+        .map((l) => l.trim().substring(3).trim())
+        .filter(Boolean);
+
+      return { hasChanges: combinedDiff.trim().length > 0, diff: combinedDiff, filesChanged };
+    } catch {
+      return { hasChanges: false, diff: '', filesChanged: [] };
+    }
+  }
+
+  /** Non-blocking getBranch(). */
+  async getBranchAsync(): Promise<string | null> {
+    try {
+      const branch = (await this.git(['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
+      return branch === 'HEAD' ? null : branch;
+    } catch {
+      return null;
     }
   }
 

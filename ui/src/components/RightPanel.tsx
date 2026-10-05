@@ -189,7 +189,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 if (e.key === 'Escape') setShowCommitInput(false);
               }}
               placeholder="Commit message (e.g. fix: update config)..."
-              className="flex-1 bg-black border border-zinc-800 rounded-md px-2.5 py-1 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-accent-border font-sans"
+              className="flex-1 rounded-md border border-zinc-800 bg-black px-2.5 py-1 font-sans text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-ring"
             />
             <button
               onClick={handleCommitPush}

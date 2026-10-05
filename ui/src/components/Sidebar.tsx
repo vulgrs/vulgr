@@ -169,7 +169,7 @@ const FileNode: React.FC<{
         <button
           onClick={handleCopy}
           className="p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-          title="Copy relative path"
+          title="Göreli yolu kopyala"
         >
           {copied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
         </button>
@@ -177,7 +177,7 @@ const FileNode: React.FC<{
           <button
             onClick={handleInsert}
             className="p-0.5 rounded text-zinc-500 hover:text-sky-300 hover:bg-zinc-800 transition-colors"
-            title="Paste path into terminal"
+            title="Yolu komut kutusuna ekle"
           >
             <Plus size={10} />
           </button>
@@ -301,7 +301,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {recentMenuOpen && (
             <div className="absolute left-0 mt-1 w-64 rounded-xl bg-base-elevated border border-zinc-800 shadow-2xl p-1.5 z-50 text-xs font-sans animate-slide-in-up">
               <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-                <span>Recent Projects</span>
+                <span>Son Projeler</span>
                 <span className="text-[9px] font-mono text-zinc-600">{recentProjects.length}</span>
               </div>
 
@@ -333,7 +333,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 })}
                 {recentProjects.length === 0 && (
                   <div className="px-2 py-3 text-center text-zinc-600 text-[11px]">
-                    No recent projects recorded yet.
+                    Henüz açılmış bir proje yok.
                   </div>
                 )}
               </div>
@@ -358,7 +358,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={onOpenProjectFolder}
           className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800/60 transition-colors flex-shrink-0"
-          title="Open project folder from disk (dialog)"
+          title="Diskten bir proje klasörü seçin"
         >
           <FolderPlus size={13} />
         </button>
@@ -373,10 +373,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ? 'border-sky-500 text-sky-400 bg-zinc-900/40'
               : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
-          title="Active sessions and past agent conversations"
+          title="Açık terminaller ve yapay zekâya verdiğiniz önceki istekler"
         >
           <MessageSquare size={11} />
-          <span>Sessions</span>
+          <span>Oturumlar</span>
           {tabs.length > 0 && (
             <span className="text-[9px] px-1 rounded-full bg-zinc-800 text-zinc-400">
               {tabs.length}
@@ -391,10 +391,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ? 'border-sky-500 text-sky-400 bg-zinc-900/40'
               : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
-          title="Project file explorer"
+          title="Proje dosyaları — tıklayınca yol komut kutusuna eklenir"
         >
           <Folder size={11} />
-          <span>Files</span>
+          <span>Dosyalar</span>
           {projectFiles.length > 0 && (
             <span className="text-[9px] px-1 rounded-full bg-zinc-800 text-zinc-400">
               {projectFiles.length}
@@ -409,10 +409,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ? 'border-sky-500 text-sky-400 bg-zinc-900/40'
               : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
-          title="Project persistent memory & rules"
+          title="Ajanların bu proje hakkında hatırlayacağı kurallar ve bilgiler"
         >
           <Brain size={11} />
-          <span>Memory</span>
+          <span>Hafıza</span>
           {projectMemory?.rules && projectMemory.rules.length > 0 && (
             <span className="text-[9px] px-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
               {projectMemory.rules.length}
@@ -433,7 +433,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search conversations..."
+                  placeholder="Konuşmalarda ara..."
                   className="flex-1 min-w-0 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none"
                 />
               </div>
@@ -442,7 +442,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   onClick={() => setNewMenuOpen(!newMenuOpen)}
                   className="p-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
-                  title="New session — Claude, AGY, Codex or Shell"
+                  title="Yeni oturum — Claude, AGY, Codex veya terminal"
                 >
                   <Plus size={13} />
                 </button>
@@ -481,7 +481,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Active Tabs */}
               <div>
                 <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 flex items-center justify-between">
-                  <span>Open Tabs</span>
+                  <span>Açık Sekmeler</span>
                   <span className="text-[9px] font-mono text-zinc-600">{filteredTabs.length}</span>
                 </div>
 
@@ -519,7 +519,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   })}
                   {filteredTabs.length === 0 && (
                     <div className="px-2 py-2 text-[11px] text-zinc-600">
-                      No open tabs matching search.
+                      Aramayla eşleşen sekme yok.
                     </div>
                   )}
                 </div>
@@ -528,7 +528,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Past Project Conversations */}
               <div>
                 <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 flex items-center justify-between">
-                  <span>Project History</span>
+                  <span>Geçmiş İstekler</span>
                   <span className="text-[9px] font-mono text-zinc-600">{filteredPastConversations.length}</span>
                 </div>
 
@@ -575,7 +575,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   {filteredPastConversations.length === 0 && (
                     <div className="px-2 py-4 text-center text-zinc-600 text-[11px] leading-relaxed">
-                      No past conversations recorded yet for this project. When you run prompts with Claude or AGY, they will be archived here.
+                      Bu projede henüz bir istek yok. Komut kutusuna isteğinizi yazıp Ctrl+Shift+Enter ile Claude'a sorduğunuzda burada listelenir; tıklayarak tekrar sorabilirsiniz.
                     </div>
                   )}
                 </div>
@@ -595,7 +595,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={onRefreshFiles}
                 className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-                title="Refresh project files tree"
+                title="Dosya listesini yenile"
               >
                 <RefreshCw size={11} />
               </button>
@@ -615,13 +615,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ))
               ) : (
                 <div className="p-6 text-center text-zinc-600 text-[11px] space-y-2">
-                  <p>No project directory loaded.</p>
+                  <p>Henüz bir proje klasörü seçilmedi.</p>
                   <button
                     onClick={onOpenProjectFolder}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
                   >
                     <FolderPlus size={12} />
-                    <span>Open Folder</span>
+                    <span>Klasör Aç</span>
                   </button>
                 </div>
               )}
@@ -636,7 +636,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-900 text-[11px] space-y-1">
               <div className="flex items-center gap-1.5 text-zinc-200 font-medium">
                 <Brain size={12} className="text-emerald-400 flex-shrink-0" />
-                <span>Project Memory</span>
+                <span>Proje Kuralları</span>
               </div>
               <p className="text-zinc-500 text-[10px] leading-relaxed">
                 Rules and facts saved in <code className="text-zinc-400 font-mono">.vulgaris-memory.json</code> are
@@ -659,14 +659,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   type="text"
                   value={newRuleInput}
                   onChange={(e) => setNewRuleInput(e.target.value)}
-                  placeholder="e.g. Always write tests in Vitest..."
+                  placeholder="örn. Testleri her zaman Vitest ile yaz..."
                   className="flex-1 bg-zinc-950 border border-zinc-800/80 rounded-md px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-emerald-600"
                 />
                 <button
                   type="submit"
                   disabled={!newRuleInput.trim()}
                   className="px-2 py-1 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors disabled:opacity-30 disabled:hover:bg-emerald-950 flex-shrink-0"
-                  title="Add Rule"
+                  title="Kural ekle"
                 >
                   <Plus size={12} />
                 </button>
@@ -684,7 +684,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         onClick={() => onRemoveMemoryRule?.(rule)}
                         className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-all flex-shrink-0"
-                        title="Delete rule"
+                        title="Kuralı sil"
                       >
                         <Trash2 size={11} />
                       </button>
@@ -692,7 +692,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ))
                 ) : (
                   <div className="py-2 text-center text-zinc-600 text-[11px]">
-                    No custom rules defined yet.
+                    Henüz kural yok. Ajanların her zaman uymasını istediğiniz bir kural yazın.
                   </div>
                 )}
               </div>
@@ -701,11 +701,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Facts Section */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                <span>Project Facts</span>
+                <span>Proje Bilgileri</span>
                 <button
                   onClick={() => setAddingFact(!addingFact)}
                   className="text-zinc-400 hover:text-zinc-200"
-                  title="Add new fact"
+                  title="Bilgi ekle"
                 >
                   <Plus size={11} />
                 </button>
@@ -717,14 +717,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     type="text"
                     value={newFactKey}
                     onChange={(e) => setNewFactKey(e.target.value)}
-                    placeholder="Key (e.g. framework)"
+                    placeholder="Anahtar (örn. framework)"
                     className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none"
                   />
                   <input
                     type="text"
                     value={newFactVal}
                     onChange={(e) => setNewFactVal(e.target.value)}
-                    placeholder="Value (e.g. Next.js 15)"
+                    placeholder="Değer (örn. Next.js 15)"
                     className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none"
                   />
                   <div className="flex justify-end gap-1.5 pt-1">
@@ -760,7 +760,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         onClick={() => onDeleteMemoryFact?.(key)}
                         className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-all flex-shrink-0"
-                        title="Delete fact"
+                        title="Bilgiyi sil"
                       >
                         <Trash2 size={11} />
                       </button>
@@ -768,7 +768,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ))
                 ) : (
                   <div className="py-2 text-center text-zinc-600 text-[11px]">
-                    No facts stored yet.
+                    Henüz bilgi yok.
                   </div>
                 )}
               </div>
@@ -786,7 +786,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Folder size={13} className="text-zinc-500 flex-shrink-0" />
           <div className="min-w-0">
-            <div className="text-[9px] uppercase tracking-wider text-zinc-600 leading-none">Project</div>
+            <div className="text-[9px] uppercase tracking-wider text-zinc-600 leading-none">Proje</div>
             <div className="text-zinc-400 truncate text-[11px] font-mono">
               {projectName}
             </div>
@@ -796,7 +796,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={onOpenSettings}
           className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-          title="Settings (Ctrl+,)"
+          title="Ayarlar (Ctrl+,)"
         >
           <Settings size={13} />
         </button>

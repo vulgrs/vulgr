@@ -1,18 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Sparkles,
-  Shield,
-  Bot,
-  Terminal,
-  CheckCircle2,
-  AlertTriangle,
-  X,
-  Send,
-  Loader2,
-  ArrowRight,
-  RefreshCw,
-  Zap,
+  SparklesIcon,
+  ShieldIcon,
+  BotIcon,
+  TerminalIcon,
+  CheckCircle2Icon,
+  ArrowRightIcon,
+  SendIcon,
+  RefreshCwIcon,
+  ZapIcon,
+  type LucideIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.js';
+import { Badge } from '@/components/ui/badge.js';
+import { Button } from '@/components/ui/button.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty.js';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field.js';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from '@/components/ui/input-group.js';
+import { ScrollArea } from '@/components/ui/scroll-area.js';
+import { Separator } from '@/components/ui/separator.js';
+import { Spinner } from '@/components/ui/spinner.js';
+import { OptionSelect, type OptionItem } from './OptionSelect.js';
 
 export interface AgentMessage {
   id: string;
@@ -34,6 +62,48 @@ interface AgentMeshModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const BUILDER_ITEMS: OptionItem[] = [
+  { value: 'claude', label: 'Claude Code (Official)' },
+  { value: 'agy', label: 'AGY Engine (Official)' },
+  { value: 'gemini', label: 'Gemini (Official)' },
+  { value: 'codex', label: 'Codex CLI (Official)' },
+  { value: 'mock', label: 'Mock Simulator' },
+];
+
+const VERIFIER_ITEMS: OptionItem[] = [
+  { value: 'agy', label: 'AGY Engine (Official)' },
+  { value: 'claude', label: 'Claude Code (Official)' },
+  { value: 'codex', label: 'Codex CLI (Official)' },
+  { value: 'mock', label: 'Mock Simulator' },
+];
+
+const AUDITOR_ITEMS: OptionItem[] = [
+  { value: 'gemini', label: 'Gemini (Official)' },
+  { value: 'codex', label: 'Codex CLI (Official)' },
+  { value: 'claude', label: 'Claude Code (Official)' },
+  { value: 'mock', label: 'Mock Simulator' },
+];
+
+const AGENT_META: Record<string, { icon: LucideIcon; label: string }> = {
+  claude: { icon: SparklesIcon, label: 'Claude Code' },
+  agy: { icon: ShieldIcon, label: 'AGY Engine' },
+  gemini: { icon: BotIcon, label: 'Gemini CLI' },
+  codex: { icon: BotIcon, label: 'Codex CLI' },
+  orchestrator: { icon: TerminalIcon, label: 'Orchestrator' },
+  broadcast: { icon: TerminalIcon, label: 'Broadcast' },
+};
+
+const AgentBadge: React.FC<{ agent: string }> = ({ agent }) => {
+  const meta = AGENT_META[agent] ?? { icon: TerminalIcon, label: agent };
+  const Icon = meta.icon;
+  return (
+    <Badge variant="outline">
+      <Icon data-icon="inline-start" />
+      {meta.label}
+    </Badge>
+  );
+};
 
 export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose }) => {
   const [goal, setGoal] = useState('');
@@ -59,13 +129,12 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose 
       if (msg.type === 'CONSENSUS_APPROVED') {
         setIsCompleted(true);
         setIsRunning(false);
+        toast.success('Autonomous consensus achieved');
       }
     });
 
     return () => unsubscribe();
   }, []);
-
-  if (!isOpen) return null;
 
   const handleStartMesh = async () => {
     if (!goal.trim() || isRunning) return;
@@ -83,325 +152,168 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose 
         auditor,
       });
     } catch (err: any) {
-      setError(err.message || String(err));
+      const message = err.message || String(err);
+      setError(message);
       setIsRunning(false);
-    }
-  };
-
-  const getAgentBadge = (agent: string) => {
-    switch (agent) {
-      case 'claude':
-        return {
-          icon: <Sparkles size={11} className="text-zinc-400" />,
-          label: 'Claude Code',
-          role: 'Builder',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-      case 'agy':
-        return {
-          icon: <Shield size={11} className="text-zinc-400" />,
-          label: 'AGY Engine',
-          role: 'Verifier',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-      case 'gemini':
-        return {
-          icon: <Bot size={11} className="text-zinc-400" />,
-          label: 'Gemini CLI',
-          role: 'Auditor',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-      case 'codex':
-        return {
-          icon: <Bot size={11} className="text-zinc-400" />,
-          label: 'Codex CLI',
-          role: 'Builder/Reviewer',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-      default:
-        return {
-          icon: <Terminal size={11} className="text-zinc-400" />,
-          label: 'Orchestrator',
-          role: 'Coordinator',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
+      toast.error(message);
     }
   };
 
   const lastSender = messages.length > 0 ? messages[messages.length - 1].from : null;
 
+  const pipeline = [
+    { id: 'orchestrator', label: 'Orchestrator', icon: <TerminalIcon data-icon="inline-start" /> },
+    { id: builder, label: builder, icon: <SparklesIcon data-icon="inline-start" />, role: 'Builder' },
+    { id: verifier, label: verifier, icon: <ShieldIcon data-icon="inline-start" />, role: 'Verifier' },
+    { id: auditor, label: auditor, icon: <BotIcon data-icon="inline-start" />, role: 'Auditor' },
+  ];
+
   return (
-    <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 select-none animate-overlay-in">
-      <div className="w-[900px] max-h-[88vh] modal-surface flex flex-col overflow-hidden animate-modal-in">
-        {/* Modal Header */}
-        <div className="h-14 px-5 modal-header flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-7 h-7 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-accent">
-              <Zap size={13} />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-semibold text-sm text-zinc-100 font-sans tracking-wide">
-                  Autonomous Multi-CLI Agent Mesh
-                </span>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400">
-                  Zero Human Intervention
-                </span>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <DialogHeader className="gap-2 border-b px-4 py-4 pr-12">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>
+              <ZapIcon data-icon="inline-start" />
+              Agent Mesh
+            </Badge>
+            <Badge variant="outline">Zero Human Intervention</Badge>
+          </div>
+          <DialogTitle>Autonomous Multi-CLI Agent Mesh</DialogTitle>
+          <DialogDescription className="font-mono">
+            Asynchronous Inter-CLI Protocol · .ai-bridge/bus/messages.jsonl
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+          <span className="text-xs text-muted-foreground">Pipeline</span>
+          {pipeline.map((node, index) => (
+            <React.Fragment key={`${node.role ?? 'lead'}-${node.id}`}>
+              {index > 0 && <ArrowRightIcon className="size-3 text-muted-foreground" />}
+              <Badge variant={lastSender === node.id ? 'default' : 'secondary'} className="capitalize">
+                {node.icon}
+                {node.label}
+                {node.role ? <span className="text-muted-foreground">({node.role})</span> : null}
+              </Badge>
+            </React.Fragment>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3 border-b px-4 py-4">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="mesh-goal">Goal</FieldLabel>
+              <div className="flex items-center gap-2">
+                <InputGroup className="flex-1">
+                  <InputGroupAddon>
+                    <InputGroupText className="font-mono">❯</InputGroupText>
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id="mesh-goal"
+                    value={goal}
+                    disabled={isRunning}
+                    placeholder="Assign high-level goal (e.g. 'JWT refresh token servisi ekle ve test et')..."
+                    className="font-mono"
+                    onChange={(e) => setGoal(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleStartMesh()}
+                  />
+                </InputGroup>
+                <Button disabled={!goal.trim() || isRunning} onClick={handleStartMesh}>
+                  {isRunning ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
+                  {isRunning ? 'Mesh Running...' : 'Start Autonomous Mesh'}
+                </Button>
               </div>
-              <p className="text-[11px] text-zinc-500 font-mono">
-                Asynchronous Inter-CLI Protocol • .ai-bridge/bus/messages.jsonl
-              </p>
-            </div>
-          </div>
+            </Field>
+          </FieldGroup>
 
-          <button onClick={onClose} className="modal-close-btn p-1.5">
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Visual Topology Pipeline */}
-        <div className="px-5 py-2.5 bg-base-surface border-b border-zinc-900 flex items-center justify-between text-xs flex-shrink-0">
-          <div className="flex items-center space-x-2 text-[11px] text-zinc-500 font-mono">
-            <span>Pipeline Topology:</span>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {/* Orchestrator Node */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md border transition-all ${
- lastSender === 'orchestrator'
- ? 'border-accent-border bg-accent-muted text-zinc-100'
- : 'border-zinc-900 bg-zinc-950 text-zinc-500'
- }`}
-            >
-              <Terminal size={11} className="text-zinc-400" />
-              <span className="font-semibold text-[11px]">Orchestrator</span>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            {/* Builder Node */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md border transition-all ${
- lastSender === builder
- ? 'border-accent-border bg-accent-muted text-zinc-100'
- : 'border-zinc-900 bg-zinc-950 text-zinc-500'
- }`}
-            >
-              <Sparkles size={11} className="text-zinc-400" />
-              <span className="font-semibold text-[11px] capitalize">{builder}</span>
-              <span className="text-[9px] text-zinc-500 font-mono">(Builder)</span>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            {/* Verifier Node */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md border transition-all ${
- lastSender === verifier
- ? 'border-accent-border bg-accent-muted text-zinc-100'
- : 'border-zinc-900 bg-zinc-950 text-zinc-500'
- }`}
-            >
-              <Shield size={11} className="text-zinc-400" />
-              <span className="font-semibold text-[11px] capitalize">{verifier}</span>
-              <span className="text-[9px] text-zinc-500 font-mono">(Verifier)</span>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            {/* Auditor Node */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md border transition-all ${
- lastSender === auditor
- ? 'border-accent-border bg-accent-muted text-zinc-100'
- : 'border-zinc-900 bg-zinc-950 text-zinc-500'
- }`}
-            >
-              <Bot size={11} className="text-zinc-400" />
-              <span className="font-semibold text-[11px] capitalize">{auditor}</span>
-              <span className="text-[9px] text-zinc-500 font-mono">(Auditor)</span>
-            </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-end">
+            <Field>
+              <FieldLabel htmlFor="mesh-builder">Builder</FieldLabel>
+              <OptionSelect id="mesh-builder" value={builder} items={BUILDER_ITEMS} disabled={isRunning} onValueChange={setBuilder} />
+            </Field>
+            <ArrowRightIcon className="mb-2 hidden size-3 text-muted-foreground sm:block" />
+            <Field>
+              <FieldLabel htmlFor="mesh-verifier">Verifier</FieldLabel>
+              <OptionSelect id="mesh-verifier" value={verifier} items={VERIFIER_ITEMS} disabled={isRunning} onValueChange={setVerifier} />
+            </Field>
+            <ArrowRightIcon className="mb-2 hidden size-3 text-muted-foreground sm:block" />
+            <Field>
+              <FieldLabel htmlFor="mesh-auditor">Auditor</FieldLabel>
+              <OptionSelect id="mesh-auditor" value={auditor} items={AUDITOR_ITEMS} disabled={isRunning} onValueChange={setAuditor} />
+            </Field>
           </div>
         </div>
 
-        {/* Goal Input & Mesh Configuration */}
-        <div className="p-4 bg-base-surface border-b border-zinc-900 space-y-3 flex-shrink-0">
-          <div className="flex items-center space-x-2">
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-2.5 text-zinc-500 font-mono text-xs select-none">❯</span>
-              <input
-                type="text"
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                disabled={isRunning}
-                placeholder="Assign high-level goal (e.g. 'JWT refresh token servisi ekle ve test et')..."
-                className="w-full glass-input pl-7 pr-3 py-2 text-xs font-mono text-zinc-100 placeholder:text-zinc-600"
-                onKeyDown={(e) => e.key === 'Enter' && handleStartMesh()}
-              />
-            </div>
-
-            <button
-              onClick={handleStartMesh}
-              disabled={!goal.trim() || isRunning}
-              className="btn-accent flex items-center space-x-2 px-5 py-2.5 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              <span>{isRunning ? 'Mesh Running...' : 'Start Autonomous Mesh'}</span>
-            </button>
-          </div>
-
-          {/* Model Roles */}
-          <div className="flex items-center space-x-4 text-xs">
-            <div className="flex items-center space-x-1.5">
-              <span className="text-[11px] text-zinc-500 font-medium">Builder:</span>
-              <select
-                value={builder}
-                onChange={(e) => setBuilder(e.target.value)}
-                disabled={isRunning}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
-              >
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Official)</option>
-                <option value="agy" className="bg-base-elevated text-zinc-300">AGY Engine (Official)</option>
-                <option value="gemini" className="bg-base-elevated text-emerald-300">Gemini (Official)</option>
-                <option value="codex" className="bg-base-elevated text-zinc-300">Codex CLI (Official)</option>
-                <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
-              </select>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            <div className="flex items-center space-x-1.5">
-              <span className="text-[11px] text-zinc-500 font-medium">Verifier:</span>
-              <select
-                value={verifier}
-                onChange={(e) => setVerifier(e.target.value)}
-                disabled={isRunning}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
-              >
-                <option value="agy" className="bg-base-elevated text-zinc-300">AGY Engine (Official)</option>
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Official)</option>
-                <option value="codex" className="bg-base-elevated text-zinc-300">Codex CLI (Official)</option>
-                <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
-              </select>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            <div className="flex items-center space-x-1.5">
-              <span className="text-[11px] text-zinc-500 font-medium">Auditor:</span>
-              <select
-                value={auditor}
-                onChange={(e) => setAuditor(e.target.value)}
-                disabled={isRunning}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-emerald-300 font-mono text-xs focus:outline-none focus:border-emerald-500/50"
-              >
-                <option value="gemini" className="bg-base-elevated text-emerald-300">Gemini (Official)</option>
-                <option value="codex" className="bg-base-elevated text-zinc-300">Codex CLI (Official)</option>
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Official)</option>
-                <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Live Inter-CLI Communication Timeline */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 select-text min-h-[350px] bg-base-app">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-zinc-500">
-              <div className="w-14 h-14 rounded-xl bg-zinc-950 border border-zinc-900 flex items-center justify-center text-zinc-500 mb-3">
-                <RefreshCw size={24} className={isRunning ? 'animate-spin' : ''} />
-              </div>
-              <p className="text-sm font-medium text-zinc-300 font-sans">Autonomous Inter-CLI Bus Ready</p>
-              <p className="text-xs text-zinc-500 max-w-md mt-1 leading-relaxed">
-                Assign a goal above to start the loop. Builder writes code, Verifier executes tests, and Auditor inspects the git diff. If tests fail, patches are sent automatically without manual copying.
-              </p>
-            </div>
-          ) : (
-            messages.map((msg) => {
-              const fromBadge = getAgentBadge(msg.from);
-              const toBadge = getAgentBadge(msg.to);
-              const isError = msg.type === 'VERIFICATION_FAILED' || msg.type === 'SECURITY_CONCERN';
-              const isSuccess = msg.type === 'CONSENSUS_APPROVED' || msg.type === 'VERIFICATION_PASSED';
-
-              return (
-                <div
-                  key={msg.id}
-                  className={`p-3.5 rounded-lg border text-xs space-y-2 transition-all duration-200 ${
- isError
- ? 'bg-red-950/20 border-red-500/40'
- : isSuccess
- ? 'bg-emerald-950/20 border-emerald-500/40'
- : 'surface-card'
- }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-md border text-[11px] font-mono ${fromBadge.color}`}>
-                        {fromBadge.icon}
-                        <span className="font-semibold">{fromBadge.label}</span>
-                      </span>
-
-                      <ArrowRight size={11} className="text-zinc-600" />
-
-                      <span className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-md border text-[11px] font-mono ${toBadge.color}`}>
-                        {toBadge.icon}
-                        <span className="font-semibold">{toBadge.label}</span>
-                      </span>
-
-                      <span
-                        className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
- isError
- ? 'bg-red-500/20 border border-red-500/40 text-red-300'
- : isSuccess
- ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
- : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
- }`}
-                      >
-                        {msg.type}
-                      </span>
-                    </div>
-
-                    <span className="font-mono text-[10px] text-zinc-500">
-                      {new Date(msg.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-
-                  <p className="text-zinc-300 font-medium leading-relaxed">{msg.payload.summary}</p>
-
-                  {msg.payload.errorTrace && (
-                    <pre className="p-2.5 rounded-md bg-black/70 border border-red-500/30 font-mono text-[10px] text-red-300 max-h-36 overflow-y-auto whitespace-pre-wrap">
-                      {msg.payload.errorTrace}
-                    </pre>
-                  )}
-                </div>
-              );
-            })
-          )}
-          <div ref={feedEndRef} />
-        </div>
-
-        {/* Footer */}
-        {isCompleted && (
-          <div className="p-3.5 bg-emerald-950/40 border-t border-emerald-500/40 flex items-center justify-between text-xs text-emerald-200 flex-shrink-0">
-            <div className="flex items-center space-x-2">
-              <CheckCircle2 size={16} className="text-emerald-400" />
-              <span className="font-semibold text-sm font-sans">Autonomous Consensus Achieved! All tests passed and code audited.</span>
-            </div>
-            <button
-              onClick={onClose}
-              className="px-4 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all"
-            >
-              Done
-            </button>
+        {error && (
+          <div className="px-4 pt-4">
+            <Alert variant="destructive">
+              <AlertTitle>Mesh failed to start</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           </div>
         )}
-      </div>
-    </div>
+
+        <ScrollArea className="min-h-80 flex-1">
+          <div className="flex flex-col gap-3 p-4">
+            {messages.length === 0 ? (
+              <Empty className="border-0">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <RefreshCwIcon className={isRunning ? 'animate-spin' : ''} />
+                  </EmptyMedia>
+                  <EmptyTitle>Autonomous Inter-CLI Bus Ready</EmptyTitle>
+                  <EmptyDescription>
+                    Assign a goal above to start the loop. Builder writes code, Verifier executes tests, and Auditor inspects the git diff. If tests fail, patches are sent automatically.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              messages.map((msg) => {
+                const isError = msg.type === 'VERIFICATION_FAILED' || msg.type === 'SECURITY_CONCERN';
+                const isSuccess = msg.type === 'CONSENSUS_APPROVED' || msg.type === 'VERIFICATION_PASSED';
+
+                return (
+                  <div key={msg.id} className="flex flex-col gap-2 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AgentBadge agent={msg.from} />
+                        <ArrowRightIcon className="size-3 text-muted-foreground" />
+                        <AgentBadge agent={msg.to} />
+                        <Badge variant={isError ? 'destructive' : isSuccess ? 'default' : 'secondary'}>
+                          {msg.type}
+                        </Badge>
+                      </div>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {new Date(msg.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed">{msg.payload.summary}</p>
+                    {msg.payload.errorTrace && (
+                      <pre className="max-h-36 overflow-y-auto rounded-lg bg-muted p-2.5 font-mono text-xs whitespace-pre-wrap text-destructive">
+                        {msg.payload.errorTrace}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })
+            )}
+            <div ref={feedEndRef} />
+          </div>
+        </ScrollArea>
+
+        {isCompleted && (
+          <>
+            <Separator />
+            <DialogFooter className="mx-0 mb-0 rounded-none">
+              <div className="mr-auto flex items-center gap-2 text-sm">
+                <CheckCircle2Icon className="size-4 text-primary" />
+                Autonomous consensus achieved. All tests passed and the code was audited.
+              </div>
+              <Button onClick={onClose}>Done</Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };

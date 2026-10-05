@@ -6,7 +6,7 @@ export type CursorStyleType = 'block' | 'underline' | 'bar';
 
 export interface ClaudeConfig {
   skipPermissions: boolean; // Appends --dangerously-skip-permissions to bypass all interactive prompts
-  model: string;           // e.g. 'claude-3-7-sonnet', 'claude-3-5-sonnet', 'claude-3-5-haiku'
+  model: string;           // 'default' (the CLI's own choice) or an alias: 'opus', 'sonnet', 'haiku'
   maxRetries: number;
   additionalFlags: string[];
 }
@@ -50,7 +50,7 @@ export const DEFAULT_CONFIG: WarpConfig = {
 
   claude: {
     skipPermissions: false,
-    model: 'claude-3-7-sonnet',
+    model: 'default',
     maxRetries: 3,
     additionalFlags: [],
   },
@@ -71,6 +71,18 @@ export const DEFAULT_CONFIG: WarpConfig = {
   lastUpdated: new Date().toISOString(),
 };
 
+/** True when the model should be passed to `claude --model` ('default' leaves it to the CLI). */
+export function claudeModelFlag(model: string | undefined): boolean {
+  return !!model && model !== 'default';
+}
+
+// Configs saved by older versions point at retired Claude 3.x model ids, which
+// make `claude --model ...` refuse to start. Fall back to the CLI's default.
+function migrateClaudeConfig(claude: ClaudeConfig): ClaudeConfig {
+  if (!claude.model || /^claude-3/.test(claude.model)) return { ...claude, model: 'default' };
+  return claude;
+}
+
 export class ConfigManager {
   private readonly configPath: string;
   private config: WarpConfig;
@@ -88,7 +100,7 @@ export class ConfigManager {
         return {
           ...DEFAULT_CONFIG,
           ...parsed,
-          claude: { ...DEFAULT_CONFIG.claude, ...(parsed.claude || {}) },
+          claude: migrateClaudeConfig({ ...DEFAULT_CONFIG.claude, ...(parsed.claude || {}) }),
           agy: { ...DEFAULT_CONFIG.agy, ...(parsed.agy || {}) },
           codex: { ...DEFAULT_CONFIG.codex, ...(parsed.codex || {}) },
         };
@@ -143,7 +155,7 @@ export class ConfigManager {
     if (this.config.claude.skipPermissions) {
       flags.push('--dangerously-skip-permissions');
     }
-    if (this.config.claude.model) {
+    if (claudeModelFlag(this.config.claude.model)) {
       flags.push('--model', this.config.claude.model);
     }
     if (this.config.claude.additionalFlags?.length > 0) {
