@@ -24,6 +24,8 @@ interface XtermPaneProps {
   onPipeErrorToAgent: (targetType: 'claude' | 'agy' | 'codex', errorSnippet: string) => void;
   onRegisterCommandHandler?: (sessionId: string, handler: ((command: string) => void) | null) => void;
   onSessionState?: (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => void;
+  /** A shell command finished: its exit code and the output it printed. */
+  onCommandFinished?: (sessionId: string, result: { command?: string; exitCode: number; output: string }) => void;
 }
 
 const ERROR_PATTERN =
@@ -57,6 +59,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   onPipeErrorToAgent,
   onRegisterCommandHandler,
   onSessionState,
+  onCommandFinished,
 }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermInstance = useRef<Terminal | null>(null);
@@ -70,6 +73,8 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   const submitCommandRef = useRef<((command: string) => void) | null>(null);
   const onSessionStateRef = useRef(onSessionState);
   onSessionStateRef.current = onSessionState;
+  const onCommandFinishedRef = useRef(onCommandFinished);
+  onCommandFinishedRef.current = onCommandFinished;
   const onPipeErrorRef = useRef(onPipeErrorToAgent);
   onPipeErrorRef.current = onPipeErrorToAgent;
 
@@ -384,6 +389,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         b.endLine = term.buffer.active.baseY + term.buffer.active.cursorY;
         paintLabel(b);
         refreshHeader(b);
+        onCommandFinishedRef.current?.(session.id, { command: b.command, exitCode, output: blockText(b) });
       };
 
       // `clear` wipes the screen and scrollback. Stale headers would be left

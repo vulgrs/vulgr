@@ -60,6 +60,10 @@ export class PtyManager {
     const isPlainShellSession = !options.command;
     if (isPlainShellSession && /(^|[\\/])(powershell|pwsh)(\.exe)?$/i.test(file)) {
       const promptFn =
+        // Text piped into native programs (e.g. `Get-Content prompt.txt | claude -p`)
+        // is encoded with $OutputEncoding, which is ASCII in Windows PowerShell 5.1
+        // and would turn every non-ASCII character (ç, ş, ğ, ...) into '?'.
+        '$OutputEncoding = [System.Text.UTF8Encoding]::new($false); ' +
         'function global:prompt { $ok = $?; $code = if ($ok) { 0 } else { 1 }; ' +
         '"$([char]27)]633;D;$code;$($PWD.Path)$([char]7)`n" }; ' +
         // Everything is bottom-anchored: the prompt starts on the last rows of the pane

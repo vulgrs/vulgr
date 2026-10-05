@@ -16,7 +16,7 @@ import { ExportReportModal } from './components/ExportReportModal.js';
 import { TokenOptimizerHUD } from './components/TokenOptimizerHUD.js';
 import { GuideModal, type GuideAction } from './components/GuideModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
-import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
+import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
 import type {
   WorkspaceTab,
   TerminalSession,
@@ -112,7 +112,68 @@ export const App: React.FC = () => {
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
   const [verifyCmd, setVerifyCmd] = useState(() => loadPersisted('warp.verifyCmd', 'npm test'));
 
-  const { squad, startSquad, togglePause, forceHandoff, stopSquad } = useSquadOrchestrator(cwd);
+  // ---- Squad (İkili Ajan) plumbing --------------------------------------
+  // A squad step runs a command in a pane and waits for XtermPane to report
+  // that it finished (exit code + output). One waiter per pane at a time.
+  const paneWaiters = useRef<Record<string, (result: PaneRunResult) => void>>({});
+  const handleCommandFinished = useCallback(
+    (sessionId: string, result: { exitCode: number; output: string }) => {
+      const resolve = paneWaiters.current[sessionId];
+      if (!resolve) return;
+      delete paneWaiters.current[sessionId];
+      resolve({ exitCode: result.exitCode, output: result.output });
+    },
+    []
+  );
+
+  const squadDeps: SquadDeps = {
+    runInPane: (sessionId, command) =>
+      new Promise<PaneRunResult>((resolve) => {
+        paneWaiters.current[sessionId] = resolve;
+        dispatchToShell(sessionId, command);
+      }),
+    buildAgentRun: async (agent, prompt, { allowEdits }) => {
+      let shell = 'powershell';
+      try {
+        shell = (await window.warpApi?.getConfig?.())?.defaultShell || shell;
+      } catch {}
+      const base = await buildAgentCommand(agent);
+      // agy only takes its prompt as an argument; Windows PowerShell 5.1 mangles
+      // double quotes inside native arguments, so swap them for single quotes.
+      const text = agent === 'agy' ? prompt.replace(/"/g, "'") : prompt;
+      const file: string = await window.warpApi.writeSquadPrompt(text);
+      const read =
+        shell === 'powershell'
+          ? `Get-Content -Raw -Encoding UTF8 '${file.replace(/'/g, "''")}'`
+          : shell === 'cmd'
+            ? `type "${file}"`
+            : `cat '${file}'`;
+
+      if (agent === 'agy') {
+        const flags = allowEdits ? ' --mode accept-edits' : '';
+        if (shell === 'powershell') return `${base} -p (${read})${flags}`;
+        if (shell === 'cmd') return `${base} -p "${text.replace(/\s+/g, ' ').slice(0, 7000)}"${flags}`;
+        return `${base} -p "$(${read})"${flags}`;
+      }
+      const run =
+        agent === 'claude'
+          ? `${base} -p${allowEdits ? ' --permission-mode acceptEdits' : ''}`
+          : agent === 'codex'
+            ? `${base} exec ${allowEdits ? '--full-auto' : '--sandbox read-only'} -`
+            : base;
+      return `${read} | ${run}`;
+    },
+    getDiff: async () => {
+      try {
+        return (await window.warpApi.getGitDiff(cwd))?.diff || '';
+      } catch {
+        return '';
+      }
+    },
+    interrupt: (sessionId) => window.warpApi?.writeTerminal(sessionId, '\x03'),
+  };
+
+  const { squad, startSquad, togglePause, stopSquad } = useSquadOrchestrator(squadDeps);
 
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
   const activeSession =
@@ -387,38 +448,35 @@ export const App: React.FC = () => {
     verifyCmd: string;
     maxRounds: number;
   }) => {
+    if (squad) stopSquad();
     const newTabId = `tab-squad-${Date.now()}`;
     const builderSessionId = `sess-b-${Date.now()}`;
     const verifierSessionId = `sess-v-${Date.now()}`;
 
-    const getCmd = (type: SessionType) => {
-      if (type === 'claude') return 'claude';
-      if (type === 'agy') return 'agy';
-      if (type === 'codex') return 'codex';
-      return '';
-    };
-
+    // Both panes are plain shells: the squad runs each agent turn in them
+    // non-interactively, so every step's output stays visible and ends with a
+    // real exit code instead of a guess about when an agent went quiet.
     const builderSession: TerminalSession = {
       id: builderSessionId,
-      title: `${config.builder.toUpperCase()} (Builder)`,
-      type: config.builder,
-      command: getCmd(config.builder),
+      title: `${squadAgentLabel(config.builder)} (yazan)`,
+      type: 'shell',
+      command: '',
       cwd,
       createdAt: new Date().toISOString(),
     };
 
     const verifierSession: TerminalSession = {
       id: verifierSessionId,
-      title: `${config.verifier.toUpperCase()} (Verifier)`,
-      type: config.verifier,
-      command: getCmd(config.verifier),
+      title: `${squadAgentLabel(config.verifier)} (kontrol eden)`,
+      type: 'shell',
+      command: '',
       cwd,
       createdAt: new Date().toISOString(),
     };
 
     const squadTab: WorkspaceTab = {
       id: newTabId,
-      title: `Squad: ${config.builder} ⇄ ${config.verifier}`,
+      title: `İkili: ${squadAgentLabel(config.builder)} ⇄ ${squadAgentLabel(config.verifier)}`,
       layout: 'split-h',
       activeSessionId: builderSessionId,
       paneSizes: [50, 50],
@@ -1125,8 +1183,11 @@ export const App: React.FC = () => {
             <SquadBar
               squad={squad}
               onPauseToggle={togglePause}
-              onForceHandoff={forceHandoff}
               onStopSquad={stopSquad}
+              onOpenChanges={() => {
+                refreshGitDiff();
+                setRightPanelOpen(true);
+              }}
             />
           )}
 
@@ -1145,6 +1206,7 @@ export const App: React.FC = () => {
                 onLaunchAgent={handleLaunchAgent}
                 onRegisterCommandHandler={registerShellCommandHandler}
                 onSessionState={handleSessionState}
+                onCommandFinished={handleCommandFinished}
               />
             )}
           </div>
@@ -1265,6 +1327,12 @@ export const App: React.FC = () => {
       <AgentMeshModal
         isOpen={meshModalOpen}
         onClose={() => setMeshModalOpen(false)}
+        cwd={cwd}
+        onOpenChanges={() => {
+          refreshGitDiff();
+          setRightPanelOpen(true);
+        }}
+        onOpenSandboxes={() => setSandboxDrawerOpen(true)}
       />
 
       {/* Live Autonomous Squad Modal */}

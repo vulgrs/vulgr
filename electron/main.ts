@@ -2,13 +2,14 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename, extname } from 'node:path';
 import { get as httpGet } from 'node:http';
-import { existsSync, writeFileSync, readdirSync, statSync, readFileSync } from 'node:fs';
+import { existsSync, writeFileSync, readdirSync, statSync, readFileSync, mkdirSync } from 'node:fs';
 import os from 'node:os';
 import { PtyManager } from './ptyManager.js';
 import { GitUtils } from '../src/git/gitUtils.js';
 import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
 import { AgentMesh } from '../src/engine/agentMesh.js';
+import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
 import { MemoryStore } from '../src/engine/memoryStore.js';
@@ -302,14 +303,41 @@ function setupIpcHandlers() {
       auditor,
       verifyCmd,
       maxRounds: maxRounds || 3,
-      cwd: cwd || process.cwd(),
-      useSandbox: useSandbox ?? true,
+      // The project folder picked in the sidebar, not wherever the app was launched from.
+      cwd: cwd || currentCwd,
+      useSandbox: useSandbox ?? false,
       onMessage: (message) => {
         mainWindow?.webContents.send('mesh:event', message);
       },
+      onStatus: (status) => {
+        mainWindow?.webContents.send('mesh:status', status);
+      },
     });
 
-    return mesh.runMesh(goal);
+    try {
+      return await mesh.runMesh(goal);
+    } catch (err: any) {
+      return { success: false, rounds: 0, messages: [], diff: '', durationMs: 0, error: err?.message || String(err) };
+    }
+  });
+
+  // Which agent CLIs are installed, so the UI only offers ones that can run.
+  ipcMain.handle('agents:available', async () => {
+    const names = ['claude', 'agy', 'codex', 'gemini'];
+    const entries = await Promise.all(
+      names.map(async (name) => [name, await AdapterFactory.getAdapter(name).isAvailable()] as const)
+    );
+    return Object.fromEntries(entries);
+  });
+
+  // Squad: prompts are written to a temp file and piped into the agent CLI, so
+  // multi-line text with quotes never has to survive shell quoting.
+  ipcMain.handle('squad:write-prompt', (_, text: string) => {
+    const dir = join(os.tmpdir(), 'vulgaris-squad');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `prompt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
+    writeFileSync(file, text, 'utf-8');
+    return file;
   });
 
   // Git Worktree Sandbox IPC Handlers

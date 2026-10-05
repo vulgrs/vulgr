@@ -13,17 +13,14 @@ export class ClaudeAdapter extends BaseCliAdapter {
   }
 
   /**
-   * Constructs Claude CLI arguments.
-   * Uses `-p, --print` for non-interactive execution.
+   * `claude -p` reads the prompt from stdin. Print mode can't answer permission
+   * prompts, so a builder gets `--permission-mode acceptEdits` (file edits are
+   * applied, shell commands still need approval); reviewers stay read-only.
    */
-  protected buildArgs(prompt: string, options?: CliExecutionOptions): string[] {
-    const args: string[] = ['-p', prompt];
-
-    // If non-interactive automated edits are intended, allow auto-permission if flag enabled
-    if (this.extraArgs.length > 0) {
-      args.push(...this.extraArgs);
-    }
-
+  protected buildArgs(_prompt: string, options?: CliExecutionOptions): string[] {
+    const args: string[] = ['-p'];
+    if (options?.allowEdits) args.push('--permission-mode', 'acceptEdits');
+    if (this.extraArgs.length > 0) args.push(...this.extraArgs);
     return args;
   }
 }
