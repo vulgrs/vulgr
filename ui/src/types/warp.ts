@@ -50,7 +50,9 @@ export type SquadPhase =
   | 'handing_off'
   | 'verifying'
   | 'repairing'
+  | 'reviewing'
   | 'consensus'
+  | 'failed'
   | 'paused';
 
 export interface SquadSession {
@@ -66,6 +68,12 @@ export interface SquadSession {
   round: number;
   maxRounds: number;
   lastErrorSnippet?: string;
+  /** Plain-language line describing the current step. */
+  statusText?: string;
+  /** Why the squad stopped, when it ended in phase 'failed'. */
+  error?: string;
+  /** The loop holds before its next step so the user can step in. */
+  paused?: boolean;
 }
 
 export interface TerminalCommandBlock {

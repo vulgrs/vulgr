@@ -1,170 +1,242 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
 @import "@xterm/xterm/css/xterm.css";
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", "Geist", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-base-app: #08080a;
+  --color-base-surface: #0c0c0f;
+  --color-base-elevated: #131316;
+  --color-base-overlay: #0a0a0c;
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 20px 48px -12px rgba(0, 0, 0, 0.7);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: #08080a;
+  --foreground: #f4f4f5;
+  --card: #131316;
+  --card-foreground: #f4f4f5;
+  --popover: #131316;
+  --popover-foreground: #f4f4f5;
+  --primary: #4d8dff;
+  --primary-foreground: #ffffff;
+  --secondary: #1c1c21;
+  --secondary-foreground: #f4f4f5;
+  --muted: #16161a;
+  --muted-foreground: #a1a1aa;
+  --accent: #1a1a22;
+  --accent-foreground: #f4f4f5;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: rgba(77, 141, 255, 0.55);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: #0c0c0f;
+  --sidebar-foreground: #f4f4f5;
+  --sidebar-primary: #4d8dff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1a1a22;
+  --sidebar-accent-foreground: #f4f4f5;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: rgba(77, 141, 255, 0.55);
+}
 
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
   body {
-    font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
-    color: #e4e4e7;
-    background-color: #08080a;
+    @apply bg-background text-foreground antialiased;
     overflow: hidden;
     user-select: none;
-    -webkit-font-smoothing: antialiased;
   }
 }
 
-/* ==========================================================================
-   Design tokens (elevation + accent). Single source of truth for the
-   monochrome-with-one-accent surface system used across every component.
-   ========================================================================== */
-:root {
-  --bg-app: #08080a;
-  --bg-surface: #0c0c0f;
-  --bg-elevated: #131316;
-  --bg-hover: rgba(255, 255, 255, 0.055);
-  --bg-active: rgba(255, 255, 255, 0.09);
-
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.18);
-
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #71717a;
-
-  --accent: #4d8dff;
-  --accent-hover: #6ba1ff;
-  --accent-muted: rgba(77, 141, 255, 0.14);
-  --accent-border: rgba(77, 141, 255, 0.4);
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-/* Ambient app background: near-black with a faint top vignette. */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modal-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-overlay-in {
+  animation: overlay-in 0.14s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .ambient-background {
-  background-color: var(--bg-app);
+  background-color: var(--background);
   background-image: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(255, 255, 255, 0.035), transparent 70%);
 }
 
-/* Surface = bars/panels/sidebars (TopBar, Sidebar, StatusBar, docks). */
 .surface-panel {
-  background: var(--bg-surface);
-  border-color: var(--border-subtle);
+  background: var(--color-base-surface);
+  border-color: var(--border);
 }
 
-/* Card = an elevated block inside a panel (list rows, blocks, tiles). */
 .surface-card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 .surface-card:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-default);
-}
-
-/* Modal chrome shared by every dialog in the app. */
-.modal-overlay {
-  background: rgba(4, 4, 6, 0.72);
-  backdrop-filter: blur(6px);
-}
-
-.modal-surface {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: 12px;
-  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.7);
-}
-
-.modal-header {
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.modal-close-btn {
-  color: var(--text-tertiary);
-  border-radius: 8px;
-  transition: color 0.12s ease, background-color 0.12s ease;
-}
-
-.modal-close-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-
-/* Legacy aliases kept so any untouched component still resolves. */
-.glass-surface {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-}
-
-.glass-card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-}
-
-.glass-modal {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.7);
-}
-
-.glass-input {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
-}
-
-.glass-input:focus {
-  border-color: var(--accent-border);
-  box-shadow: 0 0 0 3px var(--accent-muted);
-  outline: none;
-}
-
-/* Shared primary/secondary button treatments. */
-.btn-accent {
   background: var(--accent);
-  color: #ffffff;
-  border-radius: 8px;
-  transition: background-color 0.12s ease;
-}
-
-.btn-accent:hover {
-  background: var(--accent-hover);
-}
-
-.btn-ghost {
-  background: transparent;
-  border: 1px solid var(--border-default);
-  color: var(--text-secondary);
-  border-radius: 8px;
-  transition: all 0.12s ease;
-}
-
-.btn-ghost:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
-
-/* Custom minimalist monochrome scrollbar. */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
 }
 
 .no-scrollbar {
@@ -176,25 +248,80 @@
   display: none;
 }
 
-/* Active terminal / focus ring, unified with the accent token. */
-.active-terminal-border {
-  border-color: var(--accent-border);
-  box-shadow: 0 0 0 1px var(--accent-muted);
+.modal-overlay {
+  background: rgba(4, 4, 6, 0.72);
+  backdrop-filter: blur(6px);
 }
 
-/* Shell command block header, drawn by XtermPane as an xterm decoration over the
-   rows the shell reserves for a command: "<cwd> (elapsed)" + the command itself.
-   --dx-row is one terminal row in px, set from JS. */
+.modal-surface {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-close-btn {
+  color: var(--muted-foreground);
+  border-radius: var(--radius-md);
+}
+
+.modal-close-btn:hover {
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+.glass-input {
+  background: var(--background);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+}
+
+.glass-input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
+  outline: none;
+}
+
+.btn-accent {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: var(--radius-md);
+}
+
+.btn-accent:hover {
+  background: color-mix(in srgb, var(--primary) 85%, white);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+  border-radius: var(--radius-md);
+}
+
+.btn-ghost:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.active-terminal-border {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
 .dx-block-header {
   box-sizing: border-box;
   border-top: 1px solid #232326;
   color: #52525b;
-  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  font-family: "Fira Code", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
   font-size: 11px;
   pointer-events: none;
 }
 
-/* Our own command text replaces the shell's echo, so cover it. */
 .dx-block-header.has-cmd {
   background: #000;
 }

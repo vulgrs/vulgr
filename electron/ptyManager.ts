@@ -111,6 +111,8 @@ function getManagedBashrcPath(): string {
   return bashrcPath;
 }
 
+const PTY_FLUSH_MS = 5;
+
 export class PtyManager {
   private terminals = new Map<string, pty.IPty>();
   private buffers = new Map<string, string>();
@@ -265,7 +267,16 @@ export class PtyManager {
 
       this.terminals.set(options.id, ptyProcess);
 
-      ptyProcess.onData((data: string) => {
+      // Only the process currently registered under this id may talk to the UI.
+      const isCurrent = () => this.terminals.get(options.id) === ptyProcess;
+
+      let pending = '';
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+      const flush = () => {
+        flushTimer = null;
+        const data = pending;
+        pending = '';
+        if (!data || !isCurrent()) return;
         const prev = this.buffers.get(options.id) || '';
         this.buffers.set(options.id, (prev + data).slice(-65536));
         if (this.window && !this.window.isDestroyed()) {
@@ -274,9 +285,18 @@ export class PtyManager {
             data,
           });
         }
+      };
+
+      ptyProcess.onData((data: string) => {
+        if (!isCurrent()) return;
+        pending += data;
+        if (!flushTimer) flushTimer = setTimeout(flush, PTY_FLUSH_MS);
       });
 
       ptyProcess.onExit(({ exitCode, signal }) => {
+        if (flushTimer) clearTimeout(flushTimer);
+        if (!isCurrent()) return;
+        flush();
         console.log(`[PtyManager] onExit (${options.id}): exitCode=${exitCode}, signal=${signal}`);
         this.terminals.delete(options.id);
         this.buffers.delete(options.id);
@@ -331,10 +351,10 @@ export class PtyManager {
     console.log(`[PtyManager] kill (${id})`);
     const term = this.terminals.get(id);
     if (term) {
+      this.terminals.delete(id);
       try {
         term.kill();
       } catch {}
-      this.terminals.delete(id);
     }
     this.buffers.delete(id);
   }

@@ -15,8 +15,9 @@ import { SandboxDrawer } from './components/SandboxDrawer.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { ExportReportModal } from './components/ExportReportModal.js';
 import { TokenOptimizerHUD } from './components/TokenOptimizerHUD.js';
+import { GuideModal, type GuideAction } from './components/GuideModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
-import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
+import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
 import type {
   WorkspaceTab,
   TerminalSession,
@@ -45,6 +46,8 @@ const loadPersisted = <T,>(key: string, fallback: T): T => {
     return fallback;
   }
 };
+
+const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export const App: React.FC = () => {
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
@@ -81,6 +84,20 @@ export const App: React.FC = () => {
   const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  // "Nasıl kullanılır?" guide: opens by itself on the very first launch.
+  const [guideOpen, setGuideOpen] = useState(() => {
+    try {
+      return localStorage.getItem('vulgaris.guideSeen') !== '1';
+    } catch {
+      return false;
+    }
+  });
+  const closeGuide = () => {
+    setGuideOpen(false);
+    try {
+      localStorage.setItem('vulgaris.guideSeen', '1');
+    } catch {}
+  };
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [chatModeOpen, setChatModeOpen] = useState(false);
   const [chatInitialPrompt, setChatInitialPrompt] = useState('');
@@ -98,7 +115,68 @@ export const App: React.FC = () => {
   const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
   const [verifyCmd, setVerifyCmd] = useState(() => loadPersisted('warp.verifyCmd', 'npm test'));
 
-  const { squad, startSquad, togglePause, forceHandoff, stopSquad } = useSquadOrchestrator(cwd);
+  // ---- Squad (İkili Ajan) plumbing --------------------------------------
+  // A squad step runs a command in a pane and waits for XtermPane to report
+  // that it finished (exit code + output). One waiter per pane at a time.
+  const paneWaiters = useRef<Record<string, (result: PaneRunResult) => void>>({});
+  const handleCommandFinished = useCallback(
+    (sessionId: string, result: { exitCode: number; output: string }) => {
+      const resolve = paneWaiters.current[sessionId];
+      if (!resolve) return;
+      delete paneWaiters.current[sessionId];
+      resolve({ exitCode: result.exitCode, output: result.output });
+    },
+    []
+  );
+
+  const squadDeps: SquadDeps = {
+    runInPane: (sessionId, command) =>
+      new Promise<PaneRunResult>((resolve) => {
+        paneWaiters.current[sessionId] = resolve;
+        dispatchToShell(sessionId, command);
+      }),
+    buildAgentRun: async (agent, prompt, { allowEdits }) => {
+      let shell = 'powershell';
+      try {
+        shell = (await window.warpApi?.getConfig?.())?.defaultShell || shell;
+      } catch {}
+      const base = await buildAgentCommand(agent);
+      // agy only takes its prompt as an argument; Windows PowerShell 5.1 mangles
+      // double quotes inside native arguments, so swap them for single quotes.
+      const text = agent === 'agy' ? prompt.replace(/"/g, "'") : prompt;
+      const file: string = await window.warpApi.writeSquadPrompt(text);
+      const read =
+        shell === 'powershell'
+          ? `Get-Content -Raw -Encoding UTF8 '${file.replace(/'/g, "''")}'`
+          : shell === 'cmd'
+            ? `type "${file}"`
+            : `cat '${file}'`;
+
+      if (agent === 'agy') {
+        const flags = allowEdits ? ' --mode accept-edits' : '';
+        if (shell === 'powershell') return `${base} -p (${read})${flags}`;
+        if (shell === 'cmd') return `${base} -p "${text.replace(/\s+/g, ' ').slice(0, 7000)}"${flags}`;
+        return `${base} -p "$(${read})"${flags}`;
+      }
+      const run =
+        agent === 'claude'
+          ? `${base} -p${allowEdits ? ' --permission-mode acceptEdits' : ''}`
+          : agent === 'codex'
+            ? `${base} exec ${allowEdits ? '--full-auto' : '--sandbox read-only'} -`
+            : base;
+      return `${read} | ${run}`;
+    },
+    getDiff: async () => {
+      try {
+        return (await window.warpApi.getGitDiff(cwd))?.diff || '';
+      } catch {
+        return '';
+      }
+    },
+    interrupt: (sessionId) => window.warpApi?.writeTerminal(sessionId, '\x03'),
+  };
+
+  const { squad, startSquad, togglePause, stopSquad } = useSquadOrchestrator(squadDeps);
 
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
   const activeSession =
@@ -126,7 +204,7 @@ export const App: React.FC = () => {
     try {
       if (window.warpApi?.getContextStats) {
         const stats = await window.warpApi.getContextStats();
-        if (stats) setContextTelemetry(stats);
+        if (stats) setContextTelemetry((prev) => (sameJson(prev, stats) ? prev : stats));
       }
     } catch (err) {
       console.warn('[HUD] Failed to get context telemetry:', err);
@@ -166,12 +244,18 @@ export const App: React.FC = () => {
     refreshSandboxes();
     fetchContextTelemetry();
 
-    // Periodic refresh every 5 seconds to show diff badge / branch changes / token savings
-    const diffTimer = setInterval(() => {
-      refreshGitDiff();
-      refreshGitBranch();
-      refreshSandboxes();
-      fetchContextTelemetry();
+    // Periodic refresh every 5 seconds to show diff badge / branch changes / token savings.
+    // Skipped while the window is hidden/minimized, and never overlaps a refresh
+    // that is still running (git can be slow on big repos).
+    let inFlight = false;
+    const diffTimer = setInterval(async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      try {
+        await Promise.all([refreshGitDiff(), refreshGitBranch(), refreshSandboxes(), fetchContextTelemetry()]);
+      } finally {
+        inFlight = false;
+      }
     }, 5000);
     return () => clearInterval(diffTimer);
   }, [fetchContextTelemetry, refreshProjectData]);
@@ -180,7 +264,10 @@ export const App: React.FC = () => {
     if (window.warpApi?.listSandboxes) {
       try {
         const list = await window.warpApi.listSandboxes();
-        setActiveSandboxes(list || []);
+        const next = list || [];
+        // createdAt is regenerated on every listing; compare what actually identifies a sandbox.
+        const key = (l: any[]) => l.map((s) => `${s.worktreePath}|${s.branchName}`).join('\n');
+        setActiveSandboxes((prev) => (key(prev) === key(next) ? prev : next));
       } catch {}
     }
   };
@@ -190,7 +277,8 @@ export const App: React.FC = () => {
       try {
         const res = await window.warpApi.getGitDiff();
         setGitDiff(res.diff || '');
-        setGitFiles(res.filesChanged || []);
+        const files: string[] = res.filesChanged || [];
+        setGitFiles((prev) => (sameJson(prev, files) ? prev : files));
       } catch {}
     }
   };
@@ -290,7 +378,7 @@ export const App: React.FC = () => {
     try {
       const claude = (await window.warpApi?.getConfig?.())?.claude;
       if (claude?.skipPermissions) flags.push('--dangerously-skip-permissions');
-      if (claude?.model) flags.push('--model', claude.model);
+      if (claude?.model && claude.model !== 'default') flags.push('--model', claude.model);
       if (Array.isArray(claude?.additionalFlags)) flags.push(...claude.additionalFlags);
     } catch {}
     return ['claude', ...flags].join(' ');
@@ -365,38 +453,35 @@ export const App: React.FC = () => {
     verifyCmd: string;
     maxRounds: number;
   }) => {
+    if (squad) stopSquad();
     const newTabId = `tab-squad-${Date.now()}`;
     const builderSessionId = `sess-b-${Date.now()}`;
     const verifierSessionId = `sess-v-${Date.now()}`;
 
-    const getCmd = (type: SessionType) => {
-      if (type === 'claude') return 'claude';
-      if (type === 'agy') return 'agy';
-      if (type === 'codex') return 'codex';
-      return '';
-    };
-
+    // Both panes are plain shells: the squad runs each agent turn in them
+    // non-interactively, so every step's output stays visible and ends with a
+    // real exit code instead of a guess about when an agent went quiet.
     const builderSession: TerminalSession = {
       id: builderSessionId,
-      title: `${config.builder.toUpperCase()} (Builder)`,
-      type: config.builder,
-      command: getCmd(config.builder),
+      title: `${squadAgentLabel(config.builder)} (yazan)`,
+      type: 'shell',
+      command: '',
       cwd,
       createdAt: new Date().toISOString(),
     };
 
     const verifierSession: TerminalSession = {
       id: verifierSessionId,
-      title: `${config.verifier.toUpperCase()} (Verifier)`,
-      type: config.verifier,
-      command: getCmd(config.verifier),
+      title: `${squadAgentLabel(config.verifier)} (kontrol eden)`,
+      type: 'shell',
+      command: '',
       cwd,
       createdAt: new Date().toISOString(),
     };
 
     const squadTab: WorkspaceTab = {
       id: newTabId,
-      title: `Squad: ${config.builder} ⇄ ${config.verifier}`,
+      title: `İkili: ${squadAgentLabel(config.builder)} ⇄ ${squadAgentLabel(config.verifier)}`,
       layout: 'split-h',
       activeSessionId: builderSessionId,
       paneSizes: [50, 50],
@@ -635,8 +720,53 @@ export const App: React.FC = () => {
     }
   };
 
+  // Text pushed into the dock's input (file explorer paths, skill templates)
+  // for the user to finish and run themselves - never executed directly.
+  const [dockInsert, setDockInsert] = useState<{ text: string; nonce: number } | null>(null);
+  const insertIntoDock = (text: string) => setDockInsert({ text, nonce: Date.now() });
+
   const handleInsertFilePath = (filePath: string) => {
-    handleSendInputToActive(filePath);
+    insertIntoDock(/\s/.test(filePath) ? `"${filePath}"` : filePath);
+  };
+
+  // Ctrl+Shift+Enter in the dock / re-opening a past conversation: start Claude
+  // in the active shell with the text as its first prompt (`claude "<prompt>"`).
+  const handleAskAgent = async (prompt: string, agent: SessionType = 'claude') => {
+    const text = prompt.trim();
+    if (!text || !activeSession || activeSession.type !== 'shell') return;
+    const sessionId = activeSession.id;
+    if (sessionUi[sessionId]?.busy) {
+      // A program already owns the terminal (e.g. Claude is open): type into it.
+      window.warpApi.writeTerminal(sessionId, text + '\r');
+      return;
+    }
+    let shell = 'powershell';
+    try {
+      shell = (await window.warpApi?.getConfig?.())?.defaultShell || shell;
+    } catch {}
+    const quoted =
+      shell === 'cmd'
+        ? `"${text.replace(/"/g, '""')}"`
+        : shell === 'powershell'
+          ? `'${text.replace(/'/g, "''")}'`
+          : `'${text.replace(/'/g, "'\\''")}'`;
+    const command = await buildAgentCommand(agent);
+    dispatchToShell(sessionId, `${command} ${quoted}`);
+
+    if (window.warpApi?.saveProjectConversation) {
+      const conv: PastProjectConversation = {
+        id: `conv-${Date.now()}`,
+        title: text.length > 60 ? `${text.slice(0, 57)}...` : text,
+        agent,
+        prompt: text,
+        timestamp: new Date().toISOString(),
+      };
+      window.warpApi
+        .saveProjectConversation(conv)
+        .then(() => window.warpApi.getProjectConversations())
+        .then((convs: PastProjectConversation[]) => convs && setPastConversations(convs))
+        .catch(() => {});
+    }
   };
 
   // Registry of shell-pane "command submitted" handlers, one per XtermPane
@@ -662,9 +792,15 @@ export const App: React.FC = () => {
   // Per-shell-session UI state reported by XtermPane: whether a command is
   // currently running (dock hides so the program's own UI owns the terminal)
   // and the shell's current directory.
+  // Shell sessions that have run at least one command; until then the dock
+  // offers quick-start buttons so a new user has an obvious first step.
+  const [sessionsWithCommands, setSessionsWithCommands] = useState<Set<string>>(() => new Set());
   const [sessionUi, setSessionUi] = useState<Record<string, { busy: boolean; cwd: string; agent?: boolean }>>({});
   const handleSessionState = useCallback(
     (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => {
+      if (state.busy) {
+        setSessionsWithCommands((prev) => (prev.has(sessionId) ? prev : new Set(prev).add(sessionId)));
+      }
       setSessionUi((prev) => {
         const cur = prev[sessionId];
         if (cur && cur.busy === state.busy && cur.cwd === state.cwd && cur.agent === state.agent) return prev;
@@ -699,6 +835,11 @@ export const App: React.FC = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    if (activeSession) {
+      const id = activeSession.id;
+      setSessionsWithCommands((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+    }
+
     if (window.warpApi && activeSession) {
       // Shell sessions are chat-style: the pane runs the command in its own
       // PowerShell session. Agent sessions still take raw PTY input.
@@ -710,9 +851,47 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleGuideAction = (action: GuideAction) => {
+    switch (action) {
+      case 'focusDock':
+        insertIntoDock('');
+        break;
+      case 'launchClaude':
+        handleLaunchAgent('claude');
+        break;
+      case 'openFolder':
+        setSidebarOpen(true);
+        void handleOpenProjectFolder();
+        break;
+      case 'openSkills':
+        setSkillsModalOpen(true);
+        break;
+      case 'openChanges':
+        refreshGitDiff();
+        setRightPanelOpen(true);
+        break;
+      case 'openSquad':
+        setSquadModalOpen(true);
+        break;
+      case 'openMesh':
+        setMeshModalOpen(true);
+        break;
+      case 'openReport':
+        void handleOpenExportModal();
+        break;
+      case 'openPalette':
+        setPaletteOpen(true);
+        break;
+      case 'openSettings':
+        setSettingsModalOpen(true);
+        break;
+    }
+  };
+
   // Command Palette: catalog of every action a power user might reach for
   const paletteActions: CommandPaletteAction[] = useMemo(
     () => [
+      { id: 'guide', label: 'Nasıl kullanılır? (Yardım)', group: 'Help', shortcut: 'F1', keywords: 'help yardım rehber guide nasıl', run: () => setGuideOpen(true) },
       { id: 'new-tab', label: 'New Terminal Tab', group: 'Tabs', shortcut: 'Ctrl+Shift+T', run: handleAddTab },
       {
         id: 'next-tab',
@@ -866,6 +1045,11 @@ export const App: React.FC = () => {
   // Ctrl+W (delete word), Ctrl+K (kill line), or Ctrl+D (EOF) inside a pane.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setGuideOpen((v) => !v);
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
 
@@ -963,6 +1147,7 @@ export const App: React.FC = () => {
         onOpenExportReport={handleOpenExportModal}
         onOpenChat={() => setChatModeOpen(true)}
         onLaunchClaude={() => handleLaunchAgent('claude')}
+        onOpenGuide={() => setGuideOpen(true)}
       />
 
 
@@ -992,9 +1177,7 @@ export const App: React.FC = () => {
             onInsertFilePath={handleInsertFilePath}
             pastConversations={pastConversations}
             onSelectConversation={(conv) => {
-              if (conv.prompt) {
-                handlePipeErrorToAgent(conv.agent || 'claude', conv.prompt);
-              }
+              if (conv.prompt) void handleAskAgent(conv.prompt, conv.agent || 'claude');
             }}
             projectMemory={projectMemory}
             onAddMemoryRule={handleAddMemoryRule}
@@ -1010,8 +1193,11 @@ export const App: React.FC = () => {
             <SquadBar
               squad={squad}
               onPauseToggle={togglePause}
-              onForceHandoff={forceHandoff}
               onStopSquad={stopSquad}
+              onOpenChanges={() => {
+                refreshGitDiff();
+                setRightPanelOpen(true);
+              }}
             />
           )}
 
@@ -1030,6 +1216,7 @@ export const App: React.FC = () => {
                 onLaunchAgent={handleLaunchAgent}
                 onRegisterCommandHandler={registerShellCommandHandler}
                 onSessionState={handleSessionState}
+                onCommandFinished={handleCommandFinished}
               />
             )}
           </div>
@@ -1074,11 +1261,23 @@ export const App: React.FC = () => {
                 setChatModeOpen(true);
               }}
               onOpenHud={() => setHudOpen(true)}
+              onAskAgent={(prompt) => void handleAskAgent(prompt)}
+              insertRequest={dockInsert}
+              quickActions={
+                activeSession && !sessionsWithCommands.has(activeSession.id)
+                  ? [
+                      { label: "Claude'u başlat", title: 'Claude Code bu terminalde açılır; ne yapılacağını ona yazarsınız', onClick: () => handleLaunchAgent('claude') },
+                      { label: "Codex'i başlat", title: 'OpenAI Codex CLI bu terminalde açılır', onClick: () => handleLaunchAgent('codex') },
+                      { label: 'Proje klasörü aç', title: 'Çalışacağınız klasörü seçin', onClick: handleOpenProjectFolder },
+                      { label: 'Nasıl kullanılır?', title: 'Tüm özelliklerin kısa açıklaması (F1)', onClick: () => setGuideOpen(true) },
+                    ]
+                  : undefined
+              }
               tokenSavingsText={`${contextTelemetry?.savingsPercentage ?? 68}% saved`}
             />
             ) : (
               <div className="h-full bg-base-app border-t border-zinc-900/70 px-4 pt-3 text-[11px] font-mono text-zinc-600 select-none">
-                Program running — keyboard input goes to the terminal · Ctrl+C to interrupt
+                Komut çalışıyor — klavye girdisi terminale gidiyor · durdurmak için Ctrl+C
               </div>
             )}
             </div>
@@ -1153,6 +1352,12 @@ export const App: React.FC = () => {
       <AgentMeshModal
         isOpen={meshModalOpen}
         onClose={() => setMeshModalOpen(false)}
+        cwd={cwd}
+        onOpenChanges={() => {
+          refreshGitDiff();
+          setRightPanelOpen(true);
+        }}
+        onOpenSandboxes={() => setSandboxDrawerOpen(true)}
       />
 
       {/* Live Autonomous Squad Modal */}
@@ -1170,7 +1375,8 @@ export const App: React.FC = () => {
           if (activeSession) handleSendInputToActive(command);
         }}
         onInsertIntoInput={(command) => {
-          handleSendInputToActive(command);
+          insertIntoDock(command);
+          setSkillsModalOpen(false);
         }}
       />
 
@@ -1179,6 +1385,9 @@ export const App: React.FC = () => {
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
       />
+
+      {/* First-run / F1 feature guide */}
+      <GuideModal isOpen={guideOpen} onClose={closeGuide} onAction={handleGuideAction} />
 
       {/* Vulgaris Session Timeline & Technical Report Modal */}
       <ExportReportModal

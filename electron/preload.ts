@@ -51,6 +51,9 @@ export interface WarpApi {
     cwd?: string;
   }) => Promise<any>;
   onMeshEvent: (callback: (message: any) => void) => () => void;
+  onMeshStatus: (callback: (status: any) => void) => () => void;
+  getAvailableAgents: () => Promise<Record<string, boolean>>;
+  writeSquadPrompt: (text: string) => Promise<string>;
 
   // AI Command Search
   generateCommand: (query: string) => Promise<{ command: string; explanation: string; source: string }>;
@@ -161,6 +164,13 @@ const api: WarpApi = {
     ipcRenderer.on('mesh:event', handler);
     return () => ipcRenderer.removeListener('mesh:event', handler);
   },
+  onMeshStatus: (callback) => {
+    const handler = (_: any, status: any) => callback(status);
+    ipcRenderer.on('mesh:status', handler);
+    return () => ipcRenderer.removeListener('mesh:status', handler);
+  },
+  getAvailableAgents: () => ipcRenderer.invoke('agents:available'),
+  writeSquadPrompt: (text) => ipcRenderer.invoke('squad:write-prompt', text),
 
   generateCommand: (query) => ipcRenderer.invoke('ai:generateCommand', query),
 

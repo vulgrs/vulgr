@@ -13,13 +13,17 @@ export class CodexAdapter extends BaseCliAdapter {
     return 'codex';
   }
 
-  protected buildArgs(prompt: string, options?: CliExecutionOptions): string[] {
-    const args: string[] = ['run', prompt];
-
-    if (this.extraArgs.length > 0) {
-      args.push(...this.extraArgs);
-    }
-
+  /**
+   * `codex exec -` runs one task non-interactively, reading it from stdin.
+   * Builders get `--full-auto` (edits inside the workspace); reviewers a
+   * read-only sandbox.
+   */
+  protected buildArgs(_prompt: string, options?: CliExecutionOptions): string[] {
+    const args: string[] = ['exec'];
+    if (options?.allowEdits) args.push('--full-auto');
+    else args.push('--sandbox', 'read-only');
+    if (this.extraArgs.length > 0) args.push(...this.extraArgs);
+    args.push('-');
     return args;
   }
 

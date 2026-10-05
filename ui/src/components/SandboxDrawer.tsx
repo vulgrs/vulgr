@@ -1,17 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import { GitBranchIcon, GitMergeIcon, Trash2Icon, TerminalIcon, CheckIcon, AlertTriangleIcon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.js';
+import { Badge } from '@/components/ui/badge.js';
+import { Button } from '@/components/ui/button.js';
 import {
-  X,
-  GitBranch,
-  GitMerge,
-  Trash2,
-  Terminal,
-  Check,
-  AlertTriangle,
-  FileCode,
-  Shield,
-  Layers,
-  Sparkles,
-} from 'lucide-react';
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty.js';
+import { ScrollArea } from '@/components/ui/scroll-area.js';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet.js';
+import { Spinner } from '@/components/ui/spinner.js';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group.js';
 import { DiffViewer } from './DiffViewer.js';
 import type { SandboxSession, SandboxMergeResult } from '../types/warp.js';
 
@@ -131,150 +140,118 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-y-0 right-0 w-[640px] bg-base-elevated border-l border-zinc-800 shadow-modal z-50 flex flex-col animate-slide-in-right select-none text-zinc-200">
-      {/* Header */}
-      <div className="h-14 px-5 bg-base-surface border-b border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-            <GitBranch size={16} />
+    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="right" className="w-full gap-0 p-0 data-[side=right]:sm:max-w-2xl">
+        <SheetHeader className="border-b pr-12">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>
+              <GitBranchIcon data-icon="inline-start" />
+              Sandbox
+            </Badge>
+            <Badge variant="secondary">{sandboxes.length} active</Badge>
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-bold text-sm text-zinc-100 font-sans">
-                Agent Worktree Sandbox Review
-              </span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                {sandboxes.length} active
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-400 font-mono">
-              Review isolated agent edits before merging into your working copy
-            </p>
-          </div>
-        </div>
+          <SheetTitle>Agent Worktree Sandbox Review</SheetTitle>
+          <SheetDescription>Review isolated agent edits before merging into your working copy</SheetDescription>
+        </SheetHeader>
 
-        <button
-          onClick={onClose}
-          className="modal-close-btn p-1.5"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      {/* Sandbox Selector Tabs */}
-      {sandboxes.length > 0 ? (
-        <div className="px-5 py-2.5 bg-base-surface border-b border-zinc-900 flex items-center space-x-2 overflow-x-auto no-scrollbar">
-          {sandboxes.map((s) => {
-            const isSelected = s.id === selectedId;
-            return (
-              <button
-                key={s.id}
-                onClick={() => {
-                  setSelectedId(s.id);
+        {sandboxes.length > 0 ? (
+          <div className="border-b px-4 py-3">
+            <ToggleGroup
+              value={selectedId ? [selectedId] : []}
+              onValueChange={(value) => {
+                const next = value[0];
+                if (next) {
+                  setSelectedId(next);
                   setMergeResult(null);
-                }}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs font-mono transition-all ${
- isSelected
- ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-sm'
- : 'bg-base-surface text-zinc-400 border border-zinc-900 hover:text-zinc-100 hover:bg-zinc-900'
- }`}
-              >
-                <GitBranch size={12} />
-                <span className="truncate max-w-[160px]">{s.branchName}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="p-8 text-center text-xs text-zinc-500 font-mono">
-          No active agent sandboxes. Autonomous agents run in sandboxes automatically.
-        </div>
-      )}
-
-      {/* Merge / Conflict Status Alert Banner */}
-      {mergeResult && (
-        <div
-          className={`mx-5 my-3 p-3 rounded-md border text-xs font-mono flex items-center justify-between ${
- mergeResult.success
- ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
- : 'bg-red-500/10 border-red-500/30 text-red-300'
- }`}
-        >
-          <div className="flex items-center space-x-2">
-            {mergeResult.success ? <Check size={14} /> : <AlertTriangle size={14} />}
-            <span>
-              {mergeResult.success
-                ? `Merged cleanly into working branch! (${mergeResult.mergedCommit?.substring(0, 7)})`
-                : mergeResult.conflict
-                ? `Merge conflict in: ${mergeResult.conflictFiles?.join(', ')}`
-                : mergeResult.error || 'Merge failed'}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Diff & Files Changed Area */}
-      {selectedSandbox && (
-        <div className="flex-1 min-h-0 flex flex-col p-5 space-y-3">
-          {/* Metadata pill */}
-          <div className="flex items-center justify-between text-xs text-zinc-400 font-mono bg-base-surface p-2.5 rounded-md border border-zinc-900">
-            <div className="truncate">
-              <span className="text-zinc-500">Path: </span>
-              <span className="text-zinc-300">{selectedSandbox.worktreePath}</span>
-            </div>
-            <span className="px-2 py-0.5 rounded bg-zinc-900 text-zinc-300">
-              {filesChanged.length} file{filesChanged.length === 1 ? '' : 's'} changed
-            </span>
-          </div>
-
-          {/* Diff Viewer Container */}
-          <div className="flex-1 min-h-0 bg-base-app rounded-md border border-zinc-800 overflow-hidden">
-            {diff.trim().length > 0 ? (
-              <DiffViewer diff={diff} />
-            ) : (
-              <div className="h-full flex items-center justify-center text-xs text-zinc-500 font-mono">
-                No uncommitted changes in this sandbox yet.
-              </div>
-            )}
-          </div>
-
-          {/* Action Toolbar */}
-          <div className="pt-2 flex items-center justify-between border-t border-zinc-800">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => onOpenTerminalInSandbox(selectedSandbox.worktreePath)}
-                className="flex items-center space-x-1.5 px-3 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-200 border border-zinc-800 transition-all"
-                title="Open interactive terminal session in this sandbox directory"
-              >
-                <Terminal size={13} className="text-zinc-400" />
-                <span>Open Terminal Here</span>
-              </button>
-
-              <button
-                onClick={handleDiscard}
-                disabled={discarding}
-                className="flex items-center space-x-1.5 px-3 py-2 rounded-md bg-red-500/10 hover:bg-red-500/20 text-xs font-medium text-red-300 border border-red-500/25 transition-all disabled:opacity-50"
-                title="Delete worktree and abandon agent changes"
-              >
-                <Trash2 size={13} />
-                <span>{discarding ? 'Discarding...' : 'Discard'}</span>
-              </button>
-            </div>
-
-            <button
-              onClick={handleMerge}
-              disabled={merging}
-              className="flex items-center space-x-2 px-5 py-2.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all disabled:opacity-50"
+                }
+              }}
+              spacing={2}
+              className="flex-wrap"
             >
-              <GitMerge size={14} className="fill-current" />
-              <span>{merging ? 'Merging...' : 'Merge into Active Branch'}</span>
-            </button>
+              {sandboxes.map((sandbox) => (
+                <ToggleGroupItem key={sandbox.id} value={sandbox.id} className="max-w-48 font-mono">
+                  <GitBranchIcon data-icon="inline-start" />
+                  <span className="truncate">{sandbox.branchName}</span>
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
-        </div>
-      )}
-    </div>
+        ) : (
+          <Empty className="m-4">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <GitBranchIcon />
+              </EmptyMedia>
+              <EmptyTitle>No active sandboxes</EmptyTitle>
+              <EmptyDescription>
+                Autonomous agents run in sandboxes automatically.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+
+        {mergeResult && (
+          <div className="px-4 pt-4">
+            <Alert variant={mergeResult.success ? 'default' : 'destructive'}>
+              {mergeResult.success ? <CheckIcon /> : <AlertTriangleIcon />}
+              <AlertTitle>{mergeResult.success ? 'Merged cleanly' : 'Merge failed'}</AlertTitle>
+              <AlertDescription>
+                {mergeResult.success
+                  ? `Working branch updated (${mergeResult.mergedCommit?.substring(0, 7)})`
+                  : mergeResult.conflict
+                    ? `Merge conflict in: ${mergeResult.conflictFiles?.join(', ')}`
+                    : mergeResult.error || 'Merge failed'}
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
+        {selectedSandbox && (
+          <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 font-mono text-xs">
+              <span className="truncate text-muted-foreground">
+                Path <span className="text-foreground">{selectedSandbox.worktreePath}</span>
+              </span>
+              <Badge variant="outline">
+                {filesChanged.length} file{filesChanged.length === 1 ? '' : 's'}
+              </Badge>
+            </div>
+
+            <ScrollArea className="min-h-0 flex-1 rounded-lg ring-1 ring-foreground/10">
+              {diff.trim().length > 0 ? (
+                <DiffViewer diff={diff} />
+              ) : (
+                <Empty className="border-0">
+                  <EmptyHeader>
+                    <EmptyTitle>No uncommitted changes</EmptyTitle>
+                    <EmptyDescription>This sandbox has nothing to review yet.</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </ScrollArea>
+          </div>
+        )}
+
+        {selectedSandbox && (
+          <SheetFooter className="border-t sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => onOpenTerminalInSandbox(selectedSandbox.worktreePath)}>
+                <TerminalIcon data-icon="inline-start" />
+                Open Terminal Here
+              </Button>
+              <Button variant="destructive" disabled={discarding} onClick={handleDiscard}>
+                {discarding ? <Spinner data-icon="inline-start" /> : <Trash2Icon data-icon="inline-start" />}
+                {discarding ? 'Discarding...' : 'Discard'}
+              </Button>
+            </div>
+            <Button disabled={merging} onClick={handleMerge}>
+              {merging ? <Spinner data-icon="inline-start" /> : <GitMergeIcon data-icon="inline-start" />}
+              {merging ? 'Merging...' : 'Merge into Active Branch'}
+            </Button>
+          </SheetFooter>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 };

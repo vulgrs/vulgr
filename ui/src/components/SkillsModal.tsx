@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  X,
   Zap,
   Search,
   Brain,
@@ -16,6 +15,12 @@ import {
   Sparkles,
   Layers,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
 import type { SharedSkill, SkillCategory, MemoryData } from '../types/warp.js';
 
 interface SkillsModalProps {
@@ -225,27 +230,24 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay animate-overlay-in select-none">
-      <div className="relative w-full max-w-5xl h-[85vh] modal-surface flex flex-col overflow-hidden animate-modal-in text-zinc-200">
-        {/* Header Bar */}
-        <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-base-surface">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="flex h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <div className="flex items-center justify-between border-b bg-muted/40 px-6 py-4 pr-14">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 via-orange-500 to-zinc-500 flex items-center justify-center text-black font-bold shadow-[0_0_15px_rgba(245,158,11,0.3)]">
               <Zap size={18} className="fill-current" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-sm font-bold text-zinc-100 tracking-wide">WARP SKILLS & WORKSPACE MEMORY</h2>
+                <DialogTitle>Warp Skills & Workspace Memory</DialogTitle>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-500/15 text-zinc-300 border border-zinc-500/30">
                   Universal Mesh Shared
                 </span>
               </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Reusable parametric commands & token-optimized persistent agent memory
-              </p>
+              <DialogDescription>
+                Reusable parametric commands and token-optimized persistent agent memory
+              </DialogDescription>
             </div>
           </div>
 
@@ -289,12 +291,6 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
               </button>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
-            >
-              <X size={18} />
-            </button>
           </div>
         </div>
 
@@ -725,7 +721,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
             </div>
           </form>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
