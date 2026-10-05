@@ -1,14 +1,16 @@
 import React from 'react';
+import { GitCompareIcon, FileCodeIcon, SparklesIcon, ShieldIcon, BotIcon, RotateCcwIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge.js';
+import { Button } from '@/components/ui/button.js';
+import { ScrollArea } from '@/components/ui/scroll-area.js';
 import {
-  X,
-  RotateCcw,
-  Sparkles,
-  Shield,
-  Bot,
-  GitCompare,
-  FileCode,
-  AlertOctagon,
-} from 'lucide-react';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet.js';
 import { DiffViewer } from './DiffViewer.js';
 import type { SessionType } from '../types/warp.js';
 
@@ -29,102 +31,62 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
   onRevert,
   onSendDiffToAgent,
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-y-0 right-0 w-[600px] bg-base-elevated border-l border-zinc-800 shadow-modal z-50 flex flex-col animate-slide-in-right">
-      {/* Header */}
-      <div className="h-14 px-5 bg-base-surface border-b border-zinc-800 flex items-center justify-between select-none">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-1.5 rounded-md bg-zinc-900 border border-zinc-800 text-accent">
-            <GitCompare size={16} />
+    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="right" className="w-full gap-0 p-0 data-[side=right]:sm:max-w-xl">
+        <SheetHeader className="border-b pr-12">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>
+              <GitCompareIcon data-icon="inline-start" />
+              Diff
+            </Badge>
+            <Badge variant="outline">
+              {filesChanged.length} file{filesChanged.length === 1 ? '' : 's'}
+            </Badge>
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-bold text-sm text-zinc-100 font-sans">
-                Working Tree Diff & Cross-Check
-              </span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300">
-                {filesChanged.length} file{filesChanged.length === 1 ? '' : 's'}
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-400 font-mono">
-              Inspect uncommitted changes & run adversarial audits
-            </p>
+          <SheetTitle>Working Tree Diff & Cross-Check</SheetTitle>
+          <SheetDescription>Inspect uncommitted changes and run adversarial audits</SheetDescription>
+        </SheetHeader>
+
+        {filesChanged.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto border-b px-4 py-2">
+            <FileCodeIcon className="size-3.5 shrink-0 text-muted-foreground" />
+            {filesChanged.map((file) => (
+              <Badge key={file} variant="secondary" className="font-mono">
+                {file}
+              </Badge>
+            ))}
           </div>
-        </div>
+        )}
 
-        <button
-          onClick={onClose}
-          className="modal-close-btn p-1.5"
-        >
-          <X size={16} />
-        </button>
-      </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="p-4">
+            <DiffViewer diff={diff} />
+          </div>
+        </ScrollArea>
 
-      {/* Files List */}
-      {filesChanged.length > 0 && (
-        <div className="px-5 py-2.5 border-b border-zinc-900 bg-base-app flex items-center space-x-2 overflow-x-auto text-xs font-mono text-zinc-300">
-          <FileCode size={13} className="text-zinc-400 flex-shrink-0" />
-          {filesChanged.map((f, i) => (
-            <span
-              key={i}
-              className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] whitespace-nowrap text-zinc-300"
-            >
-              {f}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Diff Content */}
-      <div className="flex-1 overflow-y-auto p-4 select-text bg-base-app">
-        <DiffViewer diff={diff} />
-      </div>
-
-      {/* Footer / Cross-Model Actions */}
-      <div className="p-4 bg-base-surface border-t border-zinc-800 space-y-3 select-none">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider font-sans">
-            Cross-Model Adversarial Audit:
-          </span>
-          <span className="text-[10px] text-zinc-500 font-mono">Pipes diff to target CLI</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            onClick={() => onSendDiffToAgent('claude')}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold transition-all"
-          >
-            <Sparkles size={13} className="text-zinc-400" />
-            <span>Audit Claude</span>
-          </button>
-
-          <button
-            onClick={() => onSendDiffToAgent('agy')}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold transition-all"
-          >
-            <Shield size={13} className="text-zinc-400" />
-            <span>Audit AGY</span>
-          </button>
-
-          <button
-            onClick={() => onSendDiffToAgent('codex')}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-200 text-xs font-semibold transition-all"
-          >
-            <Bot size={13} className="text-emerald-400" />
-            <span>Audit Codex</span>
-          </button>
-        </div>
-
-        <button
-          onClick={onRevert}
-          className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-md bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 hover:text-red-200 text-xs font-semibold transition-all"
-        >
-          <RotateCcw size={13} />
-          <span>Discard & Rollback Changes (git reset --hard)</span>
-        </button>
-      </div>
-    </div>
+        <SheetFooter className="border-t">
+          <p className="text-xs text-muted-foreground">Cross-model adversarial audit pipes the diff to the target CLI.</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="outline" onClick={() => onSendDiffToAgent('claude')}>
+              <SparklesIcon data-icon="inline-start" />
+              Claude
+            </Button>
+            <Button variant="outline" onClick={() => onSendDiffToAgent('agy')}>
+              <ShieldIcon data-icon="inline-start" />
+              AGY
+            </Button>
+            <Button variant="outline" onClick={() => onSendDiffToAgent('codex')}>
+              <BotIcon data-icon="inline-start" />
+              Codex
+            </Button>
+          </div>
+          <Button variant="destructive" onClick={onRevert}>
+            <RotateCcwIcon data-icon="inline-start" />
+            Discard & Rollback Changes
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 };

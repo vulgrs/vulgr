@@ -13,6 +13,8 @@ export interface PtyCreateOptions {
   rows?: number;
 }
 
+const PTY_FLUSH_MS = 5;
+
 export class PtyManager {
   private terminals = new Map<string, pty.IPty>();
   private window: BrowserWindow | null = null;
@@ -72,6 +74,10 @@ export class PtyManager {
       args = ['-NoLogo', '-NoExit', '-Command', promptFn];
     }
 
+    // A pane can be remounted with the same session id (React StrictMode, HMR).
+    // Replace any process still registered under it instead of leaking it.
+    this.kill(options.id);
+
     const cwd = options.cwd || process.cwd();
     const cols = options.cols || 80;
     const rows = options.rows || 24;
@@ -113,16 +119,40 @@ export class PtyManager {
 
     this.terminals.set(options.id, ptyProcess);
 
-    ptyProcess.onData((data: string) => {
+    // Only the process currently registered under this id may talk to the UI.
+    // A killed predecessor exits asynchronously, and without this check its
+    // late exit would unregister the replacement and the pane would go dead
+    // (keystrokes written to a missing terminal, no output ever arriving).
+    const isCurrent = () => this.terminals.get(options.id) === ptyProcess;
+
+    // Heavy output (builds, `ls -R`, agent TUIs repainting) arrives in many tiny
+    // chunks. Coalesce them into one IPC message per few ms instead of one per
+    // chunk, which keeps both the main process and the renderer responsive.
+    let pending = '';
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      flushTimer = null;
+      const data = pending;
+      pending = '';
+      if (!data || !isCurrent()) return;
       if (this.window && !this.window.isDestroyed()) {
         this.window.webContents.send('pty:data', {
           id: options.id,
           data,
         });
       }
+    };
+
+    ptyProcess.onData((data: string) => {
+      if (!isCurrent()) return;
+      pending += data;
+      if (!flushTimer) flushTimer = setTimeout(flush, PTY_FLUSH_MS);
     });
 
     ptyProcess.onExit(({ exitCode, signal }) => {
+      if (flushTimer) clearTimeout(flushTimer);
+      if (!isCurrent()) return;
+      flush();
       this.terminals.delete(options.id);
       if (this.window && !this.window.isDestroyed()) {
         this.window.webContents.send('pty:exit', {
@@ -157,8 +187,10 @@ export class PtyManager {
   kill(id: string) {
     const term = this.terminals.get(id);
     if (term) {
-      term.kill();
       this.terminals.delete(id);
+      try {
+        term.kill();
+      } catch {}
     }
   }
 

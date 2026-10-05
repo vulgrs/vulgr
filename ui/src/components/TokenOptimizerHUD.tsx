@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X,
   Zap,
   Brain,
   Layers,
@@ -16,6 +15,13 @@ import {
   Play,
   Cpu,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
 import type { ContextTelemetry, MemoryData } from '../types/warp.js';
 
 interface TokenOptimizerHUDProps {
@@ -143,8 +149,6 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   const rawTotal = telemetry?.rawTokensTotal || 0;
   const optTotal = telemetry?.optimizedTokensTotal || 0;
   const savedTotal = telemetry?.savedTokensTotal || 0;
@@ -158,41 +162,31 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
   const skillsUsage = memory?.skillsUsage || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4 animate-overlay-in">
-      <div className="relative w-full max-w-4xl h-[680px] modal-surface flex flex-col overflow-hidden animate-modal-in text-zinc-100 font-sans">
-        {/* Top Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-black/40">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="flex h-[680px] max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <div className="flex items-center justify-between border-b bg-muted/40 px-6 py-4 pr-14">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-sm">
               <Zap className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold tracking-wide text-zinc-100">Token & Context Optimizer HUD</h2>
+                <DialogTitle>Token & Context Optimizer HUD</DialogTitle>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-950/60 border border-emerald-800/50 text-emerald-300">
                   ACTIVE • LEAN CONTEXT
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">
-                Stripping ANSI/spinners, squashing repetitive traces & injecting cached memory facts
-              </p>
+              <DialogDescription>
+                Stripping ANSI/spinners, squashing repetitive traces, and injecting cached memory facts
+              </DialogDescription>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={onRefreshTelemetry}
-              className="p-1.5 rounded-lg border border-zinc-800 hover:bg-zinc-800/70 text-zinc-400 hover:text-zinc-200 transition-colors"
-              title="Refresh Telemetry"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg border border-zinc-800 hover:bg-zinc-800/70 text-zinc-400 hover:text-zinc-200 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <Button variant="outline" size="icon-sm" onClick={onRefreshTelemetry}>
+              <RefreshCw />
+              <span className="sr-only">Refresh telemetry</span>
+            </Button>
           </div>
         </div>
 
@@ -682,14 +676,11 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span>Vulgaris Context & Token Guardian Active</span>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium transition-colors"
-          >
+          <Button variant="outline" onClick={onClose}>
             Close HUD
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

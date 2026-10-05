@@ -14,6 +14,7 @@ import { SandboxDrawer } from './components/SandboxDrawer.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { ExportReportModal } from './components/ExportReportModal.js';
 import { TokenOptimizerHUD } from './components/TokenOptimizerHUD.js';
+import { GuideModal, type GuideAction } from './components/GuideModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator } from './hooks/useSquadOrchestrator.js';
 import type {
@@ -44,6 +45,8 @@ const loadPersisted = <T,>(key: string, fallback: T): T => {
     return fallback;
   }
 };
+
+const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export const App: React.FC = () => {
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
@@ -80,6 +83,20 @@ export const App: React.FC = () => {
   const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  // "Nasıl kullanılır?" guide: opens by itself on the very first launch.
+  const [guideOpen, setGuideOpen] = useState(() => {
+    try {
+      return localStorage.getItem('vulgaris.guideSeen') !== '1';
+    } catch {
+      return false;
+    }
+  });
+  const closeGuide = () => {
+    setGuideOpen(false);
+    try {
+      localStorage.setItem('vulgaris.guideSeen', '1');
+    } catch {}
+  };
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [hudOpen, setHudOpen] = useState(false);
   const [contextTelemetry, setContextTelemetry] = useState<ContextTelemetry | null>(null);
@@ -123,7 +140,7 @@ export const App: React.FC = () => {
     try {
       if (window.warpApi?.getContextStats) {
         const stats = await window.warpApi.getContextStats();
-        if (stats) setContextTelemetry(stats);
+        if (stats) setContextTelemetry((prev) => (sameJson(prev, stats) ? prev : stats));
       }
     } catch (err) {
       console.warn('[HUD] Failed to get context telemetry:', err);
@@ -163,12 +180,18 @@ export const App: React.FC = () => {
     refreshSandboxes();
     fetchContextTelemetry();
 
-    // Periodic refresh every 5 seconds to show diff badge / branch changes / token savings
-    const diffTimer = setInterval(() => {
-      refreshGitDiff();
-      refreshGitBranch();
-      refreshSandboxes();
-      fetchContextTelemetry();
+    // Periodic refresh every 5 seconds to show diff badge / branch changes / token savings.
+    // Skipped while the window is hidden/minimized, and never overlaps a refresh
+    // that is still running (git can be slow on big repos).
+    let inFlight = false;
+    const diffTimer = setInterval(async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      try {
+        await Promise.all([refreshGitDiff(), refreshGitBranch(), refreshSandboxes(), fetchContextTelemetry()]);
+      } finally {
+        inFlight = false;
+      }
     }, 5000);
     return () => clearInterval(diffTimer);
   }, [fetchContextTelemetry, refreshProjectData]);
@@ -177,7 +200,10 @@ export const App: React.FC = () => {
     if (window.warpApi?.listSandboxes) {
       try {
         const list = await window.warpApi.listSandboxes();
-        setActiveSandboxes(list || []);
+        const next = list || [];
+        // createdAt is regenerated on every listing; compare what actually identifies a sandbox.
+        const key = (l: any[]) => l.map((s) => `${s.worktreePath}|${s.branchName}`).join('\n');
+        setActiveSandboxes((prev) => (key(prev) === key(next) ? prev : next));
       } catch {}
     }
   };
@@ -187,7 +213,8 @@ export const App: React.FC = () => {
       try {
         const res = await window.warpApi.getGitDiff();
         setGitDiff(res.diff || '');
-        setGitFiles(res.filesChanged || []);
+        const files: string[] = res.filesChanged || [];
+        setGitFiles((prev) => (sameJson(prev, files) ? prev : files));
       } catch {}
     }
   };
@@ -286,7 +313,7 @@ export const App: React.FC = () => {
     try {
       const claude = (await window.warpApi?.getConfig?.())?.claude;
       if (claude?.skipPermissions) flags.push('--dangerously-skip-permissions');
-      if (claude?.model) flags.push('--model', claude.model);
+      if (claude?.model && claude.model !== 'default') flags.push('--model', claude.model);
       if (Array.isArray(claude?.additionalFlags)) flags.push(...claude.additionalFlags);
     } catch {}
     return ['claude', ...flags].join(' ');
@@ -628,8 +655,53 @@ export const App: React.FC = () => {
     }
   };
 
+  // Text pushed into the dock's input (file explorer paths, skill templates)
+  // for the user to finish and run themselves - never executed directly.
+  const [dockInsert, setDockInsert] = useState<{ text: string; nonce: number } | null>(null);
+  const insertIntoDock = (text: string) => setDockInsert({ text, nonce: Date.now() });
+
   const handleInsertFilePath = (filePath: string) => {
-    handleSendInputToActive(filePath);
+    insertIntoDock(/\s/.test(filePath) ? `"${filePath}"` : filePath);
+  };
+
+  // Ctrl+Shift+Enter in the dock / re-opening a past conversation: start Claude
+  // in the active shell with the text as its first prompt (`claude "<prompt>"`).
+  const handleAskAgent = async (prompt: string, agent: SessionType = 'claude') => {
+    const text = prompt.trim();
+    if (!text || !activeSession || activeSession.type !== 'shell') return;
+    const sessionId = activeSession.id;
+    if (sessionUi[sessionId]?.busy) {
+      // A program already owns the terminal (e.g. Claude is open): type into it.
+      window.warpApi.writeTerminal(sessionId, text + '\r');
+      return;
+    }
+    let shell = 'powershell';
+    try {
+      shell = (await window.warpApi?.getConfig?.())?.defaultShell || shell;
+    } catch {}
+    const quoted =
+      shell === 'cmd'
+        ? `"${text.replace(/"/g, '""')}"`
+        : shell === 'powershell'
+          ? `'${text.replace(/'/g, "''")}'`
+          : `'${text.replace(/'/g, "'\\''")}'`;
+    const command = await buildAgentCommand(agent);
+    dispatchToShell(sessionId, `${command} ${quoted}`);
+
+    if (window.warpApi?.saveProjectConversation) {
+      const conv: PastProjectConversation = {
+        id: `conv-${Date.now()}`,
+        title: text.length > 60 ? `${text.slice(0, 57)}...` : text,
+        agent,
+        prompt: text,
+        timestamp: new Date().toISOString(),
+      };
+      window.warpApi
+        .saveProjectConversation(conv)
+        .then(() => window.warpApi.getProjectConversations())
+        .then((convs: PastProjectConversation[]) => convs && setPastConversations(convs))
+        .catch(() => {});
+    }
   };
 
   // Registry of shell-pane "command submitted" handlers, one per XtermPane
@@ -655,9 +727,15 @@ export const App: React.FC = () => {
   // Per-shell-session UI state reported by XtermPane: whether a command is
   // currently running (dock hides so the program's own UI owns the terminal)
   // and the shell's current directory.
+  // Shell sessions that have run at least one command; until then the dock
+  // offers quick-start buttons so a new user has an obvious first step.
+  const [sessionsWithCommands, setSessionsWithCommands] = useState<Set<string>>(() => new Set());
   const [sessionUi, setSessionUi] = useState<Record<string, { busy: boolean; cwd: string; agent?: boolean }>>({});
   const handleSessionState = useCallback(
     (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => {
+      if (state.busy) {
+        setSessionsWithCommands((prev) => (prev.has(sessionId) ? prev : new Set(prev).add(sessionId)));
+      }
       setSessionUi((prev) => {
         const cur = prev[sessionId];
         if (cur && cur.busy === state.busy && cur.cwd === state.cwd && cur.agent === state.agent) return prev;
@@ -692,6 +770,11 @@ export const App: React.FC = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    if (activeSession) {
+      const id = activeSession.id;
+      setSessionsWithCommands((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+    }
+
     if (window.warpApi && activeSession) {
       // Shell sessions are chat-style: the pane runs the command in its own
       // PowerShell session. Agent sessions still take raw PTY input.
@@ -703,9 +786,47 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleGuideAction = (action: GuideAction) => {
+    switch (action) {
+      case 'focusDock':
+        insertIntoDock('');
+        break;
+      case 'launchClaude':
+        handleLaunchAgent('claude');
+        break;
+      case 'openFolder':
+        setSidebarOpen(true);
+        void handleOpenProjectFolder();
+        break;
+      case 'openSkills':
+        setSkillsModalOpen(true);
+        break;
+      case 'openChanges':
+        refreshGitDiff();
+        setRightPanelOpen(true);
+        break;
+      case 'openSquad':
+        setSquadModalOpen(true);
+        break;
+      case 'openMesh':
+        setMeshModalOpen(true);
+        break;
+      case 'openReport':
+        void handleOpenExportModal();
+        break;
+      case 'openPalette':
+        setPaletteOpen(true);
+        break;
+      case 'openSettings':
+        setSettingsModalOpen(true);
+        break;
+    }
+  };
+
   // Command Palette: catalog of every action a power user might reach for
   const paletteActions: CommandPaletteAction[] = useMemo(
     () => [
+      { id: 'guide', label: 'Nasıl kullanılır? (Yardım)', group: 'Help', shortcut: 'F1', keywords: 'help yardım rehber guide nasıl', run: () => setGuideOpen(true) },
       { id: 'new-tab', label: 'New Terminal Tab', group: 'Tabs', shortcut: 'Ctrl+Shift+T', run: handleAddTab },
       {
         id: 'next-tab',
@@ -859,6 +980,11 @@ export const App: React.FC = () => {
   // Ctrl+W (delete word), Ctrl+K (kill line), or Ctrl+D (EOF) inside a pane.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setGuideOpen((v) => !v);
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
 
@@ -954,6 +1080,7 @@ export const App: React.FC = () => {
         onOpenSkillsModal={() => setSkillsModalOpen(true)}
         onOpenSettings={() => setSettingsModalOpen(true)}
         onOpenExportReport={handleOpenExportModal}
+        onOpenGuide={() => setGuideOpen(true)}
       />
 
       {/* Main Content: Sidebar + Center Workspace + Right Panel */}
@@ -982,9 +1109,7 @@ export const App: React.FC = () => {
             onInsertFilePath={handleInsertFilePath}
             pastConversations={pastConversations}
             onSelectConversation={(conv) => {
-              if (conv.prompt) {
-                handlePipeErrorToAgent(conv.agent || 'claude', conv.prompt);
-              }
+              if (conv.prompt) void handleAskAgent(conv.prompt, conv.agent || 'claude');
             }}
             projectMemory={projectMemory}
             onAddMemoryRule={handleAddMemoryRule}
@@ -1060,11 +1185,23 @@ export const App: React.FC = () => {
                 }
               }}
               onOpenHud={() => setHudOpen(true)}
+              onAskAgent={(prompt) => void handleAskAgent(prompt)}
+              insertRequest={dockInsert}
+              quickActions={
+                activeSession && !sessionsWithCommands.has(activeSession.id)
+                  ? [
+                      { label: "Claude'u başlat", title: 'Claude Code bu terminalde açılır; ne yapılacağını ona yazarsınız', onClick: () => handleLaunchAgent('claude') },
+                      { label: "Codex'i başlat", title: 'OpenAI Codex CLI bu terminalde açılır', onClick: () => handleLaunchAgent('codex') },
+                      { label: 'Proje klasörü aç', title: 'Çalışacağınız klasörü seçin', onClick: handleOpenProjectFolder },
+                      { label: 'Nasıl kullanılır?', title: 'Tüm özelliklerin kısa açıklaması (F1)', onClick: () => setGuideOpen(true) },
+                    ]
+                  : undefined
+              }
               tokenSavingsText={`${contextTelemetry?.savingsPercentage ?? 68}% saved`}
             />
             ) : (
               <div className="h-full bg-base-app border-t border-zinc-900/70 px-4 pt-3 text-[11px] font-mono text-zinc-600 select-none">
-                Program running — keyboard input goes to the terminal · Ctrl+C to interrupt
+                Komut çalışıyor — klavye girdisi terminale gidiyor · durdurmak için Ctrl+C
               </div>
             )}
             </div>
@@ -1145,7 +1282,8 @@ export const App: React.FC = () => {
           if (activeSession) handleSendInputToActive(command);
         }}
         onInsertIntoInput={(command) => {
-          handleSendInputToActive(command);
+          insertIntoDock(command);
+          setSkillsModalOpen(false);
         }}
       />
 
@@ -1154,6 +1292,9 @@ export const App: React.FC = () => {
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
       />
+
+      {/* First-run / F1 feature guide */}
+      <GuideModal isOpen={guideOpen} onClose={closeGuide} onAction={handleGuideAction} />
 
       {/* Vulgaris Session Timeline & Technical Report Modal */}
       <ExportReportModal

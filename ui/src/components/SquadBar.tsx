@@ -90,7 +90,7 @@ export const SquadBar: React.FC<SquadBarProps> = ({
       {/* Left: Squad Branding & Goal */}
       <div className="flex items-center space-x-3 min-w-0">
         <div className="flex items-center space-x-2">
-          <div className="w-5 h-5 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-accent">
+          <div className="flex size-5 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-primary">
             <Users size={11} />
           </div>
           <span
@@ -149,7 +149,7 @@ export const SquadBar: React.FC<SquadBarProps> = ({
         {squad.phase !== 'consensus' && (
           <button
             onClick={onForceHandoff}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-accent-muted hover:bg-accent-muted border border-accent-border text-accent-hover text-xs font-medium transition-all"
+            className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-all"
             title="Don't wait — pass the work to the other agent right now"
           >
             <FastForward size={11} />
