@@ -1,5 +1,7 @@
 import 'dotenv/config';
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } from 'electron';
+
+app.name = 'Vulgaris';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename, extname } from 'node:path';
 import { get as httpGet } from 'node:http';
@@ -74,7 +76,25 @@ function canConnectToDevServer(): Promise<boolean> {
 }
 
 function resolveAppIcon(): string | undefined {
-  return [join(__dirname, '../ui/icon.ico'), join(__dirname, '../../ui/public/icon.ico')].find((p) => existsSync(p));
+  const isMac = process.platform === 'darwin';
+  const candidates = isMac
+    ? [
+        join(__dirname, '../ui/logo.png'),
+        join(__dirname, '../../ui/public/logo.png'),
+        join(process.cwd(), 'ui/public/logo.png'),
+        join(process.cwd(), 'dist/ui/logo.png'),
+        join(__dirname, '../ui/favicon.png'),
+        join(__dirname, '../../ui/public/favicon.png'),
+        join(__dirname, '../ui/icon.ico'),
+      ]
+    : [
+        join(__dirname, '../ui/icon.ico'),
+        join(__dirname, '../../ui/public/icon.ico'),
+        join(process.cwd(), 'ui/public/icon.ico'),
+        join(__dirname, '../ui/logo.png'),
+        join(__dirname, '../../ui/public/logo.png'),
+      ];
+  return candidates.find((p) => existsSync(p));
 }
 
 const RECENT_PROJECTS_PATH = join(os.homedir(), '.vulgaris-recent-projects.json');
@@ -178,8 +198,12 @@ function scanProjectDirectory(baseDir: string, currentPath: string, maxDepth = 3
 }
 
 async function createWindow() {
+  const isMac = process.platform === 'darwin';
+  const iconPath = resolveAppIcon();
+  const iconImage = iconPath ? nativeImage.createFromPath(iconPath) : undefined;
+
   mainWindow = new BrowserWindow({
-    icon: resolveAppIcon(),
+    icon: iconImage,
     width: 1360,
     height: 880,
     minWidth: 900,
@@ -188,7 +212,9 @@ async function createWindow() {
     backgroundColor: '#0c0d12',
     show: true,
     autoHideMenuBar: true,
-    frame: false,
+    frame: !isMac ? false : true,
+    titleBarStyle: isMac ? 'hidden' : undefined,
+    trafficLightPosition: isMac ? { x: 12, y: 11 } : undefined,
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -628,6 +654,20 @@ function setupIpcHandlers() {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = resolveAppIcon();
+    if (iconPath) {
+      try {
+        const img = nativeImage.createFromPath(iconPath);
+        if (!img.isEmpty()) {
+          app.dock.setIcon(img);
+        }
+      } catch (err) {
+        console.warn('[Electron] Failed to set dock icon:', err);
+      }
+    }
+  }
+
   setupIpcHandlers();
   await createWindow();
 
