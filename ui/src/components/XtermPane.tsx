@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal, type IMarker, type IDecoration } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { WebglAddon } from '@xterm/addon-webgl';
 import {
   Sparkles,
   Shield,
@@ -23,7 +24,13 @@ interface XtermPaneProps {
   onPipeErrorToAgent: (targetType: 'claude' | 'agy' | 'codex', errorSnippet: string) => void;
   onRegisterCommandHandler?: (sessionId: string, handler: ((command: string) => void) | null) => void;
   onSessionState?: (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => void;
+  /** A shell command finished: its exit code and the output it printed. */
+  onCommandFinished?: (sessionId: string, result: { command?: string; exitCode: number; output: string }) => void;
 }
+
+const ERROR_PATTERN =
+  /(?:error\s+TS\d+:|TS\d{4}:|FAIL\s+|Tests:\s+\d+\s+failed|AssertionError|Traceback \(most recent call last\):|error\[E\d+\]:|npm ERR!)/i;
+const ESCAPE_CODE_PATTERN = /\x1B\[[0-9;?]*[ -\/]*[@-~]/g;
 
 const HOME_PATH = /^((?:[A-Za-z]:)?[\\/](?:Users|home)[\\/][^\\/]+)(.*)$/;
 
@@ -52,6 +59,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   onPipeErrorToAgent,
   onRegisterCommandHandler,
   onSessionState,
+  onCommandFinished,
 }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermInstance = useRef<Terminal | null>(null);
@@ -65,6 +73,8 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   const submitCommandRef = useRef<((command: string) => void) | null>(null);
   const onSessionStateRef = useRef(onSessionState);
   onSessionStateRef.current = onSessionState;
+  const onCommandFinishedRef = useRef(onCommandFinished);
+  onCommandFinishedRef.current = onCommandFinished;
   const onPipeErrorRef = useRef(onPipeErrorToAgent);
   onPipeErrorRef.current = onPipeErrorToAgent;
 
@@ -114,6 +124,15 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
 
     term.open(terminalRef.current);
 
+    // GPU renderer: far cheaper than the default DOM renderer for heavy output
+    // and agent TUIs. Falls back to the DOM renderer if WebGL is unavailable or
+    // the context is lost (GPU reset, too many contexts).
+    try {
+      const webgl = new WebglAddon();
+      webgl.onContextLoss(() => webgl.dispose());
+      term.loadAddon(webgl);
+    } catch {}
+
     xtermInstance.current = term;
     fitAddon.current = fit;
 
@@ -127,7 +146,9 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
     requestAnimationFrame(() => {
       try {
         fit.fit();
-        if (isActive) term.focus();
+        // Idle shell sessions type into BottomCommandDock (Warp-style), so only
+        // agent panes grab keyboard focus on mount.
+        if (isActive && !isShellSession) term.focus();
       } catch {}
     });
 
@@ -147,11 +168,8 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
           term.write(data);
 
           // Error sniffer for self-correction trigger
-          const errorPattern =
-            /(?:error\s+TS\d+:|TS\d{4}:|FAIL\s+|Tests:\s+\d+\s+failed|AssertionError|Traceback \(most recent call last\):|error\[E\d+\]:|npm ERR!)/i;
-          if (errorPattern.test(data)) {
-            const escapeCodePattern = /\x1B\[[0-9;?]*[ -\/]*[@-~]/g;
-            const clean = data.replace(escapeCodePattern, '');
+          if (ERROR_PATTERN.test(data)) {
+            const clean = data.replace(ESCAPE_CODE_PATTERN, '');
             if (clean.trim().length > 20) {
               setDetectedError(clean.trim());
             }
@@ -371,6 +389,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         b.endLine = term.buffer.active.baseY + term.buffer.active.cursorY;
         paintLabel(b);
         refreshHeader(b);
+        onCommandFinishedRef.current?.(session.id, { command: b.command, exitCode, output: blockText(b) });
       };
 
       // `clear` wipes the screen and scrollback. Stale headers would be left
@@ -471,13 +490,20 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       });
 
       // Handle ResizeObserver
+      // Coalesced to one fit per frame: dragging a splitter or toggling the
+      // sidebar fires many observations, and each fit() reflows the terminal.
+      let resizeFrame = 0;
       const resizeObserver = new ResizeObserver(() => {
-        try {
-          fit.fit();
-          if (term.cols > 0 && term.rows > 0) {
-            window.warpApi.resizeTerminal(session.id, term.cols, term.rows);
-          }
-        } catch {}
+        if (resizeFrame) return;
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = 0;
+          try {
+            fit.fit();
+            if (term.cols > 0 && term.rows > 0) {
+              window.warpApi.resizeTerminal(session.id, term.cols, term.rows);
+            }
+          } catch {}
+        });
       });
       resizeObserver.observe(terminalRef.current);
 
@@ -504,6 +530,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         submitCommandRef.current = null;
         unsubscribeData();
         resizeObserver.disconnect();
+        cancelAnimationFrame(resizeFrame);
         // NOTE: Do not killTerminal here. Session process lifecycle is managed by App.tsx
         // (handleCloseTab and handleCloseSession). Unmounting only disposes the DOM renderer.
         term.dispose();
@@ -516,7 +543,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   }, [session.id]);
 
   useEffect(() => {
-    if (isActive && xtermInstance.current) {
+    if (isActive && !isShellSession && xtermInstance.current) {
       xtermInstance.current.focus();
     }
   }, [isActive]);
@@ -528,7 +555,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         xtermInstance.current?.focus();
       }}
       className={`group relative flex flex-col h-full w-full min-h-0 min-w-0 bg-base-app overflow-hidden ${
-        isSplitView && isActive ? 'ring-1 ring-inset ring-accent-border' : ''
+        isSplitView && isActive ? 'ring-1 ring-inset ring-primary/40' : ''
       }`}
     >
       {isShellSession ? (
@@ -651,7 +678,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       )}
 
       {/* Interactive Terminal Canvas — full-bleed, no padding */}
-      <div ref={terminalRef} className="flex-1 min-h-0 min-w-0 w-full overflow-hidden bg-base-app" />
+      <div ref={terminalRef} className="flex-1 min-h-0 min-w-0 w-full overflow-hidden bg-base-app pl-3 pr-1" />
     </div>
   );
 };

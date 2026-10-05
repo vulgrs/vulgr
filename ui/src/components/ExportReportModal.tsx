@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  X,
   FileDown,
   Copy,
   Check,
@@ -15,6 +14,15 @@ import {
   Eye,
   GitBranch,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
+import { Spinner } from '@/components/ui/spinner.js';
 import type { SessionReportData, ReportCommandBlock } from '../types/warp.js';
 
 interface ExportReportModalProps {
@@ -108,25 +116,18 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   const passedCmds = reportData.commands.filter((c) => c.exitCode === 0).length;
   const failedCmds = reportData.commands.filter((c) => c.exitCode !== null && c.exitCode !== 0).length;
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4 animate-overlay-in">
-      <div
-        className="relative w-full max-w-4xl max-h-[85vh] flex flex-col modal-surface overflow-hidden animate-modal-in font-sans text-zinc-200"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-base-surface">
+        <div className="flex items-center justify-between border-b bg-muted/40 px-6 py-4 pr-14">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-zinc-500 to-zinc-400 flex items-center justify-center text-black shadow-[0_0_15px_rgba(168,85,247,0.3)]">
               <FileDown size={17} className="text-black fill-current" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-sm font-bold text-zinc-100 tracking-wide">
-                  Vulgaris Technical Session Report
-                </h2>
+                <DialogTitle>Vulgaris Technical Session Report</DialogTitle>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-zinc-500/10 text-zinc-300 border border-zinc-500/25">
                   {totalCmds} commands
                 </span>
@@ -136,7 +137,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-zinc-400 mt-0.5 flex items-center space-x-2 font-mono">
+              <DialogDescription className="flex items-center gap-2 font-mono">
                 <span>{reportData.workspacePath || 'Current Workspace'}</span>
                 {reportData.branch && (
                   <>
@@ -147,17 +148,9 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                     </span>
                   </>
                 )}
-              </p>
+              </DialogDescription>
             </div>
           </div>
-
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-all"
-            title="Close (Esc)"
-          >
-            <X size={17} />
-          </button>
         </div>
 
         {/* Tab Switcher & Option Bar */}
@@ -300,36 +293,18 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
         </div>
 
         {/* Modal Footer / Action Bar */}
-        <div className="px-6 py-3.5 bg-base-surface border-t border-zinc-800 flex items-center justify-between">
-          <div className="flex items-center space-x-2 text-xs text-zinc-400 font-mono">
-            {saveStatus && (
-              <span className="text-emerald-400 flex items-center space-x-1 animate-overlay-in">
-                <Check size={13} />
-                <span>{saveStatus}</span>
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2.5">
-            <button
-              onClick={handleCopy}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-200 hover:text-zinc-100 hover:bg-zinc-800 text-xs font-medium transition-all"
-            >
-              {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-              <span>{copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}</span>
-            </button>
-
-            <button
-              onClick={handleSaveToDisk}
-              disabled={isSaving}
-              className="flex items-center space-x-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-zinc-600 to-zinc-600 hover:from-zinc-500 hover:to-zinc-500 text-zinc-100 text-xs font-semibold shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-            >
-              <FileDown size={13} />
-              <span>{isSaving ? 'Saving...' : 'Save to File...'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+        <DialogFooter className="mx-0 mb-0 rounded-none">
+          {saveStatus ? <p className="mr-auto font-mono text-xs text-muted-foreground">{saveStatus}</p> : null}
+          <Button variant="outline" onClick={handleCopy}>
+            {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
+            {copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}
+          </Button>
+          <Button onClick={handleSaveToDisk} disabled={isSaving}>
+            {isSaving ? <Spinner data-icon="inline-start" /> : <FileDown data-icon="inline-start" />}
+            {isSaving ? 'Saving...' : 'Save to File...'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

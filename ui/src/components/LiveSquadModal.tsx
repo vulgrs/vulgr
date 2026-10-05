@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { UsersIcon, PlayIcon, InfoIcon, XCircleIcon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.js';
+import { Badge } from '@/components/ui/badge.js';
+import { Button } from '@/components/ui/button.js';
 import {
-  Users,
-  Sparkles,
-  Shield,
-  Bot,
-  ArrowRight,
-  Terminal,
-  X,
-  Play,
-  CheckCircle2,
-} from 'lucide-react';
-
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field.js';
+import { Input } from '@/components/ui/input.js';
+import { Textarea } from '@/components/ui/textarea.js';
+import { OptionSelect, type OptionItem } from './OptionSelect.js';
 import type { SessionType } from '../types/warp.js';
 
 interface LiveSquadModalProps {
@@ -25,177 +29,182 @@ interface LiveSquadModalProps {
   }) => void;
 }
 
-export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({
-  isOpen,
-  onClose,
-  onLaunchSquad,
-}) => {
+const AGENT_ITEMS: OptionItem[] = [
+  { value: 'claude', label: 'Claude Code' },
+  { value: 'agy', label: 'AGY' },
+  { value: 'codex', label: 'Codex CLI' },
+];
+
+const ROUND_ITEMS: OptionItem[] = [
+  { value: '2', label: '2 tur' },
+  { value: '3', label: '3 tur' },
+  { value: '5', label: '5 tur' },
+];
+
+const load = (key: string, fallback: string) => {
+  try {
+    return localStorage.getItem(`vulgaris.squad.${key}`) || fallback;
+  } catch {
+    return fallback;
+  }
+};
+const save = (key: string, value: string) => {
+  try {
+    localStorage.setItem(`vulgaris.squad.${key}`, value);
+  } catch {}
+};
+
+export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose, onLaunchSquad }) => {
   const [goal, setGoal] = useState('');
-  const [builder, setBuilder] = useState<SessionType>('claude');
-  const [verifier, setVerifier] = useState<SessionType>('shell');
-  const [verifyCmd, setVerifyCmd] = useState('npm test');
-  const [maxRounds, setMaxRounds] = useState(3);
+  const [builder, setBuilder] = useState(() => load('builder', 'claude'));
+  const [verifier, setVerifier] = useState(() => load('verifier', 'agy'));
+  const [verifyCmd, setVerifyCmd] = useState(() => load('verifyCmd', 'npm test'));
+  const [maxRounds, setMaxRounds] = useState(() => load('maxRounds', '3'));
+  const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
 
+  useEffect(() => {
+    if (!isOpen || !window.warpApi?.getAvailableAgents) return;
+    window.warpApi.getAvailableAgents().then((map: Record<string, boolean>) => {
+      setAvailable(map);
+      const first = AGENT_ITEMS.find((a) => map[a.value])?.value;
+      if (first && !map[builder]) setBuilder(first);
+      if (verifier !== 'shell' && !map[verifier]) setVerifier(first ?? 'shell');
+    }).catch(() => {});
+  }, [isOpen]);
 
-  if (!isOpen) return null;
+  const installed = AGENT_ITEMS.filter((a) => !available || available[a.value]);
+  const verifierItems: OptionItem[] = [...installed, { value: 'shell', label: 'Ajan yok, sadece test komutu' }];
+  const missing = available ? AGENT_ITEMS.filter((a) => !available[a.value]).map((a) => a.label) : [];
+  const noBuilder = available !== null && installed.length === 0;
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!goal.trim()) return;
+    if (!goal.trim() || noBuilder) return;
+    save('builder', builder);
+    save('verifier', verifier);
+    save('verifyCmd', verifyCmd);
+    save('maxRounds', maxRounds);
 
     onLaunchSquad({
       goal: goal.trim(),
-      builder,
-      verifier,
+      builder: builder as SessionType,
+      verifier: verifier as SessionType,
       verifyCmd: verifyCmd.trim() || 'npm test',
-      maxRounds,
+      maxRounds: Number(maxRounds) || 3,
     });
+    setGoal('');
     onClose();
   };
 
+  const builderLabel = AGENT_ITEMS.find((a) => a.value === builder)?.label ?? builder;
+  const verifierLabel = AGENT_ITEMS.find((a) => a.value === verifier)?.label;
+
   return (
-    <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 select-none animate-overlay-in">
-      <div className="w-[640px] modal-surface overflow-hidden animate-modal-in">
-        {/* Header */}
-        <div className="h-14 px-5 modal-header flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-accent">
-              <Users size={15} />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-semibold text-sm text-zinc-100 font-sans tracking-wide">
-                  Live Autonomous Squad
-                </span>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400">
-                  2-Way Split Screen
-                </span>
-              </div>
-              <p className="text-[11px] text-zinc-500 font-mono">
-                Interactive real-time terminal handoff & self-repair loop
-              </p>
-            </div>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <DialogHeader className="gap-2 border-b px-4 py-4 pr-12">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>
+              <UsersIcon data-icon="inline-start" />
+              İkili Ajan
+            </Badge>
+            <Badge variant="outline">Yan yana iki panel, canlı</Badge>
           </div>
+          <DialogTitle>Biri yazsın, diğeri kontrol etsin</DialogTitle>
+          <DialogDescription>
+            Solda bir ajan kodu yazar, sağda test komutunuz çalışır. Hata çıkarsa kontrol eden ajan nedenini bulur ve
+            iş geri gönderilir; testler geçince kodu gözden geçirir. Her adımı panellerde canlı izlersiniz.
+          </DialogDescription>
+        </DialogHeader>
 
-          <button onClick={onClose} className="modal-close-btn p-1.5">
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Goal Input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-300 flex items-center space-x-1.5">
-              <span>Task / Engineering Goal:</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-zinc-500 font-mono text-xs select-none">❯</span>
-              <input
-                type="text"
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="squad-goal">Ne yapılsın?</FieldLabel>
+              <Textarea
+                id="squad-goal"
                 autoFocus
+                rows={2}
                 value={goal}
+                placeholder="örn. Sepete indirim kodu desteği ekle ve testlerini yaz"
                 onChange={(e) => setGoal(e.target.value)}
-                placeholder="e.g. Implement JWT refresh token service and run tests..."
-                className="w-full glass-input pl-7 pr-3 py-2 text-xs font-mono text-zinc-100 placeholder:text-zinc-600"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
+                }}
               />
-            </div>
-          </div>
+            </Field>
 
-          {/* Model Roles */}
-          <div className="grid grid-cols-2 gap-3 p-3.5 rounded-lg bg-base-surface border border-zinc-900">
-            {/* Builder Selection */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-zinc-300 flex items-center space-x-1.5">
-                <Sparkles size={12} className="text-zinc-400" />
-                <span>Builder (Code Generator)</span>
-              </label>
-              <select
-                value={builder}
-                onChange={(e) => setBuilder(e.target.value as SessionType)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
-              >
-                <option value="claude">Claude Code (Installed & Active)</option>
-              </select>
-              <p className="text-[10px] text-zinc-500">Writes code autonomously in Left Terminal Pane</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="squad-builder">Yazan (sol panel)</FieldLabel>
+                <OptionSelect id="squad-builder" value={builder} items={installed} disabled={noBuilder} onValueChange={setBuilder} />
+                <FieldDescription>Kodu yazar ve gelen geri bildirime göre düzeltir</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="squad-verifier">Kontrol eden (sağ panel)</FieldLabel>
+                <OptionSelect id="squad-verifier" value={verifier} items={verifierItems} onValueChange={setVerifier} />
+                <FieldDescription>Testleri çalıştırır, hataları inceler, kodu gözden geçirir</FieldDescription>
+              </Field>
             </div>
 
-            {/* Verifier Selection */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-zinc-300 flex items-center space-x-1.5">
-                <Shield size={12} className="text-zinc-400" />
-                <span>Verifier (Test & Audit)</span>
-              </label>
-              <select
-                value={verifier}
-                onChange={(e) => setVerifier(e.target.value as SessionType)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
-              >
-                <option value="shell">Native Shell (Run verify command in PTY)</option>
-                <option value="claude">Claude Code (Verifier instance)</option>
-              </select>
-              <p className="text-[10px] text-zinc-500">Runs tests & verification in Right Terminal Pane</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field className="sm:col-span-2">
+                <FieldLabel htmlFor="squad-verify">Test komutu</FieldLabel>
+                <Input
+                  id="squad-verify"
+                  value={verifyCmd}
+                  placeholder="npm test"
+                  className="font-mono"
+                  onChange={(e) => setVerifyCmd(e.target.value)}
+                />
+                <FieldDescription>Başarıda 0 ile çıkan bir komut (npm test, npm run build...)</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="squad-rounds">En fazla tur</FieldLabel>
+                <OptionSelect id="squad-rounds" value={maxRounds} items={ROUND_ITEMS} onValueChange={setMaxRounds} />
+              </Field>
             </div>
-          </div>
+          </FieldGroup>
 
+          {missing.length > 0 && !noBuilder && (
+            <p className="text-xs text-muted-foreground">Bu bilgisayarda kurulu olmadığı için listede yok: {missing.join(', ')}.</p>
+          )}
+          {noBuilder && (
+            <Alert variant="destructive">
+              <XCircleIcon />
+              <AlertTitle>Kurulu ajan bulunamadı</AlertTitle>
+              <AlertDescription>Claude Code, AGY veya Codex CLI'dan en az birini kurun.</AlertDescription>
+            </Alert>
+          )}
 
-          {/* Verification Command & Rounds */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-1">
-              <label className="text-[11px] font-medium text-zinc-400">Verification Command</label>
-              <input
-                type="text"
-                value={verifyCmd}
-                onChange={(e) => setVerifyCmd(e.target.value)}
-                placeholder="npm test"
-                className="w-full glass-input px-2.5 py-1.5 text-zinc-200 text-xs font-mono"
-              />
-            </div>
+          <Alert>
+            <InfoIcon />
+            <AlertTitle>Nasıl ilerler?</AlertTitle>
+            <AlertDescription>
+              <ol className="list-decimal space-y-0.5 pl-4">
+                <li>{builderLabel} görevi alır ve dosyaları düzenler (sol panel).</li>
+                <li>"{verifyCmd || 'npm test'}" sağ panelde çalışır.</li>
+                <li>
+                  {verifierLabel
+                    ? `Başarısızsa ${verifierLabel} hatayı inceler, ${builderLabel} düzeltir. Başarılıysa ${verifierLabel} kodu gözden geçirir.`
+                    : `Başarısızsa hata çıktısı ${builderLabel}'a geri gönderilir.`}
+                </li>
+                <li>Onay gelene ya da tur sınırına ulaşılana kadar tekrar eder. İstediğiniz an duraklatabilirsiniz.</li>
+              </ol>
+            </AlertDescription>
+          </Alert>
 
-            <div className="space-y-1">
-              <label className="text-[11px] font-medium text-zinc-400">Max Auto-Fix Rounds</label>
-              <select
-                value={maxRounds}
-                onChange={(e) => setMaxRounds(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1.5 text-zinc-200 font-mono text-xs focus:outline-none focus:border-accent-border"
-              >
-                <option value={2}>2 Rounds</option>
-                <option value={3}>3 Rounds</option>
-                <option value={5}>5 Rounds</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Workflow Summary Explanation */}
-          <div className="p-3 rounded-lg bg-accent-muted border border-accent-border text-zinc-300 text-xs flex items-start space-x-2.5">
-            <CheckCircle2 size={15} className="text-accent flex-shrink-0 mt-0.5" />
-            <div className="text-[11px] leading-relaxed">
-              <span className="font-semibold text-zinc-200">How the live loop works: </span>
-              A split-view tab opens. Claude receives the task and types code live. When done, AGY triggers the tests on the right. If any test fails, the stack trace is automatically piped back to Claude to self-repair. You can intervene or pause at any second.
-            </div>
-          </div>
-
-          {/* Footer Actions */}
-          <div className="pt-2 flex items-center justify-end space-x-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-ghost px-4 py-2 text-xs font-medium border-transparent hover:border-zinc-800"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={!goal.trim()}
-              className="btn-accent flex items-center space-x-2 px-5 py-2 font-semibold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Play size={13} className="fill-current" />
-              <span>Launch Live Squad</span>
-            </button>
-          </div>
+          <DialogFooter className="mx-0 mb-0 rounded-none border-0 bg-transparent p-0">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Vazgeç
+            </Button>
+            <Button type="submit" disabled={!goal.trim() || noBuilder}>
+              <PlayIcon data-icon="inline-start" />
+              Başlat
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

@@ -1,24 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Sparkles,
-  Shield,
-  Bot,
-  Terminal,
-  CheckCircle2,
-  AlertTriangle,
-  X,
-  Send,
-  Loader2,
-  ArrowRight,
-  RefreshCw,
-  Zap,
+  SparklesIcon,
+  ShieldIcon,
+  BotIcon,
+  TerminalIcon,
+  CheckCircle2Icon,
+  ArrowRightIcon,
+  SendIcon,
+  ZapIcon,
+  AlertTriangleIcon,
+  XCircleIcon,
+  type LucideIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.js';
+import { Badge } from '@/components/ui/badge.js';
+import { Button } from '@/components/ui/button.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.js';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field.js';
+import { Input } from '@/components/ui/input.js';
+import { Spinner } from '@/components/ui/spinner.js';
+import { Switch } from '@/components/ui/switch.js';
+import { Textarea } from '@/components/ui/textarea.js';
+import { OptionSelect, type OptionItem } from './OptionSelect.js';
 
 export interface AgentMessage {
   id: string;
   runId: string;
   from: 'claude' | 'agy' | 'gemini' | 'codex' | 'orchestrator';
-  to: 'claude' | 'agy' | 'gemini' | 'codex' | 'broadcast';
+  to: 'claude' | 'agy' | 'gemini' | 'codex' | 'broadcast' | 'orchestrator';
   type: string;
   payload: {
     summary: string;
@@ -30,373 +47,395 @@ export interface AgentMessage {
   timestamp: string;
 }
 
+interface MeshStatus {
+  stage: 'checking' | 'building' | 'verifying' | 'diagnosing' | 'repairing' | 'auditing' | 'done' | 'failed';
+  agent?: string;
+  round: number;
+  maxRounds: number;
+  text: string;
+}
+
+interface MeshResult {
+  success: boolean;
+  rounds: number;
+  audit?: 'approved' | 'rejected' | 'skipped';
+  error?: string;
+  sandbox?: { worktreePath: string; branchName: string };
+}
+
 interface AgentMeshModalProps {
   isOpen: boolean;
   onClose: () => void;
+  cwd?: string;
+  onOpenChanges?: () => void;
+  onOpenSandboxes?: () => void;
 }
 
-export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose }) => {
-  const [goal, setGoal] = useState('');
-  const [builder, setBuilder] = useState('claude');
-  const [verifier, setVerifier] = useState('claude');
-  const [auditor, setAuditor] = useState('claude');
+const AGENTS: OptionItem[] = [
+  { value: 'claude', label: 'Claude Code' },
+  { value: 'agy', label: 'AGY' },
+  { value: 'codex', label: 'Codex CLI' },
+  { value: 'gemini', label: 'Gemini CLI' },
+];
 
+const ROUND_ITEMS: OptionItem[] = [
+  { value: '1', label: '1 tur' },
+  { value: '2', label: '2 tur' },
+  { value: '3', label: '3 tur' },
+  { value: '5', label: '5 tur' },
+];
+
+const AGENT_META: Record<string, { icon: LucideIcon; label: string }> = {
+  claude: { icon: SparklesIcon, label: 'Claude' },
+  agy: { icon: ShieldIcon, label: 'AGY' },
+  gemini: { icon: BotIcon, label: 'Gemini' },
+  codex: { icon: BotIcon, label: 'Codex' },
+  orchestrator: { icon: TerminalIcon, label: 'Vulgaris' },
+  broadcast: { icon: TerminalIcon, label: 'Herkes' },
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  USER_TASK: 'Görev verildi',
+  CODE_READY: 'Kod yazıldı',
+  VERIFICATION_FAILED: 'Test başarısız',
+  VERIFICATION_PASSED: 'Testler geçti',
+  PATCH_APPLIED: 'Düzeltme uygulandı',
+  SECURITY_CONCERN: 'Denetçi sorun buldu',
+  CONSENSUS_APPROVED: 'Onaylandı',
+};
+
+const AgentBadge: React.FC<{ agent: string }> = ({ agent }) => {
+  const meta = AGENT_META[agent] ?? { icon: TerminalIcon, label: agent };
+  const Icon = meta.icon;
+  return (
+    <Badge variant="outline">
+      <Icon data-icon="inline-start" />
+      {meta.label}
+    </Badge>
+  );
+};
+
+const loadSetting = (key: string, fallback: string) => {
+  try {
+    return localStorage.getItem(`vulgaris.mesh.${key}`) || fallback;
+  } catch {
+    return fallback;
+  }
+};
+const saveSetting = (key: string, value: string) => {
+  try {
+    localStorage.setItem(`vulgaris.mesh.${key}`, value);
+  } catch {}
+};
+
+export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
+  isOpen,
+  onClose,
+  cwd,
+  onOpenChanges,
+  onOpenSandboxes,
+}) => {
+  const [goal, setGoal] = useState('');
+  const [builder, setBuilder] = useState(() => loadSetting('builder', 'claude'));
+  const [verifier, setVerifier] = useState(() => loadSetting('verifier', 'agy'));
+  const [auditor, setAuditor] = useState(() => loadSetting('auditor', 'claude'));
+  const [verifyCmd, setVerifyCmd] = useState(() => loadSetting('verifyCmd', 'npm test'));
+  const [maxRounds, setMaxRounds] = useState(() => loadSetting('maxRounds', '3'));
+  const [useSandbox, setUseSandbox] = useState(false);
+  const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<MeshStatus | null>(null);
+  const [result, setResult] = useState<MeshResult | null>(null);
 
   const feedEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, status]);
+
+  // Only offer agents that are installed; fall back to the first installed
+  // one when a remembered choice isn't available on this machine.
+  useEffect(() => {
+    if (!isOpen || !window.warpApi?.getAvailableAgents) return;
+    window.warpApi.getAvailableAgents().then((map: Record<string, boolean>) => {
+      setAvailable(map);
+      const firstInstalled = AGENTS.find((a) => map[a.value])?.value;
+      if (!firstInstalled) return;
+      const fix = (value: string, set: (v: string) => void) => {
+        if (!map[value]) set(firstInstalled);
+      };
+      fix(builder, setBuilder);
+      fix(verifier, setVerifier);
+      fix(auditor, setAuditor);
+    }).catch(() => {});
+  }, [isOpen]);
 
   useEffect(() => {
     if (!window.warpApi) return;
-
-    const unsubscribe = window.warpApi.onMeshEvent((msg: AgentMessage) => {
-      setMessages((prev) => [...prev, msg]);
-      if (msg.type === 'CONSENSUS_APPROVED') {
-        setIsCompleted(true);
-        setIsRunning(false);
-      }
-    });
-
-    return () => unsubscribe();
+    const offEvent = window.warpApi.onMeshEvent((msg: AgentMessage) => setMessages((prev) => [...prev, msg]));
+    const offStatus = window.warpApi.onMeshStatus?.((s: MeshStatus) => setStatus(s));
+    return () => {
+      offEvent?.();
+      offStatus?.();
+    };
   }, []);
 
-  if (!isOpen) return null;
+  const installedItems = AGENTS.filter((a) => !available || available[a.value]);
+  const missing = available ? AGENTS.filter((a) => !available[a.value]).map((a) => a.label) : [];
+  const noneInstalled = available !== null && installedItems.length === 0;
 
   const handleStartMesh = async () => {
-    if (!goal.trim() || isRunning) return;
+    if (!goal.trim() || isRunning || noneInstalled) return;
+
+    saveSetting('builder', builder);
+    saveSetting('verifier', verifier);
+    saveSetting('auditor', auditor);
+    saveSetting('verifyCmd', verifyCmd);
+    saveSetting('maxRounds', maxRounds);
 
     setIsRunning(true);
     setMessages([]);
-    setIsCompleted(false);
-    setError(null);
+    setResult(null);
+    setStatus(null);
 
     try {
-      await window.warpApi.runAgentMesh({
+      const res: MeshResult = await window.warpApi.runAgentMesh({
         goal: goal.trim(),
         builder,
         verifier,
         auditor,
+        verifyCmd: verifyCmd.trim() || 'npm test',
+        maxRounds: Number(maxRounds) || 3,
+        useSandbox,
+        cwd,
       });
+      setResult(res);
+      if (res.success) toast.success(res.audit === 'rejected' ? 'Testler geçti, denetçi uyarı verdi' : 'Görev tamamlandı');
+      else toast.error('Görev tamamlanamadı');
     } catch (err: any) {
-      setError(err.message || String(err));
+      const message = err?.message || String(err);
+      setResult({ success: false, rounds: 0, error: message });
+      toast.error(message);
+    } finally {
       setIsRunning(false);
     }
   };
 
-  const getAgentBadge = (agent: string) => {
-    switch (agent) {
-      case 'claude':
-        return {
-          icon: <Sparkles size={11} className="text-zinc-400" />,
-          label: 'Claude Code',
-          role: 'Builder',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-      case 'agy':
-        return {
-          icon: <Shield size={11} className="text-zinc-400" />,
-          label: 'AGY Engine',
-          role: 'Verifier',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-      case 'gemini':
-        return {
-          icon: <Bot size={11} className="text-zinc-400" />,
-          label: 'Gemini CLI',
-          role: 'Auditor',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-      case 'codex':
-        return {
-          icon: <Bot size={11} className="text-zinc-400" />,
-          label: 'Codex CLI',
-          role: 'Builder/Reviewer',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-      default:
-        return {
-          icon: <Terminal size={11} className="text-zinc-400" />,
-          label: 'Orchestrator',
-          role: 'Coordinator',
-          color: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-200',
-          dot: 'bg-zinc-400',
-        };
-    }
-  };
-
-  const lastSender = messages.length > 0 ? messages[messages.length - 1].from : null;
+  const roleField = (
+    id: string,
+    title: string,
+    help: string,
+    value: string,
+    onChange: (v: string) => void
+  ) => (
+    <Field>
+      <FieldLabel htmlFor={id}>{title}</FieldLabel>
+      <OptionSelect id={id} value={value} items={installedItems} disabled={isRunning || noneInstalled} onValueChange={onChange} />
+      <FieldDescription>{help}</FieldDescription>
+    </Field>
+  );
 
   return (
-    <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4 select-none animate-overlay-in">
-      <div className="w-[900px] max-h-[88vh] modal-surface flex flex-col overflow-hidden animate-modal-in">
-        {/* Modal Header */}
-        <div className="h-14 px-5 modal-header flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-7 h-7 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-accent">
-              <Zap size={13} />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-semibold text-sm text-zinc-100 font-sans tracking-wide">
-                  Autonomous Multi-CLI Agent Mesh
-                </span>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400">
-                  Zero Human Intervention
-                </span>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <DialogHeader className="gap-2 border-b px-4 py-4 pr-12">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>
+              <ZapIcon data-icon="inline-start" />
+              Otomatik Görev
+            </Badge>
+            <Badge variant="outline">Arka planda, terminalsiz</Badge>
+          </div>
+          <DialogTitle>Üç ajan, tek hedef</DialogTitle>
+          <DialogDescription>
+            Bir hedef yazın. <b>Yazan</b> ajan kodu yazar, test komutunuz çalıştırılır. Test başarısız olursa{' '}
+            <b>kontrol eden</b> ajan hatayı inceler ve yazan ajan düzeltir. Testler geçince <b>denetçi</b> ajan son
+            değişiklikleri gözden geçirir. Siz sadece sonucu takip edersiniz.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-4 border-b px-4 py-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="mesh-goal">Hedef</FieldLabel>
+                <Textarea
+                  id="mesh-goal"
+                  value={goal}
+                  disabled={isRunning}
+                  rows={2}
+                  placeholder="örn. Kullanıcı kaydı için e-posta doğrulaması ekle ve testlerini yaz"
+                  onChange={(e) => setGoal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleStartMesh();
+                  }}
+                />
+              </Field>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                {roleField('mesh-builder', '1. Yazan', 'Kodu yazar ve düzeltir', builder, setBuilder)}
+                {roleField('mesh-verifier', '2. Kontrol eden', 'Test hatalarını inceler, ne düzeltileceğini söyler', verifier, setVerifier)}
+                {roleField('mesh-auditor', '3. Denetçi', 'Testler geçince son kodu gözden geçirir', auditor, setAuditor)}
               </div>
-              <p className="text-[11px] text-zinc-500 font-mono">
-                Asynchronous Inter-CLI Protocol • .ai-bridge/bus/messages.jsonl
-              </p>
-            </div>
-          </div>
 
-          <button onClick={onClose} className="modal-close-btn p-1.5">
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Visual Topology Pipeline */}
-        <div className="px-5 py-2.5 bg-base-surface border-b border-zinc-900 flex items-center justify-between text-xs flex-shrink-0">
-          <div className="flex items-center space-x-2 text-[11px] text-zinc-500 font-mono">
-            <span>Pipeline Topology:</span>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {/* Orchestrator Node */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md border transition-all ${
- lastSender === 'orchestrator'
- ? 'border-accent-border bg-accent-muted text-zinc-100'
- : 'border-zinc-900 bg-zinc-950 text-zinc-500'
- }`}
-            >
-              <Terminal size={11} className="text-zinc-400" />
-              <span className="font-semibold text-[11px]">Orchestrator</span>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            {/* Builder Node */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md border transition-all ${
- lastSender === builder
- ? 'border-accent-border bg-accent-muted text-zinc-100'
- : 'border-zinc-900 bg-zinc-950 text-zinc-500'
- }`}
-            >
-              <Sparkles size={11} className="text-zinc-400" />
-              <span className="font-semibold text-[11px] capitalize">{builder}</span>
-              <span className="text-[9px] text-zinc-500 font-mono">(Builder)</span>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            {/* Verifier Node */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md border transition-all ${
- lastSender === verifier
- ? 'border-accent-border bg-accent-muted text-zinc-100'
- : 'border-zinc-900 bg-zinc-950 text-zinc-500'
- }`}
-            >
-              <Shield size={11} className="text-zinc-400" />
-              <span className="font-semibold text-[11px] capitalize">{verifier}</span>
-              <span className="text-[9px] text-zinc-500 font-mono">(Verifier)</span>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            {/* Auditor Node */}
-            <div
-              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md border transition-all ${
- lastSender === auditor
- ? 'border-accent-border bg-accent-muted text-zinc-100'
- : 'border-zinc-900 bg-zinc-950 text-zinc-500'
- }`}
-            >
-              <Bot size={11} className="text-zinc-400" />
-              <span className="font-semibold text-[11px] capitalize">{auditor}</span>
-              <span className="text-[9px] text-zinc-500 font-mono">(Auditor)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Goal Input & Mesh Configuration */}
-        <div className="p-4 bg-base-surface border-b border-zinc-900 space-y-3 flex-shrink-0">
-          <div className="flex items-center space-x-2">
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-2.5 text-zinc-500 font-mono text-xs select-none">❯</span>
-              <input
-                type="text"
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                disabled={isRunning}
-                placeholder="Assign high-level goal (e.g. 'JWT refresh token servisi ekle ve test et')..."
-                className="w-full glass-input pl-7 pr-3 py-2 text-xs font-mono text-zinc-100 placeholder:text-zinc-600"
-                onKeyDown={(e) => e.key === 'Enter' && handleStartMesh()}
-              />
-            </div>
-
-            <button
-              onClick={handleStartMesh}
-              disabled={!goal.trim() || isRunning}
-              className="btn-accent flex items-center space-x-2 px-5 py-2.5 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              <span>{isRunning ? 'Mesh Running...' : 'Start Autonomous Mesh'}</span>
-            </button>
-          </div>
-
-          {/* Model Roles */}
-          <div className="flex items-center space-x-4 text-xs">
-            <div className="flex items-center space-x-1.5">
-              <span className="text-[11px] text-zinc-500 font-medium">Builder:</span>
-              <select
-                value={builder}
-                onChange={(e) => setBuilder(e.target.value)}
-                disabled={isRunning}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
-              >
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Builder)</option>
-                <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
-              </select>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            <div className="flex items-center space-x-1.5">
-              <span className="text-[11px] text-zinc-500 font-medium">Verifier:</span>
-              <select
-                value={verifier}
-                onChange={(e) => setVerifier(e.target.value)}
-                disabled={isRunning}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-zinc-300 font-mono text-xs focus:outline-none focus:border-accent-border"
-              >
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Verifier)</option>
-                <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
-              </select>
-            </div>
-
-            <ArrowRight size={12} className="text-zinc-700" />
-
-            <div className="flex items-center space-x-1.5">
-              <span className="text-[11px] text-zinc-500 font-medium">Auditor:</span>
-              <select
-                value={auditor}
-                onChange={(e) => setAuditor(e.target.value)}
-                disabled={isRunning}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-2.5 py-1 text-emerald-300 font-mono text-xs focus:outline-none focus:border-emerald-500/50"
-              >
-                <option value="claude" className="bg-base-elevated text-zinc-300">Claude Code (Auditor)</option>
-                <option value="mock" className="bg-base-elevated text-zinc-400">Mock Simulator</option>
-              </select>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Live Inter-CLI Communication Timeline */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 select-text min-h-[350px] bg-base-app">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-zinc-500">
-              <div className="w-14 h-14 rounded-xl bg-zinc-950 border border-zinc-900 flex items-center justify-center text-zinc-500 mb-3">
-                <RefreshCw size={24} className={isRunning ? 'animate-spin' : ''} />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field className="sm:col-span-2">
+                  <FieldLabel htmlFor="mesh-verify">Test komutu</FieldLabel>
+                  <Input
+                    id="mesh-verify"
+                    value={verifyCmd}
+                    disabled={isRunning}
+                    placeholder="npm test"
+                    className="font-mono"
+                    onChange={(e) => setVerifyCmd(e.target.value)}
+                  />
+                  <FieldDescription>Başarılı sayılması için 0 koduyla çıkmalı (örn. npm test, npm run build)</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="mesh-rounds">En fazla deneme</FieldLabel>
+                  <OptionSelect id="mesh-rounds" value={maxRounds} items={ROUND_ITEMS} disabled={isRunning} onValueChange={setMaxRounds} />
+                </Field>
               </div>
-              <p className="text-sm font-medium text-zinc-300 font-sans">Autonomous Inter-CLI Bus Ready</p>
-              <p className="text-xs text-zinc-500 max-w-md mt-1 leading-relaxed">
-                Assign a goal above to start the loop. Builder writes code, Verifier executes tests, and Auditor inspects the git diff. If tests fail, patches are sent automatically without manual copying.
+
+              <Field orientation="horizontal">
+                <Switch id="mesh-sandbox" checked={useSandbox} disabled={isRunning} onCheckedChange={setUseSandbox} />
+                <div className="flex flex-col gap-0.5">
+                  <FieldLabel htmlFor="mesh-sandbox">Ayrı bir kopyada çalış (sandbox)</FieldLabel>
+                  <FieldDescription>
+                    Açıksa değişiklikler ana klasörünüze değil, ayrı bir git kopyasına yazılır; sonra Sandbox panelinden
+                    birleştirirsiniz. Not: o kopyada node_modules olmadığı için test komutu kurulum gerektirebilir.
+                  </FieldDescription>
+                </div>
+              </Field>
+            </FieldGroup>
+
+            {missing.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Bu bilgisayarda kurulu olmadığı için listede yok: {missing.join(', ')}.
               </p>
+            )}
+            {noneInstalled && (
+              <Alert variant="destructive">
+                <XCircleIcon />
+                <AlertTitle>Hiç ajan bulunamadı</AlertTitle>
+                <AlertDescription>
+                  Claude Code, AGY, Codex veya Gemini CLI'dan en az birini kurun (örn. Claude Code için terminalde
+                  "npm install -g @anthropic-ai/claude-code").
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <span className="mr-auto text-xs text-muted-foreground">Ctrl+Enter ile de başlatabilirsiniz</span>
+              <Button disabled={!goal.trim() || isRunning || noneInstalled} onClick={handleStartMesh}>
+                {isRunning ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
+                {isRunning ? 'Çalışıyor...' : 'Görevi başlat'}
+              </Button>
             </div>
-          ) : (
-            messages.map((msg) => {
-              const fromBadge = getAgentBadge(msg.from);
-              const toBadge = getAgentBadge(msg.to);
+          </div>
+
+          <div className="flex flex-col gap-3 p-4">
+            {messages.length === 0 && !isRunning && !result && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Görev başlayınca ajanların birbirine ne ilettiği burada adım adım görünür.
+              </p>
+            )}
+
+            {messages.map((msg) => {
               const isError = msg.type === 'VERIFICATION_FAILED' || msg.type === 'SECURITY_CONCERN';
               const isSuccess = msg.type === 'CONSENSUS_APPROVED' || msg.type === 'VERIFICATION_PASSED';
-
               return (
-                <div
-                  key={msg.id}
-                  className={`p-3.5 rounded-lg border text-xs space-y-2 transition-all duration-200 ${
- isError
- ? 'bg-red-950/20 border-red-500/40'
- : isSuccess
- ? 'bg-emerald-950/20 border-emerald-500/40'
- : 'surface-card'
- }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-md border text-[11px] font-mono ${fromBadge.color}`}>
-                        {fromBadge.icon}
-                        <span className="font-semibold">{fromBadge.label}</span>
-                      </span>
-
-                      <ArrowRight size={11} className="text-zinc-600" />
-
-                      <span className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-md border text-[11px] font-mono ${toBadge.color}`}>
-                        {toBadge.icon}
-                        <span className="font-semibold">{toBadge.label}</span>
-                      </span>
-
-                      <span
-                        className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
- isError
- ? 'bg-red-500/20 border border-red-500/40 text-red-300'
- : isSuccess
- ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
- : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
- }`}
-                      >
-                        {msg.type}
-                      </span>
+                <div key={msg.id} className="flex flex-col gap-2 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AgentBadge agent={msg.from} />
+                      <ArrowRightIcon className="size-3 text-muted-foreground" />
+                      <AgentBadge agent={msg.to} />
+                      <Badge variant={isError ? 'destructive' : isSuccess ? 'default' : 'secondary'}>
+                        {TYPE_LABELS[msg.type] ?? msg.type}
+                      </Badge>
                     </div>
-
-                    <span className="font-mono text-[10px] text-zinc-500">
+                    <span className="font-mono text-xs text-muted-foreground">
                       {new Date(msg.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-
-                  <p className="text-zinc-300 font-medium leading-relaxed">{msg.payload.summary}</p>
-
+                  <p className="text-sm leading-relaxed">{msg.payload.summary}</p>
                   {msg.payload.errorTrace && (
-                    <pre className="p-2.5 rounded-md bg-black/70 border border-red-500/30 font-mono text-[10px] text-red-300 max-h-36 overflow-y-auto whitespace-pre-wrap">
+                    <pre className="max-h-36 overflow-y-auto rounded-lg bg-muted p-2.5 font-mono text-xs whitespace-pre-wrap text-destructive">
                       {msg.payload.errorTrace}
                     </pre>
                   )}
+                  {msg.payload.details && msg.type !== 'USER_TASK' && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">Ajanın yanıtını göster</summary>
+                      <pre className="mt-1.5 max-h-48 overflow-y-auto rounded-lg bg-muted p-2.5 font-mono whitespace-pre-wrap">
+                        {msg.payload.details}
+                      </pre>
+                    </details>
+                  )}
                 </div>
               );
-            })
-          )}
-          <div ref={feedEndRef} />
+            })}
+
+            {isRunning && status && (
+              <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm">
+                <Spinner />
+                <span>{status.text}</span>
+                {status.round > 0 && (
+                  <span className="ml-auto font-mono text-xs text-muted-foreground">
+                    tur {status.round}/{status.maxRounds}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {result && !result.success && (
+              <Alert variant="destructive">
+                <XCircleIcon />
+                <AlertTitle>Görev tamamlanamadı</AlertTitle>
+                <AlertDescription>{result.error || 'Bilinmeyen bir hata oluştu.'}</AlertDescription>
+              </Alert>
+            )}
+            {result?.success && (
+              <Alert>
+                {result.audit === 'rejected' ? <AlertTriangleIcon /> : <CheckCircle2Icon />}
+                <AlertTitle>
+                  {result.audit === 'rejected'
+                    ? 'Testler geçti, ama denetçi bir sorun buldu'
+                    : `Tamamlandı: testler ${result.rounds}. turda geçti`}
+                </AlertTitle>
+                <AlertDescription>
+                  {result.sandbox
+                    ? 'Değişiklikler ayrı bir sandbox kopyasında. Sandbox panelinden inceleyip ana koda birleştirebilirsiniz.'
+                    : 'Değişiklikler proje klasörünüzde. "Değişiklikler" panelinden inceleyip commit edebilirsiniz.'}
+                  {result.audit === 'rejected' && ' Denetçinin notları yukarıdaki son mesajda.'}
+                </AlertDescription>
+              </Alert>
+            )}
+            <div ref={feedEndRef} />
+          </div>
         </div>
 
-        {/* Footer */}
-        {isCompleted && (
-          <div className="p-3.5 bg-emerald-950/40 border-t border-emerald-500/40 flex items-center justify-between text-xs text-emerald-200 flex-shrink-0">
-            <div className="flex items-center space-x-2">
-              <CheckCircle2 size={16} className="text-emerald-400" />
-              <span className="font-semibold text-sm font-sans">Autonomous Consensus Achieved! All tests passed and code audited.</span>
-            </div>
-            <button
-              onClick={onClose}
-              className="px-4 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all"
-            >
-              Done
-            </button>
-          </div>
+        {result && (
+          <DialogFooter className="m-0 rounded-none border-t px-4 py-3">
+            {result.sandbox ? (
+              onOpenSandboxes && (
+                <Button variant="outline" onClick={() => { onClose(); onOpenSandboxes(); }}>
+                  Sandbox'ı aç
+                </Button>
+              )
+            ) : (
+              onOpenChanges && (
+                <Button variant="outline" onClick={() => { onClose(); onOpenChanges(); }}>
+                  Değişiklikleri incele
+                </Button>
+              )
+            )}
+            <Button onClick={onClose}>Kapat</Button>
+          </DialogFooter>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

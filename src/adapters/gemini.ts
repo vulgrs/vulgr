@@ -19,6 +19,13 @@ export class GeminiAdapter extends BaseCliAdapter {
     return 'gemini';
   }
 
+  // Default mode pipes the prompt in: Gemini CLI runs one non-interactive turn
+  // when stdin isn't a terminal, and it's an npm .cmd shim on Windows, where a
+  // prompt passed as an argument would go through cmd.exe quoting.
+  protected get promptVia(): 'stdin' | 'arg' {
+    return this.promptMode === 'flag' ? 'stdin' : 'arg';
+  }
+
   /**
    * Constructs Gemini CLI arguments for non-interactive execution.
    */
@@ -34,9 +41,10 @@ export class GeminiAdapter extends BaseCliAdapter {
         break;
       case 'flag':
       default:
-        args = ['-p', prompt];
         break;
     }
+
+    if (options?.allowEdits) args.push('--approval-mode', 'auto_edit');
 
     if (this.extraArgs.length > 0) {
       args.push(...this.extraArgs);
