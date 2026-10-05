@@ -7,8 +7,9 @@ import {
   CheckCircle2Icon,
   ArrowRightIcon,
   SendIcon,
-  RefreshCwIcon,
   ZapIcon,
+  AlertTriangleIcon,
+  XCircleIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,30 +24,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.js';
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '@/components/ui/empty.js';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field.js';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from '@/components/ui/input-group.js';
-import { ScrollArea } from '@/components/ui/scroll-area.js';
-import { Separator } from '@/components/ui/separator.js';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field.js';
+import { Input } from '@/components/ui/input.js';
 import { Spinner } from '@/components/ui/spinner.js';
+import { Switch } from '@/components/ui/switch.js';
+import { Textarea } from '@/components/ui/textarea.js';
 import { OptionSelect, type OptionItem } from './OptionSelect.js';
 
 export interface AgentMessage {
   id: string;
   runId: string;
   from: 'claude' | 'agy' | 'gemini' | 'codex' | 'orchestrator';
-  to: 'claude' | 'agy' | 'gemini' | 'codex' | 'broadcast';
+  to: 'claude' | 'agy' | 'gemini' | 'codex' | 'broadcast' | 'orchestrator';
   type: string;
   payload: {
     summary: string;
@@ -58,40 +47,61 @@ export interface AgentMessage {
   timestamp: string;
 }
 
+interface MeshStatus {
+  stage: 'checking' | 'building' | 'verifying' | 'diagnosing' | 'repairing' | 'auditing' | 'done' | 'failed';
+  agent?: string;
+  round: number;
+  maxRounds: number;
+  text: string;
+}
+
+interface MeshResult {
+  success: boolean;
+  rounds: number;
+  audit?: 'approved' | 'rejected' | 'skipped';
+  error?: string;
+  sandbox?: { worktreePath: string; branchName: string };
+}
+
 interface AgentMeshModalProps {
   isOpen: boolean;
   onClose: () => void;
+  cwd?: string;
+  onOpenChanges?: () => void;
+  onOpenSandboxes?: () => void;
 }
 
-const BUILDER_ITEMS: OptionItem[] = [
-  { value: 'claude', label: 'Claude Code (Official)' },
-  { value: 'agy', label: 'AGY Engine (Official)' },
-  { value: 'gemini', label: 'Gemini (Official)' },
-  { value: 'codex', label: 'Codex CLI (Official)' },
-  { value: 'mock', label: 'Mock Simulator' },
+const AGENTS: OptionItem[] = [
+  { value: 'claude', label: 'Claude Code' },
+  { value: 'agy', label: 'AGY' },
+  { value: 'codex', label: 'Codex CLI' },
+  { value: 'gemini', label: 'Gemini CLI' },
 ];
 
-const VERIFIER_ITEMS: OptionItem[] = [
-  { value: 'agy', label: 'AGY Engine (Official)' },
-  { value: 'claude', label: 'Claude Code (Official)' },
-  { value: 'codex', label: 'Codex CLI (Official)' },
-  { value: 'mock', label: 'Mock Simulator' },
-];
-
-const AUDITOR_ITEMS: OptionItem[] = [
-  { value: 'gemini', label: 'Gemini (Official)' },
-  { value: 'codex', label: 'Codex CLI (Official)' },
-  { value: 'claude', label: 'Claude Code (Official)' },
-  { value: 'mock', label: 'Mock Simulator' },
+const ROUND_ITEMS: OptionItem[] = [
+  { value: '1', label: '1 tur' },
+  { value: '2', label: '2 tur' },
+  { value: '3', label: '3 tur' },
+  { value: '5', label: '5 tur' },
 ];
 
 const AGENT_META: Record<string, { icon: LucideIcon; label: string }> = {
-  claude: { icon: SparklesIcon, label: 'Claude Code' },
-  agy: { icon: ShieldIcon, label: 'AGY Engine' },
-  gemini: { icon: BotIcon, label: 'Gemini CLI' },
-  codex: { icon: BotIcon, label: 'Codex CLI' },
-  orchestrator: { icon: TerminalIcon, label: 'Orchestrator' },
-  broadcast: { icon: TerminalIcon, label: 'Broadcast' },
+  claude: { icon: SparklesIcon, label: 'Claude' },
+  agy: { icon: ShieldIcon, label: 'AGY' },
+  gemini: { icon: BotIcon, label: 'Gemini' },
+  codex: { icon: BotIcon, label: 'Codex' },
+  orchestrator: { icon: TerminalIcon, label: 'Vulgaris' },
+  broadcast: { icon: TerminalIcon, label: 'Herkes' },
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  USER_TASK: 'Görev verildi',
+  CODE_READY: 'Kod yazıldı',
+  VERIFICATION_FAILED: 'Test başarısız',
+  VERIFICATION_PASSED: 'Testler geçti',
+  PATCH_APPLIED: 'Düzeltme uygulandı',
+  SECURITY_CONCERN: 'Denetçi sorun buldu',
+  CONSENSUS_APPROVED: 'Onaylandı',
 };
 
 const AgentBadge: React.FC<{ agent: string }> = ({ agent }) => {
@@ -105,213 +115,325 @@ const AgentBadge: React.FC<{ agent: string }> = ({ agent }) => {
   );
 };
 
-export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({ isOpen, onClose }) => {
+const loadSetting = (key: string, fallback: string) => {
+  try {
+    return localStorage.getItem(`vulgaris.mesh.${key}`) || fallback;
+  } catch {
+    return fallback;
+  }
+};
+const saveSetting = (key: string, value: string) => {
+  try {
+    localStorage.setItem(`vulgaris.mesh.${key}`, value);
+  } catch {}
+};
+
+export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
+  isOpen,
+  onClose,
+  cwd,
+  onOpenChanges,
+  onOpenSandboxes,
+}) => {
   const [goal, setGoal] = useState('');
-  const [builder, setBuilder] = useState('claude');
-  const [verifier, setVerifier] = useState('agy');
-  const [auditor, setAuditor] = useState('gemini');
+  const [builder, setBuilder] = useState(() => loadSetting('builder', 'claude'));
+  const [verifier, setVerifier] = useState(() => loadSetting('verifier', 'agy'));
+  const [auditor, setAuditor] = useState(() => loadSetting('auditor', 'claude'));
+  const [verifyCmd, setVerifyCmd] = useState(() => loadSetting('verifyCmd', 'npm test'));
+  const [maxRounds, setMaxRounds] = useState(() => loadSetting('maxRounds', '3'));
+  const [useSandbox, setUseSandbox] = useState(false);
+  const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<MeshStatus | null>(null);
+  const [result, setResult] = useState<MeshResult | null>(null);
 
   const feedEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, status]);
+
+  // Only offer agents that are installed; fall back to the first installed
+  // one when a remembered choice isn't available on this machine.
+  useEffect(() => {
+    if (!isOpen || !window.warpApi?.getAvailableAgents) return;
+    window.warpApi.getAvailableAgents().then((map: Record<string, boolean>) => {
+      setAvailable(map);
+      const firstInstalled = AGENTS.find((a) => map[a.value])?.value;
+      if (!firstInstalled) return;
+      const fix = (value: string, set: (v: string) => void) => {
+        if (!map[value]) set(firstInstalled);
+      };
+      fix(builder, setBuilder);
+      fix(verifier, setVerifier);
+      fix(auditor, setAuditor);
+    }).catch(() => {});
+  }, [isOpen]);
 
   useEffect(() => {
     if (!window.warpApi) return;
-
-    const unsubscribe = window.warpApi.onMeshEvent((msg: AgentMessage) => {
-      setMessages((prev) => [...prev, msg]);
-      if (msg.type === 'CONSENSUS_APPROVED') {
-        setIsCompleted(true);
-        setIsRunning(false);
-        toast.success('Autonomous consensus achieved');
-      }
-    });
-
-    return () => unsubscribe();
+    const offEvent = window.warpApi.onMeshEvent((msg: AgentMessage) => setMessages((prev) => [...prev, msg]));
+    const offStatus = window.warpApi.onMeshStatus?.((s: MeshStatus) => setStatus(s));
+    return () => {
+      offEvent?.();
+      offStatus?.();
+    };
   }, []);
 
+  const installedItems = AGENTS.filter((a) => !available || available[a.value]);
+  const missing = available ? AGENTS.filter((a) => !available[a.value]).map((a) => a.label) : [];
+  const noneInstalled = available !== null && installedItems.length === 0;
+
   const handleStartMesh = async () => {
-    if (!goal.trim() || isRunning) return;
+    if (!goal.trim() || isRunning || noneInstalled) return;
+
+    saveSetting('builder', builder);
+    saveSetting('verifier', verifier);
+    saveSetting('auditor', auditor);
+    saveSetting('verifyCmd', verifyCmd);
+    saveSetting('maxRounds', maxRounds);
 
     setIsRunning(true);
     setMessages([]);
-    setIsCompleted(false);
-    setError(null);
+    setResult(null);
+    setStatus(null);
 
     try {
-      await window.warpApi.runAgentMesh({
+      const res: MeshResult = await window.warpApi.runAgentMesh({
         goal: goal.trim(),
         builder,
         verifier,
         auditor,
+        verifyCmd: verifyCmd.trim() || 'npm test',
+        maxRounds: Number(maxRounds) || 3,
+        useSandbox,
+        cwd,
       });
+      setResult(res);
+      if (res.success) toast.success(res.audit === 'rejected' ? 'Testler geçti, denetçi uyarı verdi' : 'Görev tamamlandı');
+      else toast.error('Görev tamamlanamadı');
     } catch (err: any) {
-      const message = err.message || String(err);
-      setError(message);
-      setIsRunning(false);
+      const message = err?.message || String(err);
+      setResult({ success: false, rounds: 0, error: message });
       toast.error(message);
+    } finally {
+      setIsRunning(false);
     }
   };
 
-  const lastSender = messages.length > 0 ? messages[messages.length - 1].from : null;
-
-  const pipeline = [
-    { id: 'orchestrator', label: 'Orchestrator', icon: <TerminalIcon data-icon="inline-start" /> },
-    { id: builder, label: builder, icon: <SparklesIcon data-icon="inline-start" />, role: 'Builder' },
-    { id: verifier, label: verifier, icon: <ShieldIcon data-icon="inline-start" />, role: 'Verifier' },
-    { id: auditor, label: auditor, icon: <BotIcon data-icon="inline-start" />, role: 'Auditor' },
-  ];
+  const roleField = (
+    id: string,
+    title: string,
+    help: string,
+    value: string,
+    onChange: (v: string) => void
+  ) => (
+    <Field>
+      <FieldLabel htmlFor={id}>{title}</FieldLabel>
+      <OptionSelect id={id} value={value} items={installedItems} disabled={isRunning || noneInstalled} onValueChange={onChange} />
+      <FieldDescription>{help}</FieldDescription>
+    </Field>
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
         <DialogHeader className="gap-2 border-b px-4 py-4 pr-12">
           <div className="flex flex-wrap items-center gap-2">
             <Badge>
               <ZapIcon data-icon="inline-start" />
-              Agent Mesh
+              Otomatik Görev
             </Badge>
-            <Badge variant="outline">Zero Human Intervention</Badge>
+            <Badge variant="outline">Arka planda, terminalsiz</Badge>
           </div>
-          <DialogTitle>Autonomous Multi-CLI Agent Mesh</DialogTitle>
-          <DialogDescription className="font-mono">
-            Asynchronous Inter-CLI Protocol · .ai-bridge/bus/messages.jsonl
+          <DialogTitle>Üç ajan, tek hedef</DialogTitle>
+          <DialogDescription>
+            Bir hedef yazın. <b>Yazan</b> ajan kodu yazar, test komutunuz çalıştırılır. Test başarısız olursa{' '}
+            <b>kontrol eden</b> ajan hatayı inceler ve yazan ajan düzeltir. Testler geçince <b>denetçi</b> ajan son
+            değişiklikleri gözden geçirir. Siz sadece sonucu takip edersiniz.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
-          <span className="text-xs text-muted-foreground">Pipeline</span>
-          {pipeline.map((node, index) => (
-            <React.Fragment key={`${node.role ?? 'lead'}-${node.id}`}>
-              {index > 0 && <ArrowRightIcon className="size-3 text-muted-foreground" />}
-              <Badge variant={lastSender === node.id ? 'default' : 'secondary'} className="capitalize">
-                {node.icon}
-                {node.label}
-                {node.role ? <span className="text-muted-foreground">({node.role})</span> : null}
-              </Badge>
-            </React.Fragment>
-          ))}
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-4 border-b px-4 py-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="mesh-goal">Hedef</FieldLabel>
+                <Textarea
+                  id="mesh-goal"
+                  value={goal}
+                  disabled={isRunning}
+                  rows={2}
+                  placeholder="örn. Kullanıcı kaydı için e-posta doğrulaması ekle ve testlerini yaz"
+                  onChange={(e) => setGoal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleStartMesh();
+                  }}
+                />
+              </Field>
 
-        <div className="flex flex-col gap-3 border-b px-4 py-4">
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="mesh-goal">Goal</FieldLabel>
-              <div className="flex items-center gap-2">
-                <InputGroup className="flex-1">
-                  <InputGroupAddon>
-                    <InputGroupText className="font-mono">❯</InputGroupText>
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    id="mesh-goal"
-                    value={goal}
-                    disabled={isRunning}
-                    placeholder="Assign high-level goal (e.g. 'JWT refresh token servisi ekle ve test et')..."
-                    className="font-mono"
-                    onChange={(e) => setGoal(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleStartMesh()}
-                  />
-                </InputGroup>
-                <Button disabled={!goal.trim() || isRunning} onClick={handleStartMesh}>
-                  {isRunning ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
-                  {isRunning ? 'Mesh Running...' : 'Start Autonomous Mesh'}
-                </Button>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {roleField('mesh-builder', '1. Yazan', 'Kodu yazar ve düzeltir', builder, setBuilder)}
+                {roleField('mesh-verifier', '2. Kontrol eden', 'Test hatalarını inceler, ne düzeltileceğini söyler', verifier, setVerifier)}
+                {roleField('mesh-auditor', '3. Denetçi', 'Testler geçince son kodu gözden geçirir', auditor, setAuditor)}
               </div>
-            </Field>
-          </FieldGroup>
 
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-end">
-            <Field>
-              <FieldLabel htmlFor="mesh-builder">Builder</FieldLabel>
-              <OptionSelect id="mesh-builder" value={builder} items={BUILDER_ITEMS} disabled={isRunning} onValueChange={setBuilder} />
-            </Field>
-            <ArrowRightIcon className="mb-2 hidden size-3 text-muted-foreground sm:block" />
-            <Field>
-              <FieldLabel htmlFor="mesh-verifier">Verifier</FieldLabel>
-              <OptionSelect id="mesh-verifier" value={verifier} items={VERIFIER_ITEMS} disabled={isRunning} onValueChange={setVerifier} />
-            </Field>
-            <ArrowRightIcon className="mb-2 hidden size-3 text-muted-foreground sm:block" />
-            <Field>
-              <FieldLabel htmlFor="mesh-auditor">Auditor</FieldLabel>
-              <OptionSelect id="mesh-auditor" value={auditor} items={AUDITOR_ITEMS} disabled={isRunning} onValueChange={setAuditor} />
-            </Field>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field className="sm:col-span-2">
+                  <FieldLabel htmlFor="mesh-verify">Test komutu</FieldLabel>
+                  <Input
+                    id="mesh-verify"
+                    value={verifyCmd}
+                    disabled={isRunning}
+                    placeholder="npm test"
+                    className="font-mono"
+                    onChange={(e) => setVerifyCmd(e.target.value)}
+                  />
+                  <FieldDescription>Başarılı sayılması için 0 koduyla çıkmalı (örn. npm test, npm run build)</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="mesh-rounds">En fazla deneme</FieldLabel>
+                  <OptionSelect id="mesh-rounds" value={maxRounds} items={ROUND_ITEMS} disabled={isRunning} onValueChange={setMaxRounds} />
+                </Field>
+              </div>
+
+              <Field orientation="horizontal">
+                <Switch id="mesh-sandbox" checked={useSandbox} disabled={isRunning} onCheckedChange={setUseSandbox} />
+                <div className="flex flex-col gap-0.5">
+                  <FieldLabel htmlFor="mesh-sandbox">Ayrı bir kopyada çalış (sandbox)</FieldLabel>
+                  <FieldDescription>
+                    Açıksa değişiklikler ana klasörünüze değil, ayrı bir git kopyasına yazılır; sonra Sandbox panelinden
+                    birleştirirsiniz. Not: o kopyada node_modules olmadığı için test komutu kurulum gerektirebilir.
+                  </FieldDescription>
+                </div>
+              </Field>
+            </FieldGroup>
+
+            {missing.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Bu bilgisayarda kurulu olmadığı için listede yok: {missing.join(', ')}.
+              </p>
+            )}
+            {noneInstalled && (
+              <Alert variant="destructive">
+                <XCircleIcon />
+                <AlertTitle>Hiç ajan bulunamadı</AlertTitle>
+                <AlertDescription>
+                  Claude Code, AGY, Codex veya Gemini CLI'dan en az birini kurun (örn. Claude Code için terminalde
+                  "npm install -g @anthropic-ai/claude-code").
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <span className="mr-auto text-xs text-muted-foreground">Ctrl+Enter ile de başlatabilirsiniz</span>
+              <Button disabled={!goal.trim() || isRunning || noneInstalled} onClick={handleStartMesh}>
+                {isRunning ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
+                {isRunning ? 'Çalışıyor...' : 'Görevi başlat'}
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {error && (
-          <div className="px-4 pt-4">
-            <Alert variant="destructive">
-              <AlertTitle>Mesh failed to start</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          </div>
-        )}
-
-        <ScrollArea className="min-h-80 flex-1">
           <div className="flex flex-col gap-3 p-4">
-            {messages.length === 0 ? (
-              <Empty className="border-0">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <RefreshCwIcon className={isRunning ? 'animate-spin' : ''} />
-                  </EmptyMedia>
-                  <EmptyTitle>Autonomous Inter-CLI Bus Ready</EmptyTitle>
-                  <EmptyDescription>
-                    Assign a goal above to start the loop. Builder writes code, Verifier executes tests, and Auditor inspects the git diff. If tests fail, patches are sent automatically.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              messages.map((msg) => {
-                const isError = msg.type === 'VERIFICATION_FAILED' || msg.type === 'SECURITY_CONCERN';
-                const isSuccess = msg.type === 'CONSENSUS_APPROVED' || msg.type === 'VERIFICATION_PASSED';
+            {messages.length === 0 && !isRunning && !result && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Görev başlayınca ajanların birbirine ne ilettiği burada adım adım görünür.
+              </p>
+            )}
 
-                return (
-                  <div key={msg.id} className="flex flex-col gap-2 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <AgentBadge agent={msg.from} />
-                        <ArrowRightIcon className="size-3 text-muted-foreground" />
-                        <AgentBadge agent={msg.to} />
-                        <Badge variant={isError ? 'destructive' : isSuccess ? 'default' : 'secondary'}>
-                          {msg.type}
-                        </Badge>
-                      </div>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {new Date(msg.timestamp).toLocaleTimeString()}
-                      </span>
+            {messages.map((msg) => {
+              const isError = msg.type === 'VERIFICATION_FAILED' || msg.type === 'SECURITY_CONCERN';
+              const isSuccess = msg.type === 'CONSENSUS_APPROVED' || msg.type === 'VERIFICATION_PASSED';
+              return (
+                <div key={msg.id} className="flex flex-col gap-2 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AgentBadge agent={msg.from} />
+                      <ArrowRightIcon className="size-3 text-muted-foreground" />
+                      <AgentBadge agent={msg.to} />
+                      <Badge variant={isError ? 'destructive' : isSuccess ? 'default' : 'secondary'}>
+                        {TYPE_LABELS[msg.type] ?? msg.type}
+                      </Badge>
                     </div>
-                    <p className="text-sm leading-relaxed">{msg.payload.summary}</p>
-                    {msg.payload.errorTrace && (
-                      <pre className="max-h-36 overflow-y-auto rounded-lg bg-muted p-2.5 font-mono text-xs whitespace-pre-wrap text-destructive">
-                        {msg.payload.errorTrace}
-                      </pre>
-                    )}
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {new Date(msg.timestamp).toLocaleTimeString()}
+                    </span>
                   </div>
-                );
-              })
+                  <p className="text-sm leading-relaxed">{msg.payload.summary}</p>
+                  {msg.payload.errorTrace && (
+                    <pre className="max-h-36 overflow-y-auto rounded-lg bg-muted p-2.5 font-mono text-xs whitespace-pre-wrap text-destructive">
+                      {msg.payload.errorTrace}
+                    </pre>
+                  )}
+                  {msg.payload.details && msg.type !== 'USER_TASK' && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">Ajanın yanıtını göster</summary>
+                      <pre className="mt-1.5 max-h-48 overflow-y-auto rounded-lg bg-muted p-2.5 font-mono whitespace-pre-wrap">
+                        {msg.payload.details}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
+
+            {isRunning && status && (
+              <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm">
+                <Spinner />
+                <span>{status.text}</span>
+                {status.round > 0 && (
+                  <span className="ml-auto font-mono text-xs text-muted-foreground">
+                    tur {status.round}/{status.maxRounds}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {result && !result.success && (
+              <Alert variant="destructive">
+                <XCircleIcon />
+                <AlertTitle>Görev tamamlanamadı</AlertTitle>
+                <AlertDescription>{result.error || 'Bilinmeyen bir hata oluştu.'}</AlertDescription>
+              </Alert>
+            )}
+            {result?.success && (
+              <Alert>
+                {result.audit === 'rejected' ? <AlertTriangleIcon /> : <CheckCircle2Icon />}
+                <AlertTitle>
+                  {result.audit === 'rejected'
+                    ? 'Testler geçti, ama denetçi bir sorun buldu'
+                    : `Tamamlandı: testler ${result.rounds}. turda geçti`}
+                </AlertTitle>
+                <AlertDescription>
+                  {result.sandbox
+                    ? 'Değişiklikler ayrı bir sandbox kopyasında. Sandbox panelinden inceleyip ana koda birleştirebilirsiniz.'
+                    : 'Değişiklikler proje klasörünüzde. "Değişiklikler" panelinden inceleyip commit edebilirsiniz.'}
+                  {result.audit === 'rejected' && ' Denetçinin notları yukarıdaki son mesajda.'}
+                </AlertDescription>
+              </Alert>
             )}
             <div ref={feedEndRef} />
           </div>
-        </ScrollArea>
+        </div>
 
-        {isCompleted && (
-          <>
-            <Separator />
-            <DialogFooter className="mx-0 mb-0 rounded-none">
-              <div className="mr-auto flex items-center gap-2 text-sm">
-                <CheckCircle2Icon className="size-4 text-primary" />
-                Autonomous consensus achieved. All tests passed and the code was audited.
-              </div>
-              <Button onClick={onClose}>Done</Button>
-            </DialogFooter>
-          </>
+        {result && (
+          <DialogFooter className="m-0 rounded-none border-t px-4 py-3">
+            {result.sandbox ? (
+              onOpenSandboxes && (
+                <Button variant="outline" onClick={() => { onClose(); onOpenSandboxes(); }}>
+                  Sandbox'ı aç
+                </Button>
+              )
+            ) : (
+              onOpenChanges && (
+                <Button variant="outline" onClick={() => { onClose(); onOpenChanges(); }}>
+                  Değişiklikleri incele
+                </Button>
+              )
+            )}
+            <Button onClick={onClose}>Kapat</Button>
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>

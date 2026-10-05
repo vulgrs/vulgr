@@ -13,6 +13,7 @@ interface PaneGridProps {
   onLaunchAgent?: (type: SessionType) => void;
   onRegisterCommandHandler?: (sessionId: string, handler: ((command: string) => void) | null) => void;
   onSessionState?: (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => void;
+  onCommandFinished?: (sessionId: string, result: { command?: string; exitCode: number; output: string }) => void;
 }
 
 const MIN_PANE_PCT = 12;
@@ -27,6 +28,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
   onLaunchAgent,
   onRegisterCommandHandler,
   onSessionState,
+  onCommandFinished,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{ index: number; startPos: number; sizes: number[]; axis: 'x' | 'y' } | null>(
@@ -197,6 +199,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
                 onPipeErrorToAgent={onPipeErrorToAgent}
                 onRegisterCommandHandler={onRegisterCommandHandler}
                 onSessionState={onSessionState}
+                onCommandFinished={onCommandFinished}
               />
           </div>
 

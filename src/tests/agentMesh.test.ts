@@ -4,6 +4,8 @@ import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { AgentMessageBus, type AgentMessage } from '../bus/agentMessageBus.js';
 import { AgentMesh } from '../engine/agentMesh.js';
+import { AdapterFactory } from '../adapters/factory.js';
+import { MockCliAdapter } from '../adapters/mock.js';
 
 describe('Autonomous Agent Mesh & Message Bus Suite', () => {
   const testWorkspace = join(process.cwd(), '.test-mesh-workspace');
@@ -77,6 +79,28 @@ describe('Autonomous Agent Mesh & Message Bus Suite', () => {
     assert.ok(messageTypes.includes('CODE_READY'));
     assert.ok(messageTypes.includes('VERIFICATION_PASSED'));
     assert.ok(messageTypes.includes('CONSENSUS_APPROVED'));
+  });
+
+  test('AgentMesh refuses to start when a chosen agent is not installed', async () => {
+    AdapterFactory.registerAdapter('ghost', () => {
+      const adapter = new MockCliAdapter('ghost');
+      adapter.isAvailable = async () => false;
+      return adapter;
+    });
+    const statuses: string[] = [];
+    const mesh = new AgentMesh({
+      builder: 'ghost',
+      verifier: 'mock',
+      auditor: 'mock',
+      verifyCmd: 'node -e "process.exit(0)"',
+      cwd: testWorkspace,
+      onStatus: (s) => statuses.push(s.stage),
+    });
+
+    const result = await mesh.runMesh('Anything');
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /ghost/);
+    assert.deepEqual(statuses, ['checking', 'failed']);
   });
 
   test('AgentMesh autonomously repairs failures between Builder and Verifier', async () => {

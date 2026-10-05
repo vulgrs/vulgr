@@ -1,4 +1,6 @@
 import { spawn, execSync } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
 import type { ICliAdapter, CliExecutionOptions, CliExecutionResult, CliAdapterConfig } from '../types/index.js';
 import { terminateChildProcessSafely } from '../utils/processTree.js';
 
@@ -9,6 +11,14 @@ export abstract class BaseCliAdapter implements ICliAdapter {
   protected readonly maxBufferBytes: number;
   protected readonly defaultEnv: Record<string, string>;
   protected readonly extraArgs: string[];
+  /**
+   * How the prompt reaches the CLI. 'stdin' (the default) pipes it in, so
+   * multi-line prompts with quotes survive intact on every platform; 'arg'
+   * passes it as a command-line argument for CLIs that can't read stdin.
+   */
+  protected get promptVia(): 'stdin' | 'arg' {
+    return 'stdin';
+  }
 
   constructor(config: CliAdapterConfig = {}) {
     this.binaryPath = config.binaryPath || this.getDefaultBinary();
@@ -29,18 +39,42 @@ export abstract class BaseCliAdapter implements ICliAdapter {
   protected abstract buildArgs(prompt: string, options?: CliExecutionOptions): string[];
 
   /**
+   * PATH including the per-user install locations agent CLIs use (an app
+   * started from the Start menu often doesn't have them).
+   */
+  protected buildPath(): string {
+    const home = os.homedir();
+    const extra = [
+      path.join(home, '.local', 'bin'),
+      path.join(home, 'AppData', 'Local', 'agy', 'bin'),
+      path.join(home, 'AppData', 'Roaming', 'npm'),
+      path.join(home, '.cargo', 'bin'),
+    ];
+    const key = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
+    return [...extra, process.env[key] || ''].filter(Boolean).join(path.delimiter);
+  }
+
+  /** Absolute path of the executable, or null when it isn't installed. */
+  resolveBinary(): string | null {
+    try {
+      const cmd = process.platform === 'win32' ? `where.exe ${this.binaryPath}` : `which ${this.binaryPath}`;
+      const out = execSync(cmd, {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env: { ...process.env, PATH: this.buildPath(), Path: this.buildPath() },
+        timeout: 5000,
+      });
+      return out.split(/\r?\n/).map((l) => l.trim()).find(Boolean) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Check if the CLI executable is available in PATH.
    */
   async isAvailable(): Promise<boolean> {
-    try {
-      const checkCmd = process.platform === 'win32'
-        ? `where.exe ${this.binaryPath}`
-        : `which ${this.binaryPath}`;
-      execSync(checkCmd, { stdio: 'ignore' });
-      return true;
-    } catch {
-      return false;
-    }
+    return this.resolveBinary() !== null;
   }
 
   /**
@@ -68,14 +102,25 @@ export abstract class BaseCliAdapter implements ICliAdapter {
     const maxBuffer = options.maxBufferBytes ?? this.maxBufferBytes;
     const cwd = options.cwd ?? process.cwd();
 
+    const fullPath = this.buildPath();
     const env = {
       ...process.env,
       ...this.defaultEnv,
       ...options.env,
+      PATH: fullPath,
+      Path: fullPath,
       CI: 'true', // Enforce non-interactive behavior in most CLIs
     };
 
     const args = [...this.buildArgs(prompt, options), ...(options.extraArgs ?? [])];
+    const stdinInput = options.stdinInput ?? (this.promptVia === 'stdin' ? prompt : undefined);
+
+    // Real executables are spawned directly so Node quotes every argument
+    // correctly. Only Windows .cmd/.bat shims (npm-installed CLIs) need a
+    // shell, and those always receive their prompt on stdin.
+    const resolved = this.resolveBinary();
+    const needsShell = process.platform === 'win32' && (!resolved || /\.(cmd|bat)$/i.test(resolved));
+    const command = resolved && !needsShell ? resolved : this.binaryPath;
 
     return new Promise<CliExecutionResult>((resolve) => {
       let stdout = '';
@@ -85,11 +130,11 @@ export abstract class BaseCliAdapter implements ICliAdapter {
       let isSettled = false;
 
       // Spawn process safely
-      const child = spawn(this.binaryPath, args, {
+      const child = spawn(command, args, {
         cwd,
         env,
-        // On Windows with .cmd/.bat or paths, shell can help resolve path correctly
-        shell: process.platform === 'win32',
+        shell: needsShell,
+        windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
@@ -119,8 +164,8 @@ export abstract class BaseCliAdapter implements ICliAdapter {
       });
 
       // Pass stdin input if supplied
-      if (options.stdinInput && child.stdin) {
-        child.stdin.write(options.stdinInput);
+      if (stdinInput && child.stdin) {
+        child.stdin.write(stdinInput);
         child.stdin.end();
       } else {
         child.stdin?.end();

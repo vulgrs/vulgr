@@ -11,6 +11,8 @@ export interface CliExecutionOptions {
   onStderr?: (chunk: string) => void;
   signal?: AbortSignal;
   stdinInput?: string;
+  /** Let the agent edit files without asking (builder role). Reviewers run read-only. */
+  allowEdits?: boolean;
   extraArgs?: string[];
 }
 
