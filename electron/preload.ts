@@ -10,6 +10,8 @@ export interface PtyCreateOptions {
 }
 
 export interface WarpApi {
+  platform: 'darwin' | 'win32' | 'linux';
+
   // PTY Interactive Terminal
   createTerminal: (options: PtyCreateOptions) => Promise<{ id: string; pid: number }>;
   writeTerminal: (id: string, data: string) => void;
@@ -116,6 +118,7 @@ export interface WarpApi {
 }
 
 const api: WarpApi = {
+  platform: process.platform as 'darwin' | 'win32' | 'linux',
   createTerminal: (options) => ipcRenderer.invoke('pty:create', options),
   writeTerminal: (id, data) => ipcRenderer.send('pty:write', { id, data }),
   resizeTerminal: (id, cols, rows) => ipcRenderer.send('pty:resize', { id, cols, rows }),

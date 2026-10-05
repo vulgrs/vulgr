@@ -80,7 +80,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenGuide,
 }) => {
   const [isMaximized, setIsMaximized] = useState(false);
-  const hasWindowControls = typeof window !== 'undefined' && !!window.warpApi?.windowMinimize;
+  const isMac =
+    (typeof window !== 'undefined' && window.warpApi?.platform === 'darwin') ||
+    (typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.userAgent));
+  const hasWindowControls = typeof window !== 'undefined' && !isMac && !!window.warpApi?.windowMinimize;
 
   useEffect(() => {
     if (!window.warpApi?.windowIsMaximized) return;
@@ -95,7 +98,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {/* Left: Brand & the three ways to automate work */}
-      <div className="flex items-center gap-1 min-w-0" style={noDrag}>
+      <div className={`flex items-center gap-1 min-w-0 ${isMac ? 'pl-[70px]' : ''}`} style={noDrag}>
         <div className="flex items-center gap-1.5 pl-1 pr-2 flex-shrink-0">
           <img src="./logo.png" alt="Vulgaris" className="w-5 h-5 object-contain" draggable={false} />
           <span className="text-[11px] font-semibold text-zinc-300">Vulgaris</span>
