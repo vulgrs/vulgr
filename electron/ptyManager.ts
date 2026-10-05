@@ -243,8 +243,8 @@ export class PtyManager {
     }
 
     const cwd = options.cwd || process.cwd();
-    const cols = options.cols || 80;
-    const rows = options.rows || 24;
+    const cols = Math.max(1, Math.floor(Number(options.cols) || 80));
+    const rows = Math.max(1, Math.floor(Number(options.rows) || 24));
 
     const pathKey = Object.keys(process.env).find((k) => k.toLowerCase() === 'path') || 'PATH';
     const currentPath = process.env[pathKey] || '';
@@ -316,12 +316,14 @@ export class PtyManager {
 
   resize(id: string, cols: number, rows: number) {
     const term = this.terminals.get(id);
-    if (term) {
-      try {
-        term.resize(cols, rows);
-      } catch (err) {
-        // Ignore resize race conditions
-      }
+    if (!term) return;
+    const safeCols = Math.max(1, Math.floor(Number(cols) || 0));
+    const safeRows = Math.max(1, Math.floor(Number(rows) || 0));
+    if (safeCols < 1 || safeRows < 1) return;
+    try {
+      term.resize(safeCols, safeRows);
+    } catch (err) {
+      // Ignore resize race conditions
     }
   }
 
