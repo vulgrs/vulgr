@@ -474,7 +474,9 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       const resizeObserver = new ResizeObserver(() => {
         try {
           fit.fit();
-          window.warpApi.resizeTerminal(session.id, term.cols, term.rows);
+          if (term.cols > 0 && term.rows > 0) {
+            window.warpApi.resizeTerminal(session.id, term.cols, term.rows);
+          }
         } catch {}
       });
       resizeObserver.observe(terminalRef.current);
@@ -488,7 +490,9 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
           const family = term.options.fontFamily || '';
           term.options.fontFamily = family.endsWith(' ') ? family.trimEnd() : family + ' ';
           fit.fit();
-          window.warpApi.resizeTerminal(session.id, term.cols, term.rows);
+          if (term.cols > 0 && term.rows > 0) {
+            window.warpApi.resizeTerminal(session.id, term.cols, term.rows);
+          }
         } catch {}
       };
       document.fonts?.addEventListener('loadingdone', remeasure);
