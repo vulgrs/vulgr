@@ -1,7 +1,8 @@
 import React, { useCallback, useRef } from 'react';
 import { XtermPane } from './XtermPane.js';
 import { Sparkles, Shield, Bot, Terminal } from 'lucide-react';
-import type { WorkspaceTab, SessionType } from '../types/warp.js';
+import type { WorkspaceTab, SessionType, TerminalSession } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface PaneGridProps {
   tab: WorkspaceTab;
@@ -14,6 +15,8 @@ interface PaneGridProps {
   onRegisterCommandHandler?: (sessionId: string, handler: ((command: string) => void) | null) => void;
   onSessionState?: (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => void;
   onCommandFinished?: (sessionId: string, result: { command?: string; exitCode: number; output: string }) => void;
+  /** Each pane's own command dock, rendered under its terminal (null for none). */
+  renderDock?: (session: TerminalSession) => React.ReactNode;
 }
 
 const MIN_PANE_PCT = 12;
@@ -29,7 +32,9 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
   onRegisterCommandHandler,
   onSessionState,
   onCommandFinished,
+  renderDock,
 }) => {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{ index: number; startPos: number; sizes: number[]; axis: 'x' | 'y' } | null>(
     null
@@ -38,11 +43,11 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
   if (tab.sessions.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 select-none font-sans">
-        <img src="./logo.png" alt="Vulgaris" className="w-20 h-20 object-contain mb-4" draggable={false} />
+        <img src="./logo-mark.svg" alt="Vulgr" className="logo-mark w-20 h-20 object-contain mb-4" draggable={false} />
 
-        <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">Workspace Ready</h2>
+        <h2 className="text-sm font-semibold text-zinc-100 tracking-wide">{t.workspace.workspaceReady}</h2>
         <p className="text-xs text-zinc-500 mt-1 max-w-sm text-center leading-relaxed">
-          Open an AI agent or shell terminal pane to start collaborating.
+          {t.workspace.workspaceReadyHint}
         </p>
 
         {onLaunchAgent && (
@@ -56,7 +61,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
               </div>
               <div>
                 <div className="text-xs font-semibold text-zinc-200">Claude Code</div>
-                <div className="text-[10px] text-zinc-500">Anthropic AI CLI</div>
+                <div className="text-[10px] text-zinc-500">{t.workspace.claudeSubtitle}</div>
               </div>
             </button>
 
@@ -68,8 +73,8 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
                 <Terminal size={16} />
               </div>
               <div>
-                <div className="text-xs font-semibold text-zinc-200">Interactive Shell</div>
-                <div className="text-[10px] text-zinc-500">macOS Zsh Terminal</div>
+                <div className="text-xs font-semibold text-zinc-200">{t.workspace.shellTitle}</div>
+                <div className="text-[10px] text-zinc-500">{t.workspace.shellSubtitle}</div>
               </div>
             </button>
           </div>
@@ -154,16 +159,19 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
       {tab.sessions.map((session, i) => (
         <React.Fragment key={session.id}>
           <div
-            className="min-h-0 min-w-0"
+            className="min-h-0 min-w-0 flex flex-col"
             style={
+              // Panes share what the dividers leave, in proportion to their sizes,
+              // so the row never overflows the window.
               isSplit
                 ? axis === 'x'
-                  ? { flex: `0 0 ${sizes[i]}%`, height: '100%' }
-                  : { flex: `0 0 ${sizes[i]}%`, width: '100%' }
+                  ? { flex: `${sizes[i]} 1 0`, height: '100%' }
+                  : { flex: `${sizes[i]} 1 0`, width: '100%' }
                 : { flex: '1 1 auto', width: '100%', height: '100%' }
             }
           >
-            <XtermPane
+            <div className="flex-1 min-h-0 min-w-0">
+              <XtermPane
                 session={session}
                 isActive={session.id === tab.activeSessionId}
                 isSplitView={isSplit}
@@ -175,6 +183,13 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
                 onSessionState={onSessionState}
                 onCommandFinished={onCommandFinished}
               />
+            </div>
+            {renderDock && (
+              // Typing in a pane's dock makes that pane the active one.
+              <div onMouseDownCapture={() => onSetActiveSession(session.id)} onFocusCapture={() => onSetActiveSession(session.id)}>
+                {renderDock(session)}
+              </div>
+            )}
           </div>
 
           {isSplit && i < count - 1 && (
@@ -183,7 +198,7 @@ export const PaneGrid: React.FC<PaneGridProps> = ({
               className={`group flex-shrink-0 flex items-center justify-center z-10 transition-colors ${
  axis === 'x' ? 'w-2.5 cursor-col-resize px-0.5' : 'h-2.5 cursor-row-resize py-0.5'
  }`}
-              title="Drag to resize"
+              title={t.workspace.dragToResize}
             >
               <div
                 className={`bg-zinc-800/80 group-hover:bg-zinc-500 transition-all rounded-full ${

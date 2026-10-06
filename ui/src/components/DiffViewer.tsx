@@ -9,6 +9,7 @@ import {
   RotateCcw,
   ChevronsUpDown,
 } from 'lucide-react';
+import { useI18n } from '../i18n/index.js';
 
 interface DiffViewerProps {
   diff: string;
@@ -148,6 +149,7 @@ function parseGitDiff(diffText: string): DiffFile[] {
 }
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) => {
+  const { t } = useI18n();
   const [copiedFile, setCopiedFile] = useState<string | null>(null);
   const [collapsedFiles, setCollapsedFiles] = useState<Record<string, boolean>>({});
 
@@ -159,9 +161,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) =>
         <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
           <Check size={18} className="text-emerald-500" />
         </div>
-        <p className="text-xs font-semibold text-zinc-300">Working tree clean</p>
+        <p className="text-xs font-semibold text-zinc-300">{t.workspace.treeClean}</p>
         <p className="text-[11px] text-zinc-500 mt-1 max-w-xs">
-          No modified, staged, or untracked files in the workspace.
+          {t.workspace.treeCleanHint}
         </p>
       </div>
     );
@@ -217,7 +219,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) =>
                 <button
                   onClick={() => copyDiff(file.filename, diff)}
                   className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
-                  title="Copy diff snippet"
+                  title={t.workspace.copyDiff}
                 >
                   {copiedFile === file.filename ? (
                     <Check size={12} className="text-emerald-400" />
@@ -229,7 +231,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) =>
                   <button
                     onClick={() => onRevertFile(file.filename)}
                     className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-red-950/30 transition-colors"
-                    title="Revert file changes"
+                    title={t.workspace.revertFile}
                   >
                     <RotateCcw size={12} />
                   </button>
@@ -246,7 +248,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) =>
                     {hunk.unmodifiedBefore && hunk.unmodifiedBefore > 0 && (
                       <div className="flex items-center space-x-2 px-3 py-1.5 bg-zinc-950/80 border-b border-zinc-900 text-[10px] text-zinc-500 select-none">
                         <ChevronsUpDown size={11} className="text-zinc-600" />
-                        <span>{hunk.unmodifiedBefore} unmodified lines</span>
+                        <span>{t.workspace.unmodifiedLines(hunk.unmodifiedBefore)}</span>
                       </div>
                     )}
 

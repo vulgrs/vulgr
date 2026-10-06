@@ -60,7 +60,7 @@ function getManagedZshDir(): string {
   }
   const zshrcPath = path.join(zshDir, '.zshrc');
   const zshrcContent = [
-    '# Vulgaris Terminal Integration for ZSH',
+    '# Vulgr Terminal Integration for ZSH',
     'set +e',
     'if [ -f "$HOME/.zprofile" ]; then',
     '  source "$HOME/.zprofile" 2>/dev/null || true',
@@ -94,7 +94,7 @@ function getManagedBashrcPath(): string {
   }
   const bashrcPath = path.join(bashDir, '.bashrc');
   const bashrcContent = [
-    '# Vulgaris Terminal Integration for Bash',
+    '# Vulgr Terminal Integration for Bash',
     'if [ -f "$HOME/.bash_profile" ]; then',
     '  source "$HOME/.bash_profile"',
     'elif [ -f "$HOME/.bashrc" ]; then',

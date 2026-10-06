@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/sheet.js';
 import { DiffViewer } from './DiffViewer.js';
 import type { SessionType } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface DiffDrawerProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
   onRevert,
   onSendDiffToAgent,
 }) => {
+  const { t } = useI18n();
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent side="right" className="w-full gap-0 p-0 data-[side=right]:sm:max-w-xl">
@@ -38,14 +40,14 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <Badge>
               <GitCompareIcon data-icon="inline-start" />
-              Diff
+              {t.workspace.diffBadge}
             </Badge>
             <Badge variant="outline">
-              {filesChanged.length} file{filesChanged.length === 1 ? '' : 's'}
+              {t.workspace.fileCount(filesChanged.length)}
             </Badge>
           </div>
-          <SheetTitle>Working Tree Diff & Cross-Check</SheetTitle>
-          <SheetDescription>Inspect uncommitted changes and run adversarial audits</SheetDescription>
+          <SheetTitle>{t.workspace.diffTitle}</SheetTitle>
+          <SheetDescription>{t.workspace.diffDescription}</SheetDescription>
         </SheetHeader>
 
         {filesChanged.length > 0 && (
@@ -66,7 +68,7 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
         </ScrollArea>
 
         <SheetFooter className="border-t">
-          <p className="text-xs text-muted-foreground">Cross-model adversarial audit pipes the diff to the target CLI.</p>
+          <p className="text-xs text-muted-foreground">{t.workspace.auditHint}</p>
           <div className="grid grid-cols-3 gap-2">
             <Button variant="outline" onClick={() => onSendDiffToAgent('claude')}>
               <SparklesIcon data-icon="inline-start" />
@@ -83,7 +85,7 @@ export const DiffDrawer: React.FC<DiffDrawerProps> = ({
           </div>
           <Button variant="destructive" onClick={onRevert}>
             <RotateCcwIcon data-icon="inline-start" />
-            Discard & Rollback Changes
+            {t.workspace.discard}
           </Button>
         </SheetFooter>
       </SheetContent>

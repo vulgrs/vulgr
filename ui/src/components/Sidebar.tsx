@@ -1,64 +1,55 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Plus,
-  Search,
-  Terminal,
-  Sparkles,
-  Shield,
-  Bot,
-  Settings,
-  Clock,
-  Folder,
-  FolderOpen,
-  FolderPlus,
-  File,
-  FileCode,
-  FileText,
-  ChevronRight,
-  ChevronDown,
-  RefreshCw,
-  Brain,
-  Trash2,
-  Copy,
-  Check,
-  History,
-  MessageSquare,
-  Layers,
-  Code2,
-} from 'lucide-react';
+import { Plus, FolderPlus, Brain, Trash2, Pencil, X } from 'lucide-react';
 import type {
   WorkspaceTab,
+  TerminalGroup,
   SessionType,
-  ProjectFileItem,
   PastProjectConversation,
   MemoryData,
 } from '../types/warp.js';
+import { ProfileCard } from './ProfileCard.js';
+import { useI18n } from '../i18n/index.js';
+import searchIcon from '../assets/sidebar/search.svg';
+import plusIcon from '../assets/sidebar/plus.svg';
+import sidebarToggleIcon from '../assets/sidebar/sidebar-toggle.svg';
+import duoLoopIcon from '../assets/sidebar/duo-loop.svg';
+import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
+import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
+import folderIcon from '../assets/sidebar/folder.svg';
+import chevronDownIcon from '../assets/sidebar/chevron-down.svg';
+import agentIcon from '../assets/sidebar/agent.svg';
+import branchIcon from '../assets/sidebar/branch.svg';
+import halftoneImage from '../assets/sidebar/halftone.png';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose?: () => void;
   onToggleSidebar?: () => void;
-  cwd: string;
   gitBranch: string | null;
   tabs: WorkspaceTab[];
   activeTabId: string;
   onSelectTab: (tabId: string) => void;
+  onCloseTab?: (tabId: string) => void;
+  /** Rename a terminal tab; an empty name brings back its automatic title. */
+  onRenameTab?: (tabId: string, name: string) => void;
+  /** Open a new terminal, filed under `groupId` when given. */
+  onNewTerminal?: (groupId?: string) => void;
+  groups?: TerminalGroup[];
+  /** Create an empty group and return its id (the sidebar then opens it for naming). */
+  onCreateGroup?: () => string;
+  onRenameGroup?: (groupId: string, name: string) => void;
+  /** Remove a group; its terminals stay open, ungrouped. */
+  onDeleteGroup?: (groupId: string) => void;
+  /** File a terminal under a group, or take it out of its group with null. */
+  onMoveTab?: (tabId: string, groupId: string | null) => void;
   onNewSession: (type?: SessionType) => void;
   onLaunchAgent?: (type: SessionType) => void;
   onOpenPalette: () => void;
   onOpenSquads: () => void;
+  onOpenMesh?: () => void;
   onOpenSkills: () => void;
   onOpenSettings: () => void;
   pastRuns?: any[];
-
-  // Project workspace
-  recentProjects?: string[];
-  onOpenProjectFolder?: () => void;
-  onSelectRecentProject?: (path: string) => void;
-  projectFiles?: ProjectFileItem[];
-  onRefreshFiles?: () => void;
-  onFileSelect?: (file: ProjectFileItem) => void;
-  onInsertFilePath?: (filePath: string) => void;
 
   // Conversations & Memory
   pastConversations?: PastProjectConversation[];
@@ -70,138 +61,167 @@ interface SidebarProps {
   onDeleteMemoryFact?: (key: string) => void;
 }
 
-type SidebarTab = 'sessions' | 'files' | 'memory';
+/** Terminals is the default view; Memory opens from the header icon. */
+type SidebarPanel = 'terminals' | 'memory';
 
-const typeMeta: Record<SessionType, { icon: React.ReactNode; chip: string; label: string }> = {
-  claude: { icon: <Sparkles size={11} className="text-white" />, chip: 'bg-orange-600/90', label: 'Claude Code' },
-  agy: { icon: <Shield size={11} className="text-white" />, chip: 'bg-blue-600/90', label: 'AGY Engine' },
-  codex: { icon: <Bot size={11} className="text-white" />, chip: 'bg-emerald-600/90', label: 'Codex CLI' },
-  shell: { icon: <Terminal size={11} className="text-white" />, chip: 'bg-zinc-600', label: 'Terminal' },
-};
+const COLLAPSED_GROUPS_KEY = 'vulgr.collapsedGroups';
+/** dataTransfer type carrying a dragged terminal's tab id. */
+const TAB_DRAG_TYPE = 'application/x-vulgr-tab';
 
-function getFileIcon(name: string, isDirectory: boolean) {
-  if (isDirectory) return <Folder size={12} className="text-amber-400 flex-shrink-0" />;
-  const ext = name.split('.').pop()?.toLowerCase();
-  if (['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs'].includes(ext || '')) {
-    return <FileCode size={12} className="text-sky-400 flex-shrink-0" />;
-  }
-  if (['json', 'yaml', 'yml', 'toml'].includes(ext || '')) {
-    return <Code2 size={12} className="text-emerald-400 flex-shrink-0" />;
-  }
-  if (['md', 'txt', 'log'].includes(ext || '')) {
-    return <FileText size={12} className="text-zinc-400 flex-shrink-0" />;
-  }
-  return <File size={12} className="text-zinc-400 flex-shrink-0" />;
-}
+/** The sidebar is laid out at the Figma frame's 1.4× scale, then enlarged uniformly for legibility. */
+const SIDEBAR_ZOOM = 1.25;
 
-// Recursive Tree Node Component
-const FileNode: React.FC<{
-  item: ProjectFileItem;
-  depth: number;
-  onFileSelect?: (item: ProjectFileItem) => void;
-  onInsertFilePath?: (path: string) => void;
-}> = ({ item, depth, onFileSelect, onInsertFilePath }) => {
-  const [expanded, setExpanded] = useState(depth < 1);
-  const [copied, setCopied] = useState(false);
+/** Design icon rendered at the sidebar's 1.4× scale of its Figma frame size. */
+const DesignIcon: React.FC<{ src: string; w: number; h: number; className?: string }> = ({
+  src,
+  w,
+  h,
+  className = '',
+}) => (
+  <img
+    src={src}
+    alt=""
+    draggable={false}
+    className={`flex-shrink-0 ${className}`}
+    style={{ width: w * 1.4, height: h * 1.4 }}
+  />
+);
 
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(item.relativePath || item.path);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
+/**
+ * Terminal card: agent icon + title, branch underneath. On hover it offers rename
+ * (also by double-clicking the title) and close; with `dragId` it can be dragged into a group.
+ */
+const SessionCard: React.FC<{
+  title: string;
+  meta: string;
+  active?: boolean;
+  untitled?: boolean;
+  tooltip?: string;
+  onClick: () => void;
+  onClose?: () => void;
+  closeLabel?: string;
+  /** Called with the new name; an empty string returns the card to its automatic title. */
+  onRename?: (name: string) => void;
+  renameLabel?: string;
+  /** Tab id put on the drag payload; the card is draggable only when set. */
+  dragId?: string;
+}> = ({ title, meta, active = false, untitled = false, tooltip, onClick, onClose, closeLabel, onRename, renameLabel, dragId }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const startEditing = () => {
+    if (!onRename) return;
+    setDraft(untitled ? '' : title);
+    setEditing(true);
+  };
+  const commit = () => {
+    setEditing(false);
+    if (draft.trim() !== (untitled ? '' : title)) onRename?.(draft.trim());
   };
 
-  const handleInsert = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onInsertFilePath) {
-      onInsertFilePath(item.relativePath || item.name);
-    }
-  };
-
-  if (item.isDirectory) {
-    return (
-      <div className="select-none font-mono text-[11px]">
-        <div
-          onClick={() => setExpanded(!expanded)}
-          style={{ paddingLeft: `${depth * 12 + 6}px` }}
-          className="flex items-center gap-1.5 py-1 px-1.5 rounded hover:bg-zinc-900/70 cursor-pointer text-zinc-300 hover:text-zinc-100 transition-colors group"
-        >
-          {expanded ? (
-            <ChevronDown size={11} className="text-zinc-500 group-hover:text-zinc-300 flex-shrink-0" />
-          ) : (
-            <ChevronRight size={11} className="text-zinc-500 group-hover:text-zinc-300 flex-shrink-0" />
-          )}
-          {expanded ? (
-            <FolderOpen size={12} className="text-amber-400 flex-shrink-0" />
-          ) : (
-            <Folder size={12} className="text-amber-400 flex-shrink-0" />
-          )}
-          <span className="truncate flex-1 font-medium">{item.name}</span>
-        </div>
-        {expanded && item.children && item.children.length > 0 && (
-          <div>
-            {item.children.map((child) => (
-              <FileNode
-                key={child.path}
-                item={child}
-                depth={depth + 1}
-                onFileSelect={onFileSelect}
-                onInsertFilePath={onInsertFilePath}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const titleClass = `text-[9px] leading-none ${active ? 'text-zinc-100' : 'text-zinc-500'}`;
 
   return (
     <div
-      onClick={() => onFileSelect?.(item)}
-      style={{ paddingLeft: `${depth * 12 + 20}px` }}
-      className="flex items-center gap-1.5 py-1 px-1.5 rounded hover:bg-zinc-900/70 cursor-pointer text-zinc-400 hover:text-zinc-200 transition-colors group font-mono text-[11px]"
-      title={`${item.relativePath || item.name} (${item.size ? Math.round(item.size / 1024) + ' KB' : ''})`}
+      className="group/card relative"
+      draggable={!!dragId && !editing}
+      onDragStart={(e) => {
+        if (!dragId) return;
+        e.dataTransfer.setData(TAB_DRAG_TYPE, dragId);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
     >
-      {getFileIcon(item.name, false)}
-      <span className="truncate flex-1">{item.name}</span>
-
-      <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
-        <button
-          onClick={handleCopy}
-          className="p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-          title="Göreli yolu kopyala"
-        >
-          {copied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-        </button>
-        {onInsertFilePath && (
-          <button
-            onClick={handleInsert}
-            className="p-0.5 rounded text-zinc-500 hover:text-sky-300 hover:bg-zinc-800 transition-colors"
-            title="Yolu komut kutusuna ekle"
-          >
-            <Plus size={10} />
-          </button>
-        )}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => !editing && onClick()}
+        onKeyDown={(e) => !editing && e.key === 'Enter' && onClick()}
+        title={editing ? undefined : tooltip}
+        className={`w-full h-[38px] flex flex-col justify-center gap-[3px] pl-[12px] ${
+          onClose || onRename ? 'pr-10' : 'pr-2'
+        } rounded-[7px] bg-base-elevated border text-left cursor-pointer transition-colors ${
+          active || editing ? 'border-zinc-600' : 'border-zinc-800 hover:border-zinc-700'
+        }`}
+      >
+        <div className="flex items-center gap-[5px] min-w-0">
+          <DesignIcon src={agentIcon} w={5} h={6} />
+          {editing ? (
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              onBlur={commit}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') setEditing(false);
+              }}
+              className={`${titleClass} flex-1 min-w-0 bg-transparent outline-none text-zinc-100`}
+            />
+          ) : (
+            <span
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                startEditing();
+              }}
+              className={`${titleClass} truncate ${untitled ? 'italic' : ''}`}
+            >
+              {title}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-[4px] pl-[12px] min-w-0">
+          <DesignIcon src={branchIcon} w={3} h={3} />
+          <span className="truncate text-[7px] leading-none text-zinc-500">{meta}</span>
+        </div>
       </div>
+      {!editing && (onRename || onClose) && (
+        <div className="absolute top-1/2 -translate-y-1/2 right-1.5 flex items-center opacity-0 group-hover/card:opacity-100 transition-opacity">
+          {onRename && (
+            <button
+              onClick={startEditing}
+              className="p-0.5 rounded text-zinc-600 hover:text-zinc-100 hover:bg-white/5"
+              title={renameLabel}
+            >
+              <Pencil size={9} />
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-0.5 rounded text-zinc-600 hover:text-zinc-100 hover:bg-white/5"
+              title={closeLabel}
+            >
+              <X size={10} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
-  cwd,
+  onToggleSidebar,
+  gitBranch,
   tabs,
   activeTabId,
   onSelectTab,
+  onCloseTab,
+  onRenameTab,
+  onNewTerminal,
+  groups = [],
+  onCreateGroup,
+  onRenameGroup,
+  onDeleteGroup,
+  onMoveTab,
   onNewSession,
+  onOpenSquads,
+  onOpenMesh,
   onOpenSettings,
-  recentProjects = [],
-  onOpenProjectFolder,
-  onSelectRecentProject,
-  projectFiles = [],
-  onRefreshFiles,
-  onFileSelect,
-  onInsertFilePath,
   pastConversations = [],
   onSelectConversation,
   projectMemory,
@@ -210,9 +230,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddMemoryFact,
   onDeleteMemoryFact,
 }) => {
-  const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('sessions');
+  const { t } = useI18n();
+  const typeLabel = t.common.sessionType;
+  const [panel, setPanel] = useState<SidebarPanel>('terminals');
+  // Folded groups are remembered between launches; every group starts open.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(COLLAPSED_GROUPS_KEY) || '[]');
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [groupDraft, setGroupDraft] = useState('');
+  // Drop target under the pointer while a terminal is dragged: a group id, or '' for "ungrouped".
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
-  const [recentMenuOpen, setRecentMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [newRuleInput, setNewRuleInput] = useState('');
   const [newFactKey, setNewFactKey] = useState('');
@@ -220,26 +254,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [addingFact, setAddingFact] = useState(false);
 
   useEffect(() => {
-    const handleOutside = () => {
-      setNewMenuOpen(false);
-      setRecentMenuOpen(false);
-    };
-    if (newMenuOpen || recentMenuOpen) {
-      window.addEventListener('click', handleOutside);
-      return () => window.removeEventListener('click', handleOutside);
-    }
-  }, [newMenuOpen, recentMenuOpen]);
+    if (!newMenuOpen) return;
+    const handleOutside = () => setNewMenuOpen(false);
+    window.addEventListener('click', handleOutside);
+    return () => window.removeEventListener('click', handleOutside);
+  }, [newMenuOpen]);
 
-  const projectName = useMemo(() => {
-    if (!cwd) return 'No Project';
-    const parts = cwd.split(/[\\/]/).filter(Boolean);
-    return parts[parts.length - 1] || cwd;
-  }, [cwd]);
+  const toggleGroup = (groupId: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      try {
+        localStorage.setItem(COLLAPSED_GROUPS_KEY, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+
+  const startRenamingGroup = (group: TerminalGroup) => {
+    setGroupDraft(group.name);
+    setRenamingGroupId(group.id);
+  };
+
+  const commitGroupName = () => {
+    if (renamingGroupId && groupDraft.trim()) onRenameGroup?.(renamingGroupId, groupDraft.trim());
+    setRenamingGroupId(null);
+  };
+
+  const handleCreateGroup = () => {
+    const id = onCreateGroup?.();
+    if (!id) return;
+    setPanel('terminals');
+    setGroupDraft(t.sidebar.newGroupName);
+    setRenamingGroupId(id);
+  };
+
+  // Drop-zone handlers for a group (id) or the ungrouped list ('').
+  const dropZone = (target: string) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(TAB_DRAG_TYPE)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dropTarget !== target) setDropTarget(target);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null);
+    },
+    onDrop: (e: React.DragEvent) => {
+      const tabId = e.dataTransfer.getData(TAB_DRAG_TYPE);
+      setDropTarget(null);
+      if (tabId) onMoveTab?.(tabId, target || null);
+    },
+  });
 
   const filteredTabs = useMemo(() => {
     if (!searchQuery.trim()) return tabs;
     const q = searchQuery.toLowerCase();
-    return tabs.filter((t) => t.title.toLowerCase().includes(q));
+    return tabs.filter((tab) => tab.title.toLowerCase().includes(q));
   }, [tabs, searchQuery]);
 
   const filteredPastConversations = useMemo(() => {
@@ -270,477 +341,401 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setAddingFact(false);
   };
 
+  const togglePanel = (next: SidebarPanel) => setPanel((p) => (p === next ? 'terminals' : next));
+
   if (!isOpen) return null;
 
+  const renderTabCard = (tab: WorkspaceTab) => {
+    const type = tab.sessions[0]?.type || 'shell';
+    return (
+      <SessionCard
+        key={tab.id}
+        dragId={onMoveTab ? tab.id : undefined}
+        title={tab.title || t.sidebar.untitled}
+        untitled={!tab.title}
+        meta={gitBranch || typeLabel[type]}
+        active={tab.id === activeTabId}
+        tooltip={`${typeLabel[type]}${tab.sessions.length > 1 ? ` · ${t.sidebar.panes(tab.sessions.length)}` : ''}`}
+        onClick={() => onSelectTab(tab.id)}
+        onClose={tabs.length > 1 && onCloseTab ? () => onCloseTab(tab.id) : undefined}
+        closeLabel={t.sidebar.closeTerminal}
+        onRename={onRenameTab ? (name) => onRenameTab(tab.id, name) : undefined}
+        renameLabel={t.sidebar.renameTerminal}
+      />
+    );
+  };
+
+  const modes = [
+    { label: 'Duo Loop', icon: duoLoopIcon, w: 7, h: 5.47, onClick: onOpenSquads, title: t.sidebar.duoLoopHint },
+    { label: 'Agent Swarm', icon: agentSwarmIcon, w: 7, h: 8, onClick: onOpenMesh, title: t.sidebar.agentSwarmHint },
+    { label: 'Orchestrator', icon: orchestratorIcon, w: 7, h: 8, onClick: undefined, title: t.sidebar.orchestratorHint },
+  ];
+
   return (
-    <div className="w-64 bg-base-app border-r border-zinc-900 flex flex-col h-full select-none text-xs text-zinc-300 z-20 flex-shrink-0 animate-slide-in-left">
-      {/* Project Switcher Bar */}
-      <div className="p-2 border-b border-zinc-900 flex items-center justify-between gap-1 flex-shrink-0 bg-zinc-950/60">
-        <div
-          className="relative flex-1 min-w-0"
-          onClick={(e) => e.stopPropagation()}
-        >
+    <div
+      style={{ zoom: SIDEBAR_ZOOM }}
+      className="relative w-64 bg-base-app border-r border-zinc-900 flex flex-col h-full select-none font-['Geist_Mono',ui-monospace,monospace] text-zinc-100 z-20 flex-shrink-0 animate-slide-in-left overflow-hidden">
+      {/* Halftone artwork behind the profile card; its gray dots are lightened on the dark theme. */}
+      <img
+        src={halftoneImage}
+        alt=""
+        draggable={false}
+        className="absolute left-[3px] bottom-0 w-full h-[188px] object-cover object-bottom brightness-[2.6] [.light_&]:brightness-100 pointer-events-none"
+      />
+
+      {/* Search + New / Toggle bar */}
+      <div className="relative flex h-[21px] flex-shrink-0 bg-base-elevated border-b border-zinc-800">
+        <label className="flex-1 min-w-0 flex items-center gap-[7px] pl-[10px] pr-2 border-r border-zinc-800 cursor-text">
+          <DesignIcon src={searchIcon} w={7} h={7} />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t.sidebar.search}
+            className="flex-1 min-w-0 bg-transparent text-[9px] text-zinc-100 placeholder:text-zinc-600 outline-none"
+          />
+        </label>
+
+        <div className="w-[60px] flex items-center justify-end gap-[19px] pr-[0px]">
+          <div className="relative flex" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setNewMenuOpen(!newMenuOpen)}
+              className="p-0.5 rounded hover:bg-white/5 transition-colors"
+              title={t.sidebar.newSession}
+            >
+              <DesignIcon src={plusIcon} w={7} h={7} className="-scale-x-100" />
+            </button>
+
+            {newMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-52 rounded-[12px] bg-base-elevated border border-zinc-800 shadow-lg p-1.5 z-50 text-[10px] animate-slide-in-up">
+                <div className="px-2 py-1 text-[8px] text-zinc-500 uppercase tracking-wider">{t.sidebar.launchAgent}</div>
+                {(['claude', 'agy', 'shell', 'codex'] as SessionType[]).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      onNewSession(type);
+                      setNewMenuOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-[7px] text-zinc-100 hover:bg-white/5 text-left transition-colors"
+                  >
+                    <DesignIcon src={agentIcon} w={5} h={6} />
+                    <span>{typeLabel[type]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button
-            onClick={() => setRecentMenuOpen(!recentMenuOpen)}
-            className="w-full flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-zinc-900 text-left transition-colors group min-w-0"
-            title={`Active Project: ${cwd || 'Not selected'}`}
+            onClick={onToggleSidebar}
+            className="p-0.5 rounded hover:bg-white/5 transition-colors"
+            title={t.sidebar.hideSidebar}
           >
-            <Folder size={13} className="text-amber-400 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold text-zinc-100 truncate leading-tight group-hover:text-white">
-                {projectName}
-              </div>
-              <div className="text-[9px] text-zinc-500 font-mono truncate leading-none">
-                {cwd || 'Click to select project'}
-              </div>
-            </div>
-            <ChevronDown size={11} className="text-zinc-500 group-hover:text-zinc-300 flex-shrink-0" />
+            <DesignIcon src={sidebarToggleIcon} w={8} h={7} className="-scale-x-100" />
           </button>
+        </div>
+      </div>
 
-          {/* Recent Projects Dropdown */}
-          {recentMenuOpen && (
-            <div className="absolute left-0 mt-1 w-64 rounded-xl bg-base-elevated border border-zinc-800 shadow-2xl p-1.5 z-50 text-xs font-sans animate-slide-in-up">
-              <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-                <span>Son Projeler</span>
-                <span className="text-[9px] font-mono text-zinc-600">{recentProjects.length}</span>
-              </div>
-
-              <div className="max-h-52 overflow-y-auto space-y-0.5 my-1">
-                {recentProjects.map((p) => {
-                  const name = p.split(/[\\/]/).filter(Boolean).pop() || p;
-                  const isActive = p.toLowerCase() === cwd.toLowerCase();
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => {
-                        onSelectRecentProject?.(p);
-                        setRecentMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
-                        isActive
-                          ? 'bg-zinc-800/80 text-white font-medium'
-                          : 'text-zinc-300 hover:text-white hover:bg-zinc-900'
-                      }`}
-                      title={p}
-                    >
-                      <Folder size={12} className={isActive ? 'text-amber-400' : 'text-zinc-500'} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[11px] truncate">{name}</div>
-                        <div className="text-[9px] text-zinc-500 font-mono truncate">{p}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-                {recentProjects.length === 0 && (
-                  <div className="px-2 py-3 text-center text-zinc-600 text-[11px]">
-                    Henüz açılmış bir proje yok.
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-zinc-800/80 pt-1 mt-1">
-                <button
-                  onClick={() => {
-                    setRecentMenuOpen(false);
-                    onOpenProjectFolder?.();
-                  }}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sky-400 hover:text-sky-300 hover:bg-sky-950/30 transition-colors text-left font-medium"
-                >
-                  <FolderPlus size={13} />
-                  <span>Open Folder from Computer...</span>
-                </button>
-              </div>
-            </div>
-          )}
+      {/* Scrollable content */}
+      <div className="relative flex-1 min-h-0 overflow-y-auto pb-3">
+        {/* Modes */}
+        <div className="px-[7px] pt-[10px] space-y-[3px]">
+          {modes.map((m) => (
+            <button
+              key={m.label}
+              onClick={m.onClick}
+              title={m.title}
+              className="w-full h-[21px] flex items-center gap-[7px] pl-[10px] rounded-[7px] border border-transparent text-left transition-colors hover:bg-base-elevated hover:border-zinc-800"
+            >
+              <span className="w-[10px] flex justify-center">
+                <DesignIcon src={m.icon} w={m.w} h={m.h} />
+              </span>
+              <span className="text-[10px] text-zinc-300">{m.label}</span>
+            </button>
+          ))}
         </div>
 
-        {/* Quick Open Folder Button */}
-        <button
-          onClick={onOpenProjectFolder}
-          className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800/60 transition-colors flex-shrink-0"
-          title="Diskten bir proje klasörü seçin"
-        >
-          <FolderPlus size={13} />
-        </button>
-      </div>
-
-      {/* 3-Way Sub-tab Navigation */}
-      <div className="flex border-b border-zinc-900 bg-zinc-950/40 text-[11px] font-medium flex-shrink-0">
-        <button
-          onClick={() => setActiveSidebarTab('sessions')}
-          className={`flex-1 py-1.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-            activeSidebarTab === 'sessions'
-              ? 'border-sky-500 text-sky-400 bg-zinc-900/40'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
-          title="Açık terminaller ve yapay zekâya verdiğiniz önceki istekler"
-        >
-          <MessageSquare size={11} />
-          <span>Oturumlar</span>
-          {tabs.length > 0 && (
-            <span className="text-[9px] px-1 rounded-full bg-zinc-800 text-zinc-400">
-              {tabs.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveSidebarTab('files')}
-          className={`flex-1 py-1.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-            activeSidebarTab === 'files'
-              ? 'border-sky-500 text-sky-400 bg-zinc-900/40'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
-          title="Proje dosyaları — tıklayınca yol komut kutusuna eklenir"
-        >
-          <Folder size={11} />
-          <span>Dosyalar</span>
-          {projectFiles.length > 0 && (
-            <span className="text-[9px] px-1 rounded-full bg-zinc-800 text-zinc-400">
-              {projectFiles.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveSidebarTab('memory')}
-          className={`flex-1 py-1.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-            activeSidebarTab === 'memory'
-              ? 'border-sky-500 text-sky-400 bg-zinc-900/40'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'
-          }`}
-          title="Ajanların bu proje hakkında hatırlayacağı kurallar ve bilgiler"
-        >
-          <Brain size={11} />
-          <span>Hafıza</span>
-          {projectMemory?.rules && projectMemory.rules.length > 0 && (
-            <span className="text-[9px] px-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-              {projectMemory.rules.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Main Tab Content */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        {/* ==================== SESSIONS & HISTORY TAB ==================== */}
-        {activeSidebarTab === 'sessions' && (
-          <div className="flex-1 flex flex-col min-h-0">
-            {/* Search + New Session */}
-            <div className="p-2 flex items-center gap-1.5 flex-shrink-0 border-b border-zinc-900/60">
-              <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 min-w-0">
-                <Search size={12} className="text-zinc-500 flex-shrink-0" />
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Konuşmalarda ara..."
-                  className="flex-1 min-w-0 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none"
-                />
-              </div>
-
-              <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        {/* Actions row: new terminal, new group, memory (no heading over the terminal list) */}
+        <div className="flex items-center justify-between pl-[17px] pr-[10px] mt-[12px] mb-[6px] min-h-[14px]">
+          <span className="text-[9px] text-zinc-300">{panel === 'memory' ? t.sidebar.memory : ''}</span>
+          <div className="flex items-center gap-0.5">
+            {panel === 'terminals' && (
+              <>
                 <button
-                  onClick={() => setNewMenuOpen(!newMenuOpen)}
-                  className="p-1.5 rounded-md bg-zinc-900/60 border border-zinc-800/60 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
-                  title="Yeni oturum — Claude, AGY, Codex veya terminal"
+                  onClick={() => onNewTerminal?.()}
+                  className="p-0.5 rounded text-zinc-500 hover:text-zinc-100 hover:bg-base-elevated transition-colors"
+                  title={t.sidebar.newTerminal}
                 >
-                  <Plus size={13} />
+                  <Plus size={10} />
                 </button>
-
-                {newMenuOpen && (
-                  <div className="absolute right-0 mt-1.5 w-52 rounded-xl bg-base-elevated border border-zinc-800 shadow-2xl p-1.5 z-50 text-xs font-sans animate-slide-in-up">
-                    <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                      Launch Agent
-                    </div>
-
-                    {(['claude', 'agy', 'shell', 'codex'] as SessionType[]).map((type) => {
-                      const meta = typeMeta[type];
-                      return (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            onNewSession(type);
-                            setNewMenuOpen(false);
-                          }}
-                          className="w-full flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-900 text-left transition-colors group"
-                        >
-                          <div className={`w-5 h-5 rounded flex items-center justify-center ${meta.chip}`}>
-                            {meta.icon}
-                          </div>
-                          <span className="text-xs font-medium text-zinc-200">{meta.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Session Lists */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-3 font-sans">
-              {/* Active Tabs */}
-              <div>
-                <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 flex items-center justify-between">
-                  <span>Açık Sekmeler</span>
-                  <span className="text-[9px] font-mono text-zinc-600">{filteredTabs.length}</span>
-                </div>
-
-                <div className="space-y-0.5">
-                  {filteredTabs.map((tab) => {
-                    const isActive = tab.id === activeTabId;
-                    const firstSession = tab.sessions[0];
-                    const sessionType = firstSession?.type || 'shell';
-                    const meta = typeMeta[sessionType];
-
-                    return (
-                      <div
-                        key={tab.id}
-                        onClick={() => onSelectTab(tab.id)}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
-                          isActive
-                            ? 'bg-zinc-900 border border-zinc-800 shadow-sm'
-                            : 'border border-transparent hover:bg-zinc-900/50'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${meta.chip}`}>
-                          {meta.icon}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className={`text-[11px] truncate ${isActive ? 'text-zinc-100 font-medium' : 'text-zinc-400'}`}>
-                            {tab.title}
-                          </div>
-                          <div className="text-[10px] text-zinc-600 truncate">
-                            {meta.label}
-                            {tab.sessions.length > 1 ? ` · ${tab.sessions.length} panes` : ''}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {filteredTabs.length === 0 && (
-                    <div className="px-2 py-2 text-[11px] text-zinc-600">
-                      Aramayla eşleşen sekme yok.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Past Project Conversations */}
-              <div>
-                <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 flex items-center justify-between">
-                  <span>Geçmiş İstekler</span>
-                  <span className="text-[9px] font-mono text-zinc-600">{filteredPastConversations.length}</span>
-                </div>
-
-                <div className="space-y-1">
-                  {filteredPastConversations.map((conv) => {
-                    const meta = typeMeta[conv.agent] || typeMeta.shell;
-                    const timeStr = new Date(conv.timestamp).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
-
-                    return (
-                      <div
-                        key={conv.id}
-                        onClick={() => onSelectConversation?.(conv)}
-                        className="p-2 rounded-lg border border-zinc-900 hover:border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60 cursor-pointer transition-all group"
-                      >
-                        <div className="flex items-center justify-between gap-1.5 mb-1">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${meta.chip}`}>
-                              {meta.icon}
-                            </div>
-                            <span className="text-[10px] font-semibold text-zinc-300 truncate">
-                              {conv.title || conv.agent}
-                            </span>
-                          </div>
-                          <span className="text-[9px] text-zinc-600 font-mono flex-shrink-0">
-                            {timeStr}
-                          </span>
-                        </div>
-
-                        <div className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
-                          {conv.prompt || conv.summary || 'Session record'}
-                        </div>
-
-                        {conv.summary && (
-                          <div className="mt-1 text-[10px] text-zinc-500 italic truncate">
-                            ↳ {conv.summary}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {filteredPastConversations.length === 0 && (
-                    <div className="px-2 py-4 text-center text-zinc-600 text-[11px] leading-relaxed">
-                      Bu projede henüz bir istek yok. Komut kutusuna isteğinizi yazıp Ctrl+Shift+Enter ile Claude'a sorduğunuzda burada listelenir; tıklayarak tekrar sorabilirsiniz.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+                <button
+                  onClick={handleCreateGroup}
+                  className="p-0.5 rounded text-zinc-500 hover:text-zinc-100 hover:bg-base-elevated transition-colors"
+                  title={t.sidebar.newGroup}
+                >
+                  <FolderPlus size={10} />
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => togglePanel('memory')}
+              className={`p-0.5 rounded transition-colors ${
+                panel === 'memory' ? 'bg-base-elevated text-zinc-100' : 'text-zinc-500 hover:text-zinc-100 hover:bg-base-elevated'
+              }`}
+              title={t.sidebar.memoryHint}
+            >
+              <Brain size={10} />
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* ==================== PROJECT FILES TAB ==================== */}
-        {activeSidebarTab === 'files' && (
-          <div className="flex-1 flex flex-col min-h-0">
-            {/* File Actions Bar */}
-            <div className="p-2 flex items-center justify-between border-b border-zinc-900/60 flex-shrink-0">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 font-mono">
-                Project Files
-              </span>
-              <button
-                onClick={onRefreshFiles}
-                className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-                title="Dosya listesini yenile"
-              >
-                <RefreshCw size={11} />
-              </button>
-            </div>
+        {/* ==================== TERMINALS & GROUPS ==================== */}
+        {panel === 'terminals' && (
+          <div className="pl-[17px] pr-[10px] space-y-[10px]">
+            {/* Ungrouped terminals (also the drop zone that takes a terminal out of its group) */}
+            <div
+              {...dropZone('')}
+              className={`space-y-[7px] rounded-[9px] transition-colors ${
+                dropTarget === '' ? 'bg-white/5 outline outline-1 outline-dashed outline-zinc-700' : ''
+              }`}
+            >
+              {filteredTabs
+                .filter((tab) => !tab.groupId || !groups.some((g) => g.id === tab.groupId))
+                .map((tab) => renderTabCard(tab))}
 
-            {/* Tree View */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-1 py-1.5">
-              {projectFiles.length > 0 ? (
-                projectFiles.map((item) => (
-                  <FileNode
-                    key={item.path}
-                    item={item}
-                    depth={0}
-                    onFileSelect={onFileSelect}
-                    onInsertFilePath={onInsertFilePath}
-                  />
-                ))
-              ) : (
-                <div className="p-6 text-center text-zinc-600 text-[11px] space-y-2">
-                  <p>Henüz bir proje klasörü seçilmedi.</p>
-                  <button
-                    onClick={onOpenProjectFolder}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
-                  >
-                    <FolderPlus size={12} />
-                    <span>Klasör Aç</span>
-                  </button>
-                </div>
+              {filteredPastConversations.map((conv) => (
+                <SessionCard
+                  key={conv.id}
+                  title={conv.title || conv.prompt || conv.agent}
+                  meta={`${gitBranch ? `${gitBranch} · ` : ''}${new Date(conv.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`}
+                  tooltip={conv.prompt || conv.summary}
+                  onClick={() => onSelectConversation?.(conv)}
+                />
+              ))}
+
+              {tabs.length === 0 && (
+                <button
+                  onClick={() => onNewTerminal?.()}
+                  className="w-full h-[30px] flex items-center justify-center gap-1.5 rounded-[7px] border border-dashed border-zinc-800 text-[8px] text-zinc-500 hover:text-zinc-100 hover:border-zinc-700 transition-colors"
+                >
+                  <Plus size={10} />
+                  {t.sidebar.newTerminal}
+                </button>
+              )}
+              {searchQuery.trim() && filteredTabs.length === 0 && filteredPastConversations.length === 0 && (
+                <div className="py-1 text-[8px] text-zinc-600">{t.sidebar.noMatchingSessions}</div>
               )}
             </div>
+
+            {/* Groups */}
+            {groups.map((group) => {
+              const groupTabs = filteredTabs.filter((tab) => tab.groupId === group.id);
+              if (searchQuery.trim() && groupTabs.length === 0) return null;
+              // While searching, groups with matches are shown open.
+              const open = searchQuery.trim() ? true : !collapsedGroups.has(group.id);
+              const renaming = renamingGroupId === group.id;
+              return (
+                <div
+                  key={group.id}
+                  {...dropZone(group.id)}
+                  className={`rounded-[9px] transition-colors ${
+                    dropTarget === group.id ? 'bg-white/5 outline outline-1 outline-dashed outline-zinc-700' : ''
+                  }`}
+                >
+                  <div className="group/folder flex items-center gap-1 h-[14px]">
+                    <button
+                      onClick={() => !renaming && toggleGroup(group.id)}
+                      onDoubleClick={() => startRenamingGroup(group)}
+                      className="flex items-center gap-[8px] min-w-0 flex-1 text-left"
+                    >
+                      <DesignIcon src={folderIcon} w={7} h={6.13} />
+                      {renaming ? (
+                        <input
+                          autoFocus
+                          value={groupDraft}
+                          onChange={(e) => setGroupDraft(e.target.value)}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={commitGroupName}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') commitGroupName();
+                            if (e.key === 'Escape') setRenamingGroupId(null);
+                          }}
+                          className="flex-1 min-w-0 bg-transparent outline-none text-[9px] text-zinc-100 border-b border-zinc-600"
+                        />
+                      ) : (
+                        <>
+                          <span className="truncate text-[9px] text-zinc-100">{group.name}</span>
+                          <span className="text-[7px] text-zinc-600 flex-shrink-0">{groupTabs.length}</span>
+                          <DesignIcon
+                            src={chevronDownIcon}
+                            w={4}
+                            h={2}
+                            className={`transition-transform ${open ? '' : '-rotate-90'}`}
+                          />
+                        </>
+                      )}
+                    </button>
+                    {!renaming && (
+                      <div className="flex items-center flex-shrink-0">
+                        <button
+                          onClick={() => onNewTerminal?.(group.id)}
+                          className="p-0.5 rounded text-zinc-500 hover:text-zinc-100 hover:bg-base-elevated"
+                          title={t.sidebar.newTerminalInGroup}
+                        >
+                          <Plus size={10} />
+                        </button>
+                        <div className="flex items-center opacity-0 group-hover/folder:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => startRenamingGroup(group)}
+                            className="p-0.5 rounded text-zinc-500 hover:text-zinc-100 hover:bg-base-elevated"
+                            title={t.sidebar.renameGroup}
+                          >
+                            <Pencil size={9} />
+                          </button>
+                          <button
+                            onClick={() => onDeleteGroup?.(group.id)}
+                            className="p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-base-elevated"
+                            title={t.sidebar.deleteGroup}
+                          >
+                            <Trash2 size={9} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    inert={!open}
+                    className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${
+                      open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                    }`}
+                  >
+                    <div className="min-h-0 overflow-hidden">
+                      <div className="pt-[7px] space-y-[7px]">
+                        {groupTabs.map((tab) => renderTabCard(tab))}
+                        {groupTabs.length === 0 && (
+                          <button
+                            onClick={() => onNewTerminal?.(group.id)}
+                            className="w-full h-[30px] flex items-center justify-center gap-1.5 rounded-[7px] border border-dashed border-zinc-800 text-[8px] text-zinc-500 hover:text-zinc-100 hover:border-zinc-700 transition-colors"
+                          >
+                            <Plus size={10} />
+                            {t.sidebar.emptyGroup}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* ==================== PROJECT MEMORY TAB ==================== */}
-        {activeSidebarTab === 'memory' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-2.5 space-y-4">
-            {/* Memory Info Banner */}
-            <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-900 text-[11px] space-y-1">
-              <div className="flex items-center gap-1.5 text-zinc-200 font-medium">
-                <Brain size={12} className="text-emerald-400 flex-shrink-0" />
-                <span>Proje Kuralları</span>
-              </div>
-              <p className="text-zinc-500 text-[10px] leading-relaxed">
-                Rules and facts saved in <code className="text-zinc-400 font-mono">.vulgaris-memory.json</code> are
-                automatically injected into prompts when invoking Claude Code, AGY, and Shell.
-              </p>
-            </div>
+        {/* ==================== PROJECT MEMORY ==================== */}
+        {panel === 'memory' && (
+          <div className="px-[10px] space-y-4 text-[9px]">
+            <p className="text-zinc-500 leading-relaxed">
+              {t.sidebar.memoryIntro} <code className="text-zinc-300">.vulgaris-memory.json</code>{' '}
+              {t.sidebar.memoryIntroRest}
+            </p>
 
-            {/* Rules Section */}
+            {/* Rules */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                <span>Rules & Standards</span>
-                <span className="font-mono text-zinc-600">
-                  {projectMemory?.rules?.length || 0}
-                </span>
+              <div className="flex items-center justify-between text-[8px] uppercase tracking-wider text-zinc-500">
+                <span>{t.sidebar.rules}</span>
+                <span>{projectMemory?.rules?.length || 0}</span>
               </div>
 
-              {/* Add Rule Form */}
               <form onSubmit={handleAddRule} className="flex gap-1.5">
                 <input
                   type="text"
                   value={newRuleInput}
                   onChange={(e) => setNewRuleInput(e.target.value)}
-                  placeholder="örn. Testleri her zaman Vitest ile yaz..."
-                  className="flex-1 bg-zinc-950 border border-zinc-800/80 rounded-md px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-emerald-600"
+                  placeholder={t.sidebar.rulePlaceholder}
+                  className="flex-1 min-w-0 bg-base-elevated border border-zinc-800 rounded-[5px] px-2 py-1 text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-zinc-600"
                 />
                 <button
                   type="submit"
                   disabled={!newRuleInput.trim()}
-                  className="px-2 py-1 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition-colors disabled:opacity-30 disabled:hover:bg-emerald-950 flex-shrink-0"
-                  title="Kural ekle"
+                  className="px-2 py-1 rounded-[5px] bg-base-elevated border border-zinc-800 text-zinc-100 hover:border-zinc-600 transition-colors disabled:opacity-40 flex-shrink-0"
+                  title={t.sidebar.addRule}
                 >
-                  <Plus size={12} />
+                  <Plus size={11} />
                 </button>
               </form>
 
-              {/* Rules List */}
               <div className="space-y-1">
                 {projectMemory?.rules && projectMemory.rules.length > 0 ? (
                   projectMemory.rules.map((rule, idx) => (
                     <div
                       key={idx}
-                      className="flex items-start justify-between gap-1.5 p-2 rounded-lg bg-zinc-950/80 border border-zinc-900 text-[11px] text-zinc-300 group hover:border-zinc-800 transition-colors"
+                      className="flex items-start justify-between gap-1.5 p-2 rounded-[7px] bg-base-elevated border border-zinc-800 text-zinc-300 group"
                     >
                       <span className="flex-1 leading-relaxed">{rule}</span>
                       <button
                         onClick={() => onRemoveMemoryRule?.(rule)}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-all flex-shrink-0"
-                        title="Kuralı sil"
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-600 hover:text-red-400 transition-all flex-shrink-0"
+                        title={t.sidebar.deleteRule}
                       >
-                        <Trash2 size={11} />
+                        <Trash2 size={10} />
                       </button>
                     </div>
                   ))
                 ) : (
-                  <div className="py-2 text-center text-zinc-600 text-[11px]">
-                    Henüz kural yok. Ajanların her zaman uymasını istediğiniz bir kural yazın.
+                  <div className="py-2 text-center text-zinc-600">
+                    {t.sidebar.noRules}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Facts Section */}
+            {/* Facts */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                <span>Proje Bilgileri</span>
+              <div className="flex items-center justify-between text-[8px] uppercase tracking-wider text-zinc-500">
+                <span>{t.sidebar.facts}</span>
                 <button
                   onClick={() => setAddingFact(!addingFact)}
-                  className="text-zinc-400 hover:text-zinc-200"
-                  title="Bilgi ekle"
+                  className="text-zinc-500 hover:text-zinc-100"
+                  title={t.sidebar.addFact}
                 >
-                  <Plus size={11} />
+                  <Plus size={10} />
                 </button>
               </div>
 
               {addingFact && (
-                <form onSubmit={handleAddFact} className="p-2 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1.5">
+                <form onSubmit={handleAddFact} className="p-2 rounded-[7px] bg-base-elevated border border-zinc-800 space-y-1.5">
                   <input
                     type="text"
                     value={newFactKey}
                     onChange={(e) => setNewFactKey(e.target.value)}
-                    placeholder="Anahtar (örn. framework)"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none"
+                    placeholder={t.sidebar.factKey}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-[5px] px-2 py-1 text-zinc-100 placeholder:text-zinc-600 outline-none"
                   />
                   <input
                     type="text"
                     value={newFactVal}
                     onChange={(e) => setNewFactVal(e.target.value)}
-                    placeholder="Değer (örn. Next.js 15)"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none"
+                    placeholder={t.sidebar.factValue}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-[5px] px-2 py-1 text-zinc-100 placeholder:text-zinc-600 outline-none"
                   />
                   <div className="flex justify-end gap-1.5 pt-1">
                     <button
                       type="button"
                       onClick={() => setAddingFact(false)}
-                      className="px-2 py-0.5 rounded text-[10px] text-zinc-500 hover:text-zinc-300"
+                      className="px-2 py-0.5 rounded text-zinc-500 hover:text-zinc-100"
                     >
-                      Cancel
+                      {t.sidebar.cancel}
                     </button>
                     <button
                       type="submit"
                       disabled={!newFactKey.trim() || !newFactVal.trim()}
-                      className="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 disabled:opacity-30"
+                      className="px-2 py-0.5 rounded-[5px] bg-zinc-100 text-zinc-900 disabled:opacity-40"
                     >
-                      Save
+                      {t.sidebar.save}
                     </button>
                   </div>
                 </form>
@@ -751,25 +746,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Object.entries(projectMemory.facts).map(([key, fact]) => (
                     <div
                       key={key}
-                      className="flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-lg bg-zinc-950/80 border border-zinc-900 text-[11px] group hover:border-zinc-800 transition-colors"
+                      className="flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-[7px] bg-base-elevated border border-zinc-800 group"
                     >
-                      <div className="min-w-0 flex-1 font-mono">
-                        <span className="text-zinc-400 font-medium">{key}: </span>
-                        <span className="text-zinc-200">{fact.value}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-zinc-500">{key}: </span>
+                        <span className="text-zinc-100">{fact.value}</span>
                       </div>
                       <button
                         onClick={() => onDeleteMemoryFact?.(key)}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-all flex-shrink-0"
-                        title="Bilgiyi sil"
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-600 hover:text-red-400 transition-all flex-shrink-0"
+                        title={t.sidebar.deleteFact}
                       >
-                        <Trash2 size={11} />
+                        <Trash2 size={10} />
                       </button>
                     </div>
                   ))
                 ) : (
-                  <div className="py-2 text-center text-zinc-600 text-[11px]">
-                    Henüz bilgi yok.
-                  </div>
+                  <div className="py-2 text-center text-zinc-600">{t.sidebar.noFacts}</div>
                 )}
               </div>
             </div>
@@ -777,31 +770,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Bottom Profile / Settings Bar */}
-      <div className="p-2.5 border-t border-zinc-900 flex items-center justify-between text-xs flex-shrink-0 bg-zinc-950/40">
-        <div
-          className="flex items-center space-x-2 min-w-0 cursor-pointer hover:text-zinc-100 transition-colors"
-          onClick={onOpenProjectFolder}
-          title={cwd ? `Project folder: ${cwd}` : 'Click to select project folder'}
-        >
-          <Folder size={13} className="text-zinc-500 flex-shrink-0" />
-          <div className="min-w-0">
-            <div className="text-[9px] uppercase tracking-wider text-zinc-600 leading-none">Proje</div>
-            <div className="text-zinc-400 truncate text-[11px] font-mono">
-              {projectName}
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={onOpenSettings}
-          className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-          title="Ayarlar (Ctrl+,)"
-        >
-          <Settings size={13} />
-        </button>
-      </div>
+      <ProfileCard onOpenSettings={onOpenSettings} />
     </div>
   );
 };
-

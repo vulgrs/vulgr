@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.js';
 import type { ContextTelemetry, MemoryData } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface TokenOptimizerHUDProps {
   isOpen: boolean;
@@ -37,6 +38,8 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
   telemetry,
   onRefreshTelemetry,
 }) => {
+  const { t } = useI18n();
+  const h = t.hud;
   const [activeTab, setActiveTab] = useState<'savings' | 'memory' | 'subscriptions' | 'skills'>('savings');
   const [memory, setMemory] = useState<MemoryData | null>(null);
   const [memorySnippet, setMemoryPromptSnippet] = useState<string>('');
@@ -171,13 +174,13 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <DialogTitle>Token & Context Optimizer HUD</DialogTitle>
+                <DialogTitle>{h.title}</DialogTitle>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-950/60 border border-emerald-800/50 text-emerald-300">
-                  ACTIVE • LEAN CONTEXT
+                  {h.badge}
                 </span>
               </div>
               <DialogDescription>
-                Stripping ANSI/spinners, squashing repetitive traces, and injecting cached memory facts
+                {h.description}
               </DialogDescription>
             </div>
           </div>
@@ -185,7 +188,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon-sm" onClick={onRefreshTelemetry}>
               <RefreshCw />
-              <span className="sr-only">Refresh telemetry</span>
+              <span className="sr-only">{h.refresh}</span>
             </Button>
           </div>
         </div>
@@ -194,53 +197,53 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
         <div className="grid grid-cols-4 gap-3 px-6 py-3.5 bg-zinc-950/70 border-b border-zinc-800/60">
           <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70">
             <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
-              <span>Token Savings</span>
+              <span>{h.tokenSavings}</span>
               <TrendingDown className="w-3.5 h-3.5 text-emerald-400" />
             </div>
             <div className="text-lg font-bold font-mono text-emerald-400">
-              {savingsPct}% <span className="text-xs font-normal text-zinc-400 font-sans">saved</span>
+              {savingsPct}% <span className="text-xs font-normal text-zinc-400 font-sans">{h.saved}</span>
             </div>
             <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
-              -{savedTotal.toLocaleString()} tokens
+              {h.tokensRemoved(savedTotal.toLocaleString())}
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70">
             <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
-              <span>Context Compression</span>
+              <span>{h.compression}</span>
               <Zap className="w-3.5 h-3.5 text-amber-400" />
             </div>
             <div className="text-lg font-bold font-mono text-zinc-100">
-              {optTotal.toLocaleString()} <span className="text-xs font-normal text-zinc-400 font-sans">tk fed</span>
+              {optTotal.toLocaleString()} <span className="text-xs font-normal text-zinc-400 font-sans">{h.tkFed}</span>
             </div>
             <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
-              from {rawTotal.toLocaleString()} raw
+              {h.fromRaw(rawTotal.toLocaleString())}
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70">
             <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
-              <span>Memory Recall</span>
+              <span>{h.memoryRecall}</span>
               <Brain className="w-3.5 h-3.5 text-zinc-400" />
             </div>
             <div className="text-lg font-bold font-mono text-zinc-100">
-              {factsList.length} Facts <span className="text-xs font-normal text-zinc-400 font-sans">· {rulesList.length} Rules</span>
+              {h.facts(factsList.length)} <span className="text-xs font-normal text-zinc-400 font-sans">{h.rules(rulesList.length)}</span>
             </div>
             <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
-              Zero duplicate prompts
+              {h.zeroDuplicates}
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/70">
             <div className="flex items-center justify-between text-zinc-400 text-xs mb-1">
-              <span>Quota Savings (est.)</span>
+              <span>{h.quotaSavings}</span>
               <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
             </div>
             <div className="text-lg font-bold font-mono text-zinc-100">
-              ${estCostSaved} <span className="text-xs font-normal text-zinc-400 font-sans">prevented</span>
+              ${estCostSaved} <span className="text-xs font-normal text-zinc-400 font-sans">{h.prevented}</span>
             </div>
             <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
-              {optCount} compressions done
+              {h.compressionsDone(optCount)}
             </div>
           </div>
         </div>
@@ -256,7 +259,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
  }`}
           >
             <TrendingDown className="w-3.5 h-3.5" />
-            Context & Token Savings
+            {h.tabSavings}
           </button>
           <button
             onClick={() => setActiveTab('memory')}
@@ -267,7 +270,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
  }`}
           >
             <Brain className="w-3.5 h-3.5" />
-            MemoryStore Explorer ({factsList.length + rulesList.length})
+            {h.tabMemory(factsList.length + rulesList.length)}
           </button>
           <button
             onClick={() => setActiveTab('subscriptions')}
@@ -278,7 +281,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
  }`}
           >
             <Cpu className="w-3.5 h-3.5" />
-            Local CLI Tools & Buffer
+            {h.tabLocal}
           </button>
           <button
             onClick={() => setActiveTab('skills')}
@@ -289,7 +292,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
  }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Universal Skills Cache
+            {h.tabSkills}
           </button>
         </div>
 
@@ -301,8 +304,8 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
               {/* Savings Meter Bar */}
               <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800">
                 <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="text-zinc-300 font-medium">Active Session Token Efficiency</span>
-                  <span className="font-mono text-emerald-400 font-semibold">{savingsPct}% Compressed</span>
+                  <span className="text-zinc-300 font-medium">{h.efficiency}</span>
+                  <span className="font-mono text-emerald-400 font-semibold">{h.compressed(savingsPct)}</span>
                 </div>
                 <div className="w-full h-3 bg-zinc-950 rounded-full overflow-hidden flex border border-zinc-800">
                   <div
@@ -315,8 +318,8 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                   />
                 </div>
                 <div className="flex justify-between items-center text-[11px] text-zinc-500 mt-2 font-mono">
-                  <span>Preserved Context: {optTotal.toLocaleString()} tokens</span>
-                  <span>Stripped Bloat: -{savedTotal.toLocaleString()} tokens</span>
+                  <span>{h.preserved(optTotal.toLocaleString())}</span>
+                  <span>{h.stripped(savedTotal.toLocaleString())}</span>
                 </div>
               </div>
 
@@ -325,20 +328,20 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-emerald-400" />
-                    <h3 className="text-xs font-semibold text-zinc-200">Live Context Compaction Simulator</h3>
+                    <h3 className="text-xs font-semibold text-zinc-200">{h.simulator}</h3>
                   </div>
                   <button
                     onClick={handleRunTestOptimize}
                     className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 text-xs font-medium transition-colors"
                   >
                     <Play className="w-3.5 h-3.5 fill-current" />
-                    Test Optimize
+                    {h.testOptimize}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] text-zinc-400 block mb-1">Raw Terminal / Compiler Trace (Input):</label>
+                    <label className="text-[11px] text-zinc-400 block mb-1">{h.rawInput}</label>
                     <textarea
                       value={testInput}
                       onChange={(e) => setTestInput(e.target.value)}
@@ -348,16 +351,16 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] text-zinc-400">Optimized for AI Prompt (Output):</label>
+                      <label className="text-[11px] text-zinc-400">{h.optimizedOutput}</label>
                       {testSavings && (
                         <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-800/40">
-                          {testSavings.percent}% smaller ({testSavings.rawTokens} → {testSavings.optTokens} tk)
+                          {h.smaller(testSavings.percent, testSavings.rawTokens, testSavings.optTokens)}
                         </span>
                       )}
                     </div>
                     <textarea
                       readOnly
-                      value={testOutput ?? 'Click "Test Optimize" to see compaction...'}
+                      value={testOutput ?? h.clickTest}
                       rows={5}
                       className="w-full bg-black/40 border border-zinc-800/80 rounded-lg p-2 text-xs font-mono text-emerald-300/90 focus:outline-none resize-none"
                     />
@@ -368,12 +371,12 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
               {/* Recent Optimizations Log */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Recent Optimization Events</h3>
+                  <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">{h.recentEvents}</h3>
                   <button
                     onClick={handleResetStats}
                     className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
                   >
-                    Reset Statistics
+                    {h.resetStats}
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -394,7 +397,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                             {ev.type.replace('_', ' ')}
                           </span>
                           <span className="text-zinc-400 font-sans">
-                            {ev.rawChars.toLocaleString()} chars → {ev.optimizedChars.toLocaleString()} chars
+                            {h.chars(ev.rawChars.toLocaleString(), ev.optimizedChars.toLocaleString())}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -407,7 +410,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                     ))
                   ) : (
                     <div className="text-xs text-zinc-500 p-4 text-center border border-dashed border-zinc-800 rounded-lg">
-                      No optimization events yet. Run a command in the terminal or click "Test Optimize" above.
+                      {h.noEvents}
                     </div>
                   )}
                 </div>
@@ -422,9 +425,9 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                 <div className="flex items-center gap-2.5">
                   <Brain className="w-4 h-4 text-zinc-400" />
                   <div>
-                    <h3 className="text-xs font-semibold text-zinc-200">Persistent Workspace Memory</h3>
+                    <h3 className="text-xs font-semibold text-zinc-200">{h.memoryTitle}</h3>
                     <p className="text-[11px] text-zinc-300/80">
-                      Stores facts & rules in <code className="text-white">.warp-memory.json</code> so agents don't repeatedly ask or relearn workspace context.
+                      {h.memoryStoresIn} <code className="text-white">.warp-memory.json</code> {h.memoryWhy}
                     </p>
                   </div>
                 </div>
@@ -433,24 +436,24 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-500/20 border border-zinc-500/40 hover:bg-zinc-500/30 text-zinc-200 text-xs font-medium transition-colors"
                 >
                   {copiedSnippet ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedSnippet ? 'Copied' : 'Copy AI Snippet'}
+                  {copiedSnippet ? h.copied : h.copySnippet}
                 </button>
               </div>
 
               {/* Add Fact Form */}
               <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-3">
-                <h3 className="text-xs font-semibold text-zinc-300">Add Workspace Fact</h3>
+                <h3 className="text-xs font-semibold text-zinc-300">{h.addFactTitle}</h3>
                 <form onSubmit={handleAddFact} className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Key (e.g. database, node_version)"
+                    placeholder={h.factKey}
                     value={factKey}
                     onChange={(e) => setFactKey(e.target.value)}
                     className="flex-1 bg-black/60 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700 font-mono"
                   />
                   <input
                     type="text"
-                    placeholder="Value (e.g. PostgreSQL 16 on port 5432)"
+                    placeholder={h.factValue}
                     value={factVal}
                     onChange={(e) => setFactVal(e.target.value)}
                     className="flex-[2] bg-black/60 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
@@ -461,13 +464,13 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-xs font-medium transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Save
+                    {h.save}
                   </button>
                 </form>
 
                 <div className="space-y-1.5 mt-3">
                   <label className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
-                    Stored Workspace Facts ({factsList.length})
+                    {h.storedFacts(factsList.length)}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {factsList.map((fact) => (
@@ -482,7 +485,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         <button
                           onClick={() => handleDeleteFact(fact.key)}
                           className="text-zinc-500 hover:text-red-400 transition-colors p-1"
-                          title="Delete Fact"
+                          title={h.deleteFact}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -494,11 +497,11 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
 
               {/* Add Rule Form */}
               <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-3">
-                <h3 className="text-xs font-semibold text-zinc-300">Behavioral Rules for AI Agents</h3>
+                <h3 className="text-xs font-semibold text-zinc-300">{h.rulesTitle}</h3>
                 <form onSubmit={handleAddRule} className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Rule (e.g. Always verify with npx tsc before asking for review)"
+                    placeholder={h.rulePlaceholder}
                     value={newRule}
                     onChange={(e) => setNewRule(e.target.value)}
                     className="flex-1 bg-black/60 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
@@ -509,7 +512,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-xs font-medium transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Add Rule
+                    {h.addRule}
                   </button>
                 </form>
 
@@ -526,7 +529,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                       <button
                         onClick={() => handleRemoveRule(rule)}
                         className="text-zinc-500 hover:text-red-400 transition-colors p-1"
-                        title="Remove Rule"
+                        title={h.removeRule}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -544,9 +547,9 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                 <div className="flex items-center gap-2.5">
                   <ShieldCheck className="w-4 h-4 text-zinc-400" />
                   <div>
-                    <h3 className="text-xs font-semibold text-zinc-200">Local CLI Subprocesses & Terminal Buffer Guard</h3>
+                    <h3 className="text-xs font-semibold text-zinc-200">{h.localTitle}</h3>
                     <p className="text-[11px] text-zinc-300/80">
-                      Vulgaris operates 100% via local CLI tools and terminal subprocesses. Zero external HTTP API keys or cloud connections required. Prevents terminal buffer overflows.
+                      {h.localIntro}
                     </p>
                   </div>
                 </div>
@@ -561,20 +564,20 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         C
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-zinc-100">Claude Code CLI Subprocess</h4>
-                        <span className="text-[11px] text-zinc-400">Binary: <code className="text-zinc-300">claude</code> • Pipe Mode: <code className="text-zinc-300">-p</code> • Local Terminal Subprocess</span>
+                        <h4 className="text-xs font-semibold text-zinc-100">{h.claudeTitle}</h4>
+                        <span className="text-[11px] text-zinc-400">{h.binary} <code className="text-zinc-300">claude</code> • {h.pipeMode} <code className="text-zinc-300">-p</code> • {h.localSubprocess}</span>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 border border-emerald-800/50 text-emerald-400">
-                      Pure Local CLI
+                      {h.pureLocal}
                     </span>
                   </div>
                   <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
                     <div className="h-full bg-orange-400 w-[12%]" />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                    <span>Active CLI Prompt: ~{optTotal} tokens</span>
-                    <span>Direct Shell Pipe (No external API calls)</span>
+                    <span>{h.activePrompt(optTotal)}</span>
+                    <span>{h.directPipe}</span>
                   </div>
                 </div>
 
@@ -586,20 +589,20 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         G
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-zinc-100">Antigravity / Gemini CLI Subprocess</h4>
-                        <span className="text-[11px] text-zinc-400">Binary: <code className="text-zinc-300">gemini</code> / <code className="text-zinc-300">agy</code> • Self-Healing Terminal Loop</span>
+                        <h4 className="text-xs font-semibold text-zinc-100">{h.geminiTitle}</h4>
+                        <span className="text-[11px] text-zinc-400">{h.binary} <code className="text-zinc-300">gemini</code> / <code className="text-zinc-300">agy</code> • {h.selfHealingLoop}</span>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 border border-emerald-800/50 text-emerald-400">
-                      Pure Local CLI
+                      {h.pureLocal}
                     </span>
                   </div>
                   <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
                     <div className="h-full bg-zinc-400 w-[8%]" />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                    <span>Active CLI Prompt: ~{optTotal} tokens</span>
-                    <span>Self-Healing via exit codes (3 retry budget)</span>
+                    <span>{h.activePrompt(optTotal)}</span>
+                    <span>{h.selfHealing}</span>
                   </div>
                 </div>
 
@@ -611,20 +614,20 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         $
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-zinc-100">Native PTY Terminal Shell (PowerShell / Bash)</h4>
-                        <span className="text-[11px] text-zinc-400">Direct pseudo-terminal execution • node-pty stream bridge</span>
+                        <h4 className="text-xs font-semibold text-zinc-100">{h.ptyTitle}</h4>
+                        <span className="text-[11px] text-zinc-400">{h.ptySubtitle}</span>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 border border-emerald-800/50 text-emerald-400">
-                      Active PTY
+                      {h.activePty}
                     </span>
                   </div>
                   <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
                     <div className="h-full bg-emerald-400 w-[100%]" />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                    <span>Terminal Stream: Zero Latency Raw PTY</span>
-                    <span>Fully Local Terminal Session</span>
+                    <span>{h.ptyStream}</span>
+                    <span>{h.ptyLocal}</span>
                   </div>
                 </div>
               </div>
@@ -638,16 +641,16 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                 <div className="flex items-center gap-2.5">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   <div>
-                    <h3 className="text-xs font-semibold text-amber-200">Universal Skills Token Management</h3>
+                    <h3 className="text-xs font-semibold text-amber-200">{h.skillsTitle}</h3>
                     <p className="text-[11px] text-amber-300/80">
-                      Skills are indexed in local disk and injected dynamically on invocation to keep base prompts lean.
+                      {h.skillsIntro}
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-2">
-                <h4 className="text-xs font-semibold text-zinc-300">Skill Usage & Token Footprint</h4>
+                <h4 className="text-xs font-semibold text-zinc-300">{h.skillUsage}</h4>
                 {Object.keys(skillsUsage).length > 0 ? (
                   <div className="space-y-2">
                     {Object.entries(skillsUsage).map(([skillId, count]) => (
@@ -656,13 +659,13 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                         className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-xs font-mono"
                       >
                         <span className="text-zinc-200">{skillId}</span>
-                        <span className="text-amber-400">{count} times invoked</span>
+                        <span className="text-amber-400">{h.timesInvoked(Number(count))}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="text-xs text-zinc-500 py-3 text-center border border-dashed border-zinc-800 rounded-lg">
-                    No custom skills invoked yet in this session.
+                    {h.noSkills}
                   </div>
                 )}
               </div>
@@ -674,10 +677,10 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
         <div className="flex items-center justify-between px-6 py-3 border-t border-zinc-800 bg-zinc-950 text-xs text-zinc-500">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Vulgaris Context & Token Guardian Active</span>
+            <span>{h.guardian}</span>
           </div>
           <Button variant="outline" onClick={onClose}>
-            Close HUD
+            {h.close}
           </Button>
         </div>
       </DialogContent>

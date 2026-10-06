@@ -17,6 +17,24 @@ export interface WorkspaceTab {
   activeSessionId: string;
   /** Percentage width/height (sums to 100) for each pane, in session order. */
   paneSizes?: number[];
+  /** User-made sidebar group this terminal is filed under; none = ungrouped. */
+  groupId?: string;
+  /** True when the title is generated from the work done in the tab ('' = untitled). */
+  autoTitle?: boolean;
+  /** Recent meaningful commands / agent requests run in this tab, oldest first. */
+  workLog?: WorkEntry[];
+}
+
+/** A named, user-made group of terminals in the sidebar. */
+export interface TerminalGroup {
+  id: string;
+  name: string;
+}
+
+export interface WorkEntry {
+  text: string;
+  /** An AI request (its text is the user's prompt) rather than a shell command. */
+  prompt: boolean;
 }
 
 export interface CommandPaletteAction {

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import type { SquadSession, SessionType, SquadPhase } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 /** Result of one command run in a squad pane (from the shell's exit marker). */
 export interface PaneRunResult {
@@ -53,6 +54,10 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
   squadRef.current = squad;
   const depsRef = useRef(deps);
   depsRef.current = deps;
+  // Read at each step so a running squad follows a language switch.
+  const { t } = useI18n();
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const runIdRef = useRef(0);
   const pausedRef = useRef(false);
@@ -65,6 +70,7 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
       pausedRef.current = false;
       const label = squadAgentLabel;
       const verifierIsAgent = config.verifier !== 'shell';
+      const msg = () => tRef.current.squad;
 
       setSquad({
         active: true,
@@ -78,7 +84,7 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
         phase: 'building',
         round: 1,
         maxRounds: config.maxRounds,
-        statusText: `${label(config.builder)} kodu yazıyor...`,
+        statusText: msg().building(label(config.builder)),
       });
 
       // Throws once this run was stopped or replaced; holds while paused.
@@ -120,23 +126,23 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
           for (let round = 1; ; round++) {
             // 1. Builder writes / repairs the code.
             if (round > 1) {
-              await step('repairing', `${label(config.builder)} geri bildirime göre düzeltiyor (tur ${round}/${config.maxRounds})...`, round);
+              await step('repairing', msg().repairing(label(config.builder), round, config.maxRounds), round);
             }
             const built = await runAgent(builderSessionId, config.builder, builderPrompt(feedback), true);
             if (built.exitCode !== 0) {
-              fail(`${label(config.builder)} hata ile durdu. Sol paneldeki çıktıya bakın (kurulu ve giriş yapılmış olmalı).`);
+              fail(msg().builderFailed(label(config.builder)));
               return;
             }
 
             // 2. Verify command in the right pane.
-            await step('verifying', `"${config.verifyCmd}" çalıştırılıyor (tur ${round}/${config.maxRounds})...`);
+            await step('verifying', msg().verifying(config.verifyCmd, round, config.maxRounds));
             const verified = await run(verifierSessionId, config.verifyCmd);
 
             if (verified.exitCode === 0) {
               if (!verifierIsAgent) break;
 
               // 3a. Tests pass: the verifier agent reviews the change.
-              await step('reviewing', `Testler geçti. ${label(config.verifier)} değişiklikleri inceliyor...`);
+              await step('reviewing', msg().reviewing(label(config.verifier)));
               const diff = tail(await depsRef.current.getDiff(), 20000);
               const review = await runAgent(
                 verifierSessionId,
@@ -167,7 +173,7 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
               // 3b. Tests fail: diagnose (verifier agent) and hand back to the builder.
               feedback = `"${config.verifyCmd}" failed:\n${tail(verified.output, 6000)}`;
               if (verifierIsAgent && round < config.maxRounds) {
-                await step('handing_off', `Test başarısız. ${label(config.verifier)} hatayı inceliyor...`);
+                await step('handing_off', msg().handingOff(label(config.verifier)));
                 const diagnosis = await runAgent(
                   verifierSessionId,
                   config.verifier,
@@ -188,7 +194,7 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
             }
 
             if (round >= config.maxRounds) {
-              fail(`${config.maxRounds} turda tamamlanamadı. Son durumu sağdaki panelde görebilir, devam etmek için kendiniz komut yazabilirsiniz.`);
+              fail(msg().outOfRounds(config.maxRounds));
               return;
             }
           }
@@ -196,14 +202,14 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
           update({
             phase: 'consensus',
             statusText: !verifierIsAgent
-              ? 'Tamamlandı: testler geçti.'
+              ? msg().doneTests
               : reviewSkipped
-                ? `Testler geçti. ${label(config.verifier)} incelemesi net bir sonuç vermedi; değişiklikleri kendiniz gözden geçirin (sağ panele bakın).`
-                : `Tamamlandı: testler geçti ve ${label(config.verifier)} onayladı.`,
+                ? msg().reviewUnclear(label(config.verifier))
+                : msg().doneApproved(label(config.verifier)),
           });
         } catch (err) {
           if (err instanceof SquadStopped) return;
-          fail(`Beklenmeyen hata: ${(err as Error)?.message || String(err)}`);
+          fail(msg().unexpected((err as Error)?.message || String(err)));
         }
       })();
     },

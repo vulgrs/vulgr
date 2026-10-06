@@ -4,13 +4,9 @@ import {
   PanelLeft,
   PanelLeftClose,
   Sliders,
-  Users,
   GitCompare,
   FileDown,
-  Settings,
-  Zap,
   Sparkles,
-  Terminal,
   Minus,
   Square,
 
@@ -19,16 +15,13 @@ import {
   CircleHelp,
 } from 'lucide-react';
 import type { DoctorStatus } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface TopBarProps {
   onToggleDiff: () => void;
-  onOpenMeshModal: () => void;
-  onOpenSquadModal: () => void;
   onOpenSkillsModal: () => void;
-  onOpenSettings: () => void;
   onOpenExportReport: () => void;
   onOpenChat: () => void;
-  onLaunchClaude?: () => void;
   doctor: DoctorStatus | null;
   hasUncommittedDiff: boolean;
   sidebarOpen: boolean;
@@ -65,13 +58,9 @@ const ToolButton: React.FC<{
 
 export const TopBar: React.FC<TopBarProps> = ({
   onToggleDiff,
-  onOpenMeshModal,
-  onOpenSquadModal,
   onOpenSkillsModal,
-  onOpenSettings,
   onOpenExportReport,
   onOpenChat,
-  onLaunchClaude,
   doctor,
   hasUncommittedDiff,
   sidebarOpen,
@@ -79,6 +68,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenPalette,
   onOpenGuide,
 }) => {
+  const { t } = useI18n();
   const [isMaximized, setIsMaximized] = useState(false);
   const isMac =
     (typeof window !== 'undefined' && window.warpApi?.platform === 'darwin') ||
@@ -100,8 +90,8 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Left: Brand & the three ways to automate work */}
       <div className={`flex items-center gap-1 min-w-0 ${isMac ? 'pl-[70px]' : ''}`} style={noDrag}>
         <div className="flex items-center gap-1.5 pl-1 pr-2 flex-shrink-0">
-          <img src="./logo.png" alt="Vulgaris" className="w-5 h-5 object-contain" draggable={false} />
-          <span className="text-[11px] font-semibold text-zinc-300">Vulgaris</span>
+          <img src="./logo-mark.svg" alt="Vulgr" className="logo-mark w-5 h-5 object-contain" draggable={false} />
+          <span className="text-[11px] font-semibold text-zinc-300">Vulgr</span>
         </div>
 
         <div className="h-3.5 w-px bg-zinc-850 mx-0.5 flex-shrink-0" />
@@ -109,45 +99,25 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={onToggleSidebar}
           className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900 transition-colors flex-shrink-0"
-          title="Sol paneli göster / gizle (Ctrl+Shift+B)"
-          aria-label="Sol paneli göster / gizle"
+          title={t.topbar.toggleSidebarHint}
+          aria-label={t.topbar.toggleSidebar}
         >
           {sidebarOpen ? <PanelLeftClose size={13} /> : <PanelLeft size={13} />}
         </button>
-        {onLaunchClaude && (
-          <ToolButton
-            onClick={onLaunchClaude}
-            icon={<Terminal size={13} />}
-            label="Claude CLI"
-            title="Launch interactive Claude Code session in terminal (Ctrl+Shift+C)"
-          />
-        )}
         {onOpenChat && (
           <ToolButton
             onClick={onOpenChat}
             icon={<Sparkles size={13} />}
             label="Claude Chat"
             highlight
-            title="Claude Code Chat — talk to Claude Code and watch its output as chat, with a live diff panel"
+            title={t.topbar.claudeChatHint}
           />
         )}
         <ToolButton
-          onClick={onOpenSquadModal}
-          icon={<Users size={13} />}
-          label="İkili Ajan"
-          title="İkili ajan (Ctrl+Shift+S) — iki yapay zekâ yan yana: biri kodu yazar, diğeri test edip düzeltme ister"
-        />
-        <ToolButton
-          onClick={onOpenMeshModal}
-          icon={<Zap size={13} />}
-          label="Otomatik Görev"
-          title="Otomatik görev — tek bir hedef verin; yazan, doğrulayan ve denetleyen üç ajan işi arka planda kendi başına yürütür"
-        />
-        <ToolButton
           onClick={onOpenSkillsModal}
           icon={<Sliders size={13} />}
-          label="Hafıza"
-          title="Hafıza ve şablonlar (Ctrl+Shift+K) — sık kullandığınız komutları saklayın, ajanların projeniz hakkında hatırlaması gereken kuralları yazın"
+          label={t.topbar.memory}
+          title={t.topbar.memoryHint}
         />
       </div>
 
@@ -156,12 +126,12 @@ export const TopBar: React.FC<TopBarProps> = ({
       <button
         onClick={onOpenPalette}
         className="flex items-center space-x-2 px-3 py-1 rounded-lg border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 hover:border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200 transition-all w-full max-w-md justify-between shadow-inner mx-3"
-        title="Komut paleti (Ctrl+Shift+P) — uygulamadaki her işlemi adıyla arayıp çalıştırın"
+        title={t.topbar.paletteHint}
         style={noDrag}
       >
         <div className="flex items-center space-x-2">
           <Search size={11} className="text-zinc-400" />
-          <span className="text-[11px] text-zinc-400">Ne yapmak istiyorsunuz? Arayın...</span>
+          <span className="text-[11px] text-zinc-400">{t.topbar.palettePlaceholder}</span>
         </div>
         <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] font-mono text-zinc-400">
           Ctrl+Shift+P
@@ -174,36 +144,30 @@ export const TopBar: React.FC<TopBarProps> = ({
           <ToolButton
             onClick={onToggleDiff}
             icon={<GitCompare size={13} />}
-            label="Değişiklikler"
-            title="Değişiklikler (Ctrl+Shift+G) — son commit'ten beri değişen dosyalar; buradan commit & push yapabilirsiniz"
+            label={t.topbar.changes}
+            title={t.topbar.changesHint}
             highlight={hasUncommittedDiff}
             badge={hasUncommittedDiff}
           />
           <ToolButton
             onClick={onOpenExportReport}
             icon={<FileDown size={13} />}
-            label="Rapor"
-            title="Rapor (Ctrl+Shift+X) — bu oturumda yapılanları paylaşılabilir bir rapor olarak kaydedin"
-          />
-          <ToolButton
-            onClick={onOpenSettings}
-            icon={<Settings size={13} />}
-            label="Ayarlar"
-            title="Ayarlar (Ctrl+,) — kabuk, yazı tipi, yapay zekâ modelleri ve izinler"
+            label={t.topbar.report}
+            title={t.topbar.reportHint}
           />
           <ToolButton
             onClick={onOpenGuide}
             icon={<CircleHelp size={13} />}
-            label="Yardım"
-            title="Nasıl kullanılır? (F1) — tüm özelliklerin kısa açıklaması"
+            label={t.topbar.help}
+            title={t.topbar.helpHint}
           />
 
           <div
             className="ml-1.5 flex items-center gap-1.5 text-[10px] text-zinc-500 font-mono"
-            title={doctor ? `Ortam hazır — Node ${doctor.node.version}` : 'Ortam kontrol ediliyor...'}
+            title={doctor ? t.topbar.envReady(doctor.node.version) : t.topbar.envChecking}
           >
             <span className={`w-2 h-2 rounded-full ${doctor ? 'bg-emerald-500' : 'bg-zinc-600 animate-pulse'}`} />
-            <span className="hidden xl:inline">{doctor ? 'Hazır' : 'Kontrol'}</span>
+            <span className="hidden xl:inline">{doctor ? t.topbar.ready : t.topbar.checking}</span>
           </div>
         </div>
 
@@ -213,21 +177,21 @@ export const TopBar: React.FC<TopBarProps> = ({
             <button
               onClick={() => window.warpApi.windowMinimize()}
               className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 transition-colors"
-              title="Simge durumuna küçült"
+              title={t.topbar.minimize}
             >
               <Minus size={13} />
             </button>
             <button
               onClick={() => window.warpApi.windowMaximizeToggle()}
               className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 transition-colors"
-              title={isMaximized ? 'Önceki boyut' : 'Ekranı kapla'}
+              title={isMaximized ? t.topbar.restore : t.topbar.maximize}
             >
               {isMaximized ? <Copy size={11} className="rotate-90" /> : <Square size={11} />}
             </button>
             <button
               onClick={() => window.warpApi.windowClose()}
               className="w-10 h-9 flex items-center justify-center text-zinc-400 hover:bg-red-600 hover:text-white transition-colors"
-              title="Kapat"
+              title={t.topbar.close}
             >
               <X size={14} />
             </button>

@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog.js';
 import { Spinner } from '@/components/ui/spinner.js';
 import type { SessionReportData, ReportCommandBlock } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface ExportReportModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
   onClose,
   reportData,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'timeline' | 'preview'>('timeline');
   const [format, setFormat] = useState<ExportFormat>('markdown');
   const [includeDiff, setIncludeDiff] = useState(true);
@@ -65,7 +67,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           if (mounted) setGeneratedContent(JSON.stringify(reportData, null, 2));
         }
       } catch (err: any) {
-        if (mounted) setGeneratedContent(`// Error generating report:\n${err.message}`);
+        if (mounted) setGeneratedContent(t.modals.report.generateError(err.message));
       }
     };
 
@@ -102,11 +104,11 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
       const defaultFilename = `vulgaris-report-${new Date().toISOString().slice(0, 10)}.${ext}`;
       const res = await window.warpApi.saveReportToFile(generatedContent, defaultFilename, format);
       if (res.success && res.filePath) {
-        setSaveStatus(`Saved: ${res.filePath.split(/[\\/]/).pop()}`);
+        setSaveStatus(t.modals.report.saved(res.filePath.split(/[\\/]/).pop() ?? ''));
         setTimeout(() => setSaveStatus(null), 3500);
       }
     } catch (err: any) {
-      setSaveStatus(`Error: ${err.message}`);
+      setSaveStatus(t.modals.report.error(err.message));
     } finally {
       setIsSaving(false);
     }
@@ -127,18 +129,18 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <DialogTitle>Vulgaris Technical Session Report</DialogTitle>
+                <DialogTitle>{t.modals.report.title}</DialogTitle>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-zinc-500/10 text-zinc-300 border border-zinc-500/25">
-                  {totalCmds} commands
+                  {t.modals.report.commands(totalCmds)}
                 </span>
                 {failedCmds > 0 && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-red-500/10 text-red-300 border border-red-500/25">
-                    {failedCmds} failed
+                    {t.modals.report.failed(failedCmds)}
                   </span>
                 )}
               </div>
               <DialogDescription className="flex items-center gap-2 font-mono">
-                <span>{reportData.workspacePath || 'Current Workspace'}</span>
+                <span>{reportData.workspacePath || t.modals.report.currentWorkspace}</span>
                 {reportData.branch && (
                   <>
                     <span>•</span>
@@ -165,7 +167,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
  }`}
             >
               <Clock size={13} />
-              <span>Timeline View</span>
+              <span>{t.modals.report.timeline}</span>
             </button>
 
             <button
@@ -177,7 +179,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
  }`}
             >
               <FileCode size={13} />
-              <span>Generated Code Preview</span>
+              <span>{t.modals.report.preview}</span>
             </button>
           </div>
 
@@ -224,7 +226,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
                 onChange={(e) => setIncludeDiff(e.target.checked)}
                 className="rounded border-white/[0.2] bg-zinc-900 text-zinc-500 focus:ring-0"
               />
-              <span>Include Diff</span>
+              <span>{t.modals.report.includeDiff}</span>
             </label>
           </div>
         </div>
@@ -235,7 +237,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
             <div className="space-y-3">
               {reportData.commands.length === 0 ? (
                 <div className="text-center py-12 text-zinc-500 text-xs">
-                  No terminal commands recorded yet in this workspace session.
+                  {t.modals.report.noCommands}
                 </div>
               ) : (
                 reportData.commands.map((cmd, idx) => {
@@ -297,11 +299,11 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
           {saveStatus ? <p className="mr-auto font-mono text-xs text-muted-foreground">{saveStatus}</p> : null}
           <Button variant="outline" onClick={handleCopy}>
             {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-            {copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}
+            {copied ? t.modals.report.copied : t.modals.report.copy}
           </Button>
           <Button onClick={handleSaveToDisk} disabled={isSaving}>
             {isSaving ? <Spinner data-icon="inline-start" /> : <FileDown data-icon="inline-start" />}
-            {isSaving ? 'Saving...' : 'Save to File...'}
+            {isSaving ? t.modals.report.saving : t.modals.report.save}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -30,6 +30,7 @@ export interface AgentMeshOptions {
   timeoutMs?: number;   // per agent call
   cwd?: string;
   useSandbox?: boolean; // Run agents in isolated git worktree
+  lang?: MeshLang;      // language of the status lines and message summaries shown in the UI
   onMessage?: (message: AgentMessage) => void;
   onStatus?: (status: AgentMeshStatus) => void;
 }
@@ -58,11 +59,75 @@ const AGENT_LABELS: Record<string, string> = {
 
 const label = (name: string) => AGENT_LABELS[name] ?? name;
 
+export type MeshLang = 'en' | 'tr';
+
+/** UI-facing texts (status lines, message summaries, errors). Agent prompts stay in English. */
+const MESH_TEXT = {
+  en: {
+    timedOut: 'timed out',
+    exitCode: (code: number | null) => `exit code ${code}`,
+    checking: 'Checking that the selected agents are installed...',
+    missingAgents: (names: string) =>
+      `Agent not installed: ${names}. Choose an agent installed on this computer or install that tool first.`,
+    taskGiven: (agent: string, goal: string) => `Task given to ${agent}: "${goal}"`,
+    building: (agent: string) => `${agent} is writing the code...`,
+    buildFailed: (agent: string, tail: string) => `${agent} could not complete the task: ${tail}`,
+    codeWritten: (agent: string, files: number) => `${agent} wrote the code (${files} files changed).`,
+    verifying: (cmd: string, round: number, max: number) => `Running "${cmd}" (round ${round}/${max})...`,
+    verifyPassed: (cmd: string, round: number) => `"${cmd}" passed (round ${round}).`,
+    diagnosing: (agent: string) => `${agent} is investigating the error...`,
+    verifyFailed: (cmd: string, code: number | null) => `"${cmd}" failed (exit code ${code}).`,
+    repairing: (agent: string, round: number, max: number) => `${agent} is fixing the error (round ${round}/${max})...`,
+    repairFailed: (agent: string, tail: string) => `${agent} could not apply a fix: ${tail}`,
+    patchApplied: (agent: string) => `${agent} applied the fix, testing again.`,
+    outOfRounds: (max: number) =>
+      `Tests did not pass in ${max} rounds. The last error is above; the changes are still in place, review them in the "Changes" panel.`,
+    auditing: (agent: string) => `${agent} is auditing the final changes...`,
+    auditNoVerdict: 'gave no clear verdict',
+    auditCouldNotRun: (tail: string) => `could not run: ${tail}`,
+    auditRejected: (agent: string) => `${agent} found problems in the changes.`,
+    auditSkipped: (agent: string, reason: string) =>
+      `Tests passed. ${agent}'s audit ${reason}; review the changes yourself.`,
+    auditApproved: (agent: string) => `Tests passed and ${agent} approved the changes.`,
+    doneRejected: 'Tests passed, but the auditor found problems.',
+    done: 'Done: tests passed.',
+  },
+  tr: {
+    timedOut: 'zaman aşımı',
+    exitCode: (code: number | null) => `çıkış kodu ${code}`,
+    checking: 'Seçilen ajanların kurulu olduğu kontrol ediliyor...',
+    missingAgents: (names: string) =>
+      `Kurulu olmayan ajan: ${names}. Bu bilgisayarda kurulu bir ajan seçin ya da önce o aracı kurun.`,
+    taskGiven: (agent: string, goal: string) => `Görev ${agent}'a verildi: "${goal}"`,
+    building: (agent: string) => `${agent} kodu yazıyor...`,
+    buildFailed: (agent: string, tail: string) => `${agent} görevi tamamlayamadı: ${tail}`,
+    codeWritten: (agent: string, files: number) => `${agent} kodu yazdı (${files} dosya değişti).`,
+    verifying: (cmd: string, round: number, max: number) => `"${cmd}" çalıştırılıyor (tur ${round}/${max})...`,
+    verifyPassed: (cmd: string, round: number) => `"${cmd}" başarılı (tur ${round}).`,
+    diagnosing: (agent: string) => `${agent} hatayı inceliyor...`,
+    verifyFailed: (cmd: string, code: number | null) => `"${cmd}" başarısız (çıkış kodu ${code}).`,
+    repairing: (agent: string, round: number, max: number) => `${agent} hatayı düzeltiyor (tur ${round}/${max})...`,
+    repairFailed: (agent: string, tail: string) => `${agent} düzeltme yapamadı: ${tail}`,
+    patchApplied: (agent: string) => `${agent} düzeltmeyi uyguladı, tekrar test ediliyor.`,
+    outOfRounds: (max: number) =>
+      `${max} turda testler geçmedi. Son hata yukarıda; değişiklikler yerinde duruyor, "Değişiklikler" panelinden inceleyebilirsiniz.`,
+    auditing: (agent: string) => `${agent} son değişiklikleri denetliyor...`,
+    auditNoVerdict: 'net bir karar vermedi',
+    auditCouldNotRun: (tail: string) => `çalışamadı: ${tail}`,
+    auditRejected: (agent: string) => `${agent} değişikliklerde sorun buldu.`,
+    auditSkipped: (agent: string, reason: string) =>
+      `Testler geçti. ${agent} denetimi ${reason}; değişiklikleri kendiniz gözden geçirin.`,
+    auditApproved: (agent: string) => `Testler geçti ve ${agent} değişiklikleri onayladı.`,
+    doneRejected: 'Testler geçti, ancak denetçi sorun buldu.',
+    done: 'Tamamlandı: testler geçti.',
+  },
+};
+
 /** Last lines of a failed agent call, for an error message a person can act on. */
-function failureTail(res: CliExecutionResult): string {
-  const text = [res.stderr, res.stdout].filter(Boolean).join('\n').trim();
-  if (res.timedOut) return 'zaman aşımı';
-  return text.split('\n').slice(-6).join('\n') || `çıkış kodu ${res.exitCode}`;
+function failureTail(res: CliExecutionResult, text: (typeof MESH_TEXT)[MeshLang]): string {
+  const output = [res.stderr, res.stdout].filter(Boolean).join('\n').trim();
+  if (res.timedOut) return text.timedOut;
+  return output.split('\n').slice(-6).join('\n') || text.exitCode(res.exitCode);
 }
 
 export class AgentMesh {
@@ -78,6 +143,7 @@ export class AgentMesh {
   private readonly useSandbox: boolean;
   private readonly onMessage?: (message: AgentMessage) => void;
   private readonly onStatus?: (status: AgentMeshStatus) => void;
+  private readonly text: (typeof MESH_TEXT)[MeshLang];
 
   constructor(options: AgentMeshOptions = {}) {
     this.cwd = options.cwd || process.cwd();
@@ -94,6 +160,7 @@ export class AgentMesh {
     this.useSandbox = options.useSandbox ?? false;
     this.onMessage = options.onMessage;
     this.onStatus = options.onStatus;
+    this.text = MESH_TEXT[options.lang ?? 'tr'];
   }
 
   private status(stage: AgentMeshStatus['stage'], round: number, text: string, agent?: string) {
@@ -170,7 +237,7 @@ export class AgentMesh {
 
     // Stage 0: every chosen agent must actually be installed, otherwise the
     // run would "succeed" on empty output.
-    this.status('checking', 0, 'Seçilen ajanların kurulu olduğu kontrol ediliyor...');
+    this.status('checking', 0, this.text.checking);
     const roles: Array<[string, ICliAdapter]> = [
       [this.builderName, builderAdapter],
       [this.verifierName, verifierAdapter],
@@ -182,7 +249,7 @@ export class AgentMesh {
     }
     if (missing.length > 0) {
       return fail(
-        `Kurulu olmayan ajan: ${missing.map(label).join(', ')}. Bu bilgisayarda kurulu bir ajan seçin ya da önce o aracı kurun.`,
+        this.text.missingAgents(missing.map(label).join(', ')),
         0,
         this.gitUtils
       );
@@ -220,10 +287,10 @@ export class AgentMesh {
       memorySnippet,
     ].join('\n');
     await this.bus.publish(runId, 'orchestrator', this.builderName, 'USER_TASK', {
-      summary: `Görev ${label(this.builderName)}'a verildi: "${goal}"`,
+      summary: this.text.taskGiven(label(this.builderName), goal),
       details: taskDetails,
     });
-    this.status('building', 1, `${label(this.builderName)} kodu yazıyor...`, this.builderName);
+    this.status('building', 1, this.text.building(label(this.builderName)), this.builderName);
     logger.model(this.builderName, 'Writing code autonomously...');
     const buildExec = await builderAdapter.execute(taskDetails, {
       cwd: activeCwd,
@@ -232,12 +299,12 @@ export class AgentMesh {
       onStdout: (chunk) => logger.streamChunk(chunk),
     });
     if (buildExec.exitCode !== 0 || buildExec.timedOut) {
-      return fail(`${label(this.builderName)} görevi tamamlayamadı: ${failureTail(buildExec)}`, 1, activeGit, sandboxSession);
+      return fail(this.text.buildFailed(label(this.builderName), failureTail(buildExec, this.text)), 1, activeGit, sandboxSession);
     }
 
     const diffInitial = activeGit.getDiff();
     await this.bus.publish(runId, this.builderName, this.verifierName, 'CODE_READY', {
-      summary: `${label(this.builderName)} kodu yazdı (${diffInitial.filesChanged.length} dosya değişti).`,
+      summary: this.text.codeWritten(label(this.builderName), diffInitial.filesChanged.length),
       details: buildExec.stdout.trim().slice(-2000),
       gitDiff: ContextOptimizer.optimizeDiff(diffInitial.diff),
       filesChanged: diffInitial.filesChanged,
@@ -248,14 +315,14 @@ export class AgentMesh {
     let currentRound = 1;
 
     for (; currentRound <= this.maxRounds; currentRound++) {
-      this.status('verifying', currentRound, `"${this.verifyCmd}" çalıştırılıyor (tur ${currentRound}/${this.maxRounds})...`);
+      this.status('verifying', currentRound, this.text.verifying(this.verifyCmd, currentRound, this.maxRounds));
       const verifyResult = await this.runVerificationCmd(activeCwd);
       memory.recordCommand(this.verifyCmd, verifyResult.exitCode, undefined, verifyResult.success ? 'Verification passed' : 'Verification failed');
 
       if (verifyResult.success) {
         verificationPassed = true;
         await this.bus.publish(runId, this.verifierName, this.auditorName, 'VERIFICATION_PASSED', {
-          summary: `"${this.verifyCmd}" başarılı (tur ${currentRound}).`,
+          summary: this.text.verifyPassed(this.verifyCmd, currentRound),
           gitDiff: ContextOptimizer.optimizeDiff(activeGit.getDiff().diff),
         });
         logger.success(`[${this.verifierName} -> ${this.auditorName}]: VERIFICATION_PASSED!`);
@@ -263,7 +330,7 @@ export class AgentMesh {
       }
 
       // The verifier agent reads the failure and tells the builder what to fix.
-      this.status('diagnosing', currentRound, `${label(this.verifierName)} hatayı inceliyor...`, this.verifierName);
+      this.status('diagnosing', currentRound, this.text.diagnosing(label(this.verifierName)), this.verifierName);
       const diagnosePrompt = [
         `You are reviewing work by another coding agent. The goal was: "${goal}".`,
         `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
@@ -278,14 +345,14 @@ export class AgentMesh {
       const diagnosisText = diagnosis.exitCode === 0 ? diagnosis.stdout.trim() : '';
 
       await this.bus.publish(runId, this.verifierName, this.builderName, 'VERIFICATION_FAILED', {
-        summary: `"${this.verifyCmd}" başarısız (çıkış kodu ${verifyResult.exitCode}).`,
+        summary: this.text.verifyFailed(this.verifyCmd, verifyResult.exitCode),
         errorTrace: verifyResult.output,
         details: diagnosisText || undefined,
       });
 
       if (currentRound === this.maxRounds) break;
 
-      this.status('repairing', currentRound + 1, `${label(this.builderName)} hatayı düzeltiyor (tur ${currentRound + 1}/${this.maxRounds})...`, this.builderName);
+      this.status('repairing', currentRound + 1, this.text.repairing(label(this.builderName), currentRound + 1, this.maxRounds), this.builderName);
       logger.model(this.builderName, `Autonomously repairing errors reported by ${this.verifierName}...`);
       const repairPrompt = [
         `The goal is still: "${goal}".`,
@@ -303,12 +370,12 @@ export class AgentMesh {
         onStdout: (chunk) => logger.streamChunk(chunk),
       });
       if (repairExec.exitCode !== 0 || repairExec.timedOut) {
-        return fail(`${label(this.builderName)} düzeltme yapamadı: ${failureTail(repairExec)}`, currentRound + 1, activeGit, sandboxSession);
+        return fail(this.text.repairFailed(label(this.builderName), failureTail(repairExec, this.text)), currentRound + 1, activeGit, sandboxSession);
       }
 
       const diffAfterPatch = activeGit.getDiff();
       await this.bus.publish(runId, this.builderName, this.verifierName, 'PATCH_APPLIED', {
-        summary: `${label(this.builderName)} düzeltmeyi uyguladı, tekrar test ediliyor.`,
+        summary: this.text.patchApplied(label(this.builderName)),
         details: repairExec.stdout.trim().slice(-2000),
         gitDiff: diffAfterPatch.diff,
         filesChanged: diffAfterPatch.filesChanged,
@@ -317,7 +384,7 @@ export class AgentMesh {
 
     if (!verificationPassed) {
       return fail(
-        `${this.maxRounds} turda testler geçmedi. Son hata yukarıda; değişiklikler yerinde duruyor, "Değişiklikler" panelinden inceleyebilirsiniz.`,
+        this.text.outOfRounds(this.maxRounds),
         Math.min(currentRound, this.maxRounds),
         activeGit,
         sandboxSession
@@ -325,7 +392,7 @@ export class AgentMesh {
     }
 
     // Stage 3: Auditor reviews the final diff (read-only).
-    this.status('auditing', currentRound, `${label(this.auditorName)} son değişiklikleri denetliyor...`, this.auditorName);
+    this.status('auditing', currentRound, this.text.auditing(label(this.auditorName)), this.auditorName);
     const finalDiff = activeGit.getDiff();
     const auditPrompt = [
       `You are ${label(this.auditorName)}, reviewing code written by ${label(this.builderName)} for the goal "${goal}". Tests already pass.`,
@@ -342,11 +409,11 @@ export class AgentMesh {
     let audit: AgentMeshResult['audit'] = 'skipped';
     if (auditRan && /VERDICT:\s*REJECTED/i.test(auditExec.stdout)) audit = 'rejected';
     else if (auditRan && /VERDICT:\s*APPROVED/i.test(auditExec.stdout)) audit = 'approved';
-    const skippedReason = auditRan ? 'net bir karar vermedi' : `çalışamadı: ${failureTail(auditExec)}`;
+    const skippedReason = auditRan ? this.text.auditNoVerdict : this.text.auditCouldNotRun(failureTail(auditExec, this.text));
 
     if (audit === 'rejected') {
       await this.bus.publish(runId, this.auditorName, this.builderName, 'SECURITY_CONCERN', {
-        summary: `${label(this.auditorName)} değişikliklerde sorun buldu.`,
+        summary: this.text.auditRejected(label(this.auditorName)),
         details: auditExec.stdout.trim(),
       });
       logger.warn(`[${this.auditorName} -> ${this.builderName}]: SECURITY_CONCERN flagged.`);
@@ -354,8 +421,8 @@ export class AgentMesh {
       await this.bus.publish(runId, this.auditorName, 'orchestrator', 'CONSENSUS_APPROVED', {
         summary:
           audit === 'skipped'
-            ? `Testler geçti. ${label(this.auditorName)} denetimi ${skippedReason}; değişiklikleri kendiniz gözden geçirin.`
-            : `Testler geçti ve ${label(this.auditorName)} değişiklikleri onayladı.`,
+            ? this.text.auditSkipped(label(this.auditorName), skippedReason)
+            : this.text.auditApproved(label(this.auditorName)),
         details: auditExec.stdout.trim(),
         gitDiff: finalDiff.diff,
       });
@@ -365,7 +432,7 @@ export class AgentMesh {
     this.status(
       'done',
       currentRound,
-      audit === 'rejected' ? 'Testler geçti, ancak denetçi sorun buldu.' : 'Tamamlandı: testler geçti.'
+      audit === 'rejected' ? this.text.doneRejected : this.text.done
     );
 
     return {

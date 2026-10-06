@@ -46,7 +46,7 @@ describe('SessionExporter Suite', () => {
     const md = SessionExporter.toMarkdown(sampleData, { includeDiff: true, stripAnsi: true });
 
     // Verify Title and Metadata
-    assert.ok(md.includes('# ⚡ Vulgaris Technical Session Report'));
+    assert.ok(md.includes('# ⚡ Vulgr Technical Session Report'));
     assert.ok(md.includes('C:/Users/ahmet/Desktop/Projeler/cli'));
     assert.ok(md.includes('master'));
 
@@ -79,7 +79,7 @@ describe('SessionExporter Suite', () => {
 
     assert.ok(html.startsWith('<!DOCTYPE html>'));
     assert.ok(html.includes('<html lang="en">'));
-    assert.ok(html.includes('Vulgaris Technical Session Report'));
+    assert.ok(html.includes('Vulgr Technical Session Report'));
     assert.ok(html.includes('filterCards(this.value)'));
 
     // Check command cards

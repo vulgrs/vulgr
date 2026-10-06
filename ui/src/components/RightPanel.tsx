@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer.js';
 import type { SessionType } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   onOpenTerminalInSandbox,
   onSendDiffToAgent,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'changes' | 'sandbox'>('changes');
   const [commitMsg, setCommitMsg] = useState('');
   const [showCommitInput, setShowCommitInput] = useState(false);
@@ -83,7 +85,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
  }`}
           >
             <GitCompare size={13} className="text-zinc-400" />
-            <span>Changes</span>
+            <span>{t.dock.changes}</span>
             {filesChanged.length > 0 && (
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-zinc-800 text-zinc-300">
                 {filesChanged.length}
@@ -100,7 +102,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
  }`}
           >
             <FlaskConical size={13} className="text-zinc-400" />
-            <span>Sandboxes</span>
+            <span>{t.dock.sandboxes}</span>
             {sandboxes.length > 0 && (
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
                 {sandboxes.length}
@@ -112,7 +114,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         <button
           onClick={onClose}
           className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
-          title="Close panel"
+          title={t.dock.closePanel}
         >
           <X size={14} />
         </button>
@@ -124,11 +126,11 @@ export const RightPanel: React.FC<RightPanelProps> = ({
           <div className="flex items-center space-x-2">
             <span
               className="text-zinc-400 font-medium text-xs"
-              title="Files changed since your last git commit"
+              title={t.dock.changedHint}
             >
               {filesChanged.length === 0
-                ? 'No changes'
-                : `${filesChanged.length} file${filesChanged.length === 1 ? '' : 's'} changed`}
+                ? t.dock.noChanges
+                : t.dock.filesChanged(filesChanged.length)}
             </span>
 
             {gitBranch && (
@@ -144,7 +146,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               onClick={onRevert}
               disabled={filesChanged.length === 0}
               className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-              title="Discard all uncommitted changes (cannot be undone)"
+              title={t.dock.discardAll}
             >
               <RotateCcw size={13} />
             </button>
@@ -159,7 +161,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 }
               }}
               disabled={filesChanged.length === 0 || isCommitting}
-              title="Commit all changes with a message, then push to the remote"
+              title={t.dock.commitPushHint}
               className="btn-accent flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {isCommitting ? (
@@ -169,7 +171,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               ) : (
                 <CornerDownLeft size={12} />
               )}
-              <span>Commit & Push</span>
+              <span>{t.dock.commitPush}</span>
             </button>
           </div>
         </div>
@@ -188,7 +190,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 if (e.key === 'Enter') handleCommitPush();
                 if (e.key === 'Escape') setShowCommitInput(false);
               }}
-              placeholder="Commit message (e.g. fix: update config)..."
+              placeholder={t.dock.commitPlaceholder}
               className="flex-1 rounded-md border border-zinc-800 bg-black px-2.5 py-1 font-sans text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-ring"
             />
             <button
@@ -196,7 +198,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               disabled={isCommitting}
               className="btn-accent px-2.5 py-1 text-xs font-semibold"
             >
-              Commit
+              {t.dock.commit}
             </button>
             <button
               onClick={() => setShowCommitInput(false)}
@@ -218,14 +220,14 @@ export const RightPanel: React.FC<RightPanelProps> = ({
             {filesChanged.length > 0 && onSendDiffToAgent && (
               <div className="mt-4 pt-3 border-t border-zinc-900 space-y-2">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 font-mono">
-                  Autonomous Code Review
+                  {t.dock.codeReview}
                 </span>
                 <button
                   onClick={() => onSendDiffToAgent('claude')}
                   className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-200 text-xs font-semibold transition-all shadow-sm group"
                 >
                   <Sparkles size={13} className="text-violet-400 group-hover:scale-110 transition-transform" />
-                  <span>Review & Audit with Claude Code</span>
+                  <span>{t.dock.reviewWithClaude}</span>
                 </button>
               </div>
             )}
@@ -236,18 +238,16 @@ export const RightPanel: React.FC<RightPanelProps> = ({
           <div className="space-y-3">
             <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1.5">
               <span className="text-xs font-semibold text-zinc-200">
-                Sandboxes (safe copies of your project)
+                {t.dock.sandboxesTitle}
               </span>
               <p className="text-[11px] text-zinc-500 leading-relaxed">
-                When an agent run uses sandbox isolation, it works in its own git branch and folder, so your
-                real files stay untouched until you review and merge the result.
+                {t.dock.sandboxesIntro}
               </p>
             </div>
 
             {sandboxes.length === 0 ? (
               <div className="p-8 text-center text-xs text-zinc-600">
-                No sandboxes yet. Start an Auto Mesh or Squad run with "sandbox isolation" turned on and it will
-                show up here.
+                {t.dock.noSandboxes}
               </div>
             ) : (
               sandboxes.map((sb) => (
@@ -260,7 +260,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                       {sb.branchName}
                     </span>
                     <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono">
-                      Isolated
+                      {t.dock.isolated}
                     </span>
                   </div>
 
@@ -274,7 +274,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                       className="w-full flex items-center justify-center space-x-1 px-2.5 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-medium transition-all"
                     >
                       <Terminal size={12} />
-                      <span>Open Shell in Worktree</span>
+                      <span>{t.dock.openShellInWorktree}</span>
                     </button>
                   )}
                 </div>

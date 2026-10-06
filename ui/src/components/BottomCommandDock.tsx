@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { formatCwdLabel } from './XtermPane.js';
 import type { TerminalSession, CommandSuggestion, AutoSuggestItem } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface BottomCommandDockProps {
   activeSession: TerminalSession | null;
@@ -41,8 +42,6 @@ interface BottomCommandDockProps {
   onAskAgent?: (prompt: string) => void;
   /** Text pushed in from elsewhere (file explorer, skills) to append to the input. */
   insertRequest?: { text: string; nonce: number } | null;
-  /** First-step buttons shown above the input until the session has run something. */
-  quickActions?: { label: string; title?: string; onClick: () => void }[];
 }
 
 // Commands submitted from the dock, newest last. Module-level so the history
@@ -83,8 +82,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
   onAskClaude,
   onAskAgent,
   insertRequest,
-  quickActions,
 }) => {
+  const { t } = useI18n();
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'shell' | 'claude'>('shell');
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
@@ -274,7 +273,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
   const shortCwd = formatCwdLabel(cwd || '');
 
   return (
-    <div className="relative bg-base-app border-t border-zinc-900/70 select-none z-20 flex-shrink-0 font-mono">
+    <div className="@container relative bg-base-app border-t border-zinc-900/70 select-none z-20 flex-shrink-0 font-mono">
       {/* Floating AI Command Generator Card */}
       {isAiMode && (
         <div className="absolute bottom-full mb-3 left-4 right-4 max-w-xl mx-auto bg-base-elevated rounded-xl p-4 shadow-2xl border border-zinc-800 animate-slide-in-up z-30 select-none">
@@ -284,10 +283,10 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                 <Sparkles size={13} />
               </div>
               <span className="font-semibold text-xs text-zinc-100 font-sans tracking-wide">
-                Vulgaris AI Command Search
+                {t.dock.aiSearchTitle}
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
-                Natural Language ➔ Shell
+                {t.dock.aiSearchBadge}
               </span>
             </div>
 
@@ -306,7 +305,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
             {loadingAi && !suggestion ? (
               <div className="flex items-center space-x-2 py-3 text-xs text-zinc-400 font-mono">
                 <Loader2 size={14} className="animate-spin text-zinc-300" />
-                <span>Komuta çevriliyor...</span>
+                <span>{t.dock.translating}</span>
               </div>
             ) : suggestion ? (
               <>
@@ -320,7 +319,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                     <button
                       onClick={handleCopySuggestion}
                       className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
-                      title="Copy command"
+                      title={t.dock.copyCommand}
                     >
                       {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                     </button>
@@ -333,8 +332,8 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 
                 <div className="pt-2 flex items-center justify-between border-t border-zinc-800/80 text-[10px] font-mono text-zinc-400">
                   <div className="flex items-center space-x-2">
-                    <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">↵ Enter</kbd> Çalıştır</span>
-                    <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">Tab</kbd> Kutuya yerleştir</span>
+                    <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">↵ Enter</kbd> {t.dock.runKey}</span>
+                    <span><kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-sans">Tab</kbd> {t.dock.insertKey}</span>
                   </div>
 
                   <div className="flex items-center space-x-1.5">
@@ -347,14 +346,14 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                       className="flex items-center space-x-1 btn-accent px-3 py-1 text-[10px] font-sans font-semibold transition-all"
                     >
                       <Play size={10} className="fill-current" />
-                      <span>Şimdi çalıştır</span>
+                      <span>{t.dock.runNow}</span>
                     </button>
                   </div>
                 </div>
               </>
             ) : (
               <div className="py-2 text-xs text-zinc-400 font-sans">
-                Ne yapmak istediğinizi yazın, uygun komutu önereyim (örn. <span className="font-mono text-zinc-200"># port 3000 kapat</span>).
+                {t.dock.aiPromptBefore} <span className="font-mono text-zinc-200">{t.dock.aiPromptExample}</span>{t.dock.aiPromptAfter}
               </div>
             )}
           </div>
@@ -363,23 +362,6 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 
       {/* Input block: cwd chip & mode toggle on top, then the input with a send button. */}
       <form onSubmit={handleSubmit} className="relative px-4 pt-3 pb-1.5">
-        {quickActions && quickActions.length > 0 && !input && (
-          <div className="mb-2.5 flex flex-wrap items-center gap-1.5 font-sans">
-            <span className="text-[11px] text-zinc-500 mr-1">Başlamak için:</span>
-            {quickActions.map((a) => (
-              <button
-                key={a.label}
-                type="button"
-                onClick={a.onClick}
-                title={a.title}
-                className="px-2.5 py-1 rounded-md border border-zinc-800 bg-zinc-900/60 text-[11px] text-zinc-300 hover:text-zinc-100 hover:border-zinc-700 hover:bg-zinc-900 transition-colors"
-              >
-                {a.label}
-              </button>
-            ))}
-            <span className="text-[11px] text-zinc-600 ml-1">ya da aşağıya bir komut yazın</span>
-          </div>
-        )}
         <div className="flex items-center gap-2">
           <div
             className="inline-flex items-center gap-1 px-1.5 py-1 rounded bg-zinc-900/50 border border-zinc-800/50 text-zinc-400 text-[11px]"
@@ -399,7 +381,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                   ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
-              title="Terminal Shell mode — runs commands directly in PTY (prefix # for AI translation, ? for Claude)"
+              title={t.dock.shellModeHint}
             >
               <Terminal size={10} />
               <span>Shell</span>
@@ -412,7 +394,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                   ? 'bg-violet-950/80 text-violet-200 border border-violet-700/60 font-semibold shadow-sm'
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
-              title="Claude Code mode — asks questions or sends coding tasks directly to Claude Code"
+              title={t.dock.claudeModeHint}
             >
               <Sparkles size={10} className={mode === 'claude' ? 'text-violet-300' : 'text-zinc-500'} />
               <span>Claude Code</span>
@@ -454,10 +436,10 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               disabled={!activeSession}
               placeholder={
                 !activeSession
-                  ? 'Önce bir terminal seçin'
+                  ? t.dock.selectTerminalFirst
                   : mode === 'claude'
-                  ? "Claude Code'a sor veya görev ver (örn. Testleri çalıştır, hataları düzelt)..."
-                  : "Komut girin (örn. git status) · # ile Türkçe tarif edin · ? veya Ctrl+Shift+Enter ile Claude'a sorun"
+                  ? t.dock.claudePlaceholder
+                  : t.dock.shellPlaceholder
               }
               className="w-full bg-transparent text-zinc-100 text-[13px] font-mono placeholder:text-zinc-600 focus:outline-none outline-none relative z-10"
             />
@@ -471,25 +453,26 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
                 ? 'border-violet-800 text-violet-300 enabled:hover:bg-violet-950/60 disabled:border-zinc-800 disabled:text-zinc-600'
                 : 'border-zinc-800 text-zinc-600 enabled:text-zinc-200 enabled:hover:bg-zinc-900'
             }`}
-            title={mode === 'claude' ? 'Send to Claude Code' : 'Çalıştır (Enter)'}
+            title={mode === 'claude' ? t.dock.sendToClaude : t.dock.runEnter}
           >
             {mode === 'claude' ? <Sparkles size={12} className="mr-1 text-violet-400" /> : <ArrowRight size={12} />}
-            <span>{mode === 'claude' ? 'Ask' : 'Run'}</span>
+            <span>{mode === 'claude' ? t.dock.ask : t.dock.run}</span>
           </button>
         </div>
       </form>
 
 
       {/* Hint Row — matches reference: shortcut hint left, status right */}
-      <div className="flex items-center justify-between px-4 pb-2 text-[10px] font-mono text-zinc-600">
-        <div className="flex items-center gap-3 min-w-0 truncate">
-          <span><Kbd>Enter</Kbd> çalıştır</span>
-          <span><Kbd>↑↓</Kbd> geçmiş</span>
-          <span><Kbd>Tab</Kbd> tamamla</span>
-          <span><Kbd>#</Kbd> Türkçe tarif → komut</span>
-          {onAskAgent && <span><Kbd>Ctrl+Shift+Enter</Kbd> Claude'a sor</span>}
+      <div className="flex items-center justify-between gap-3 px-4 pb-2 text-[10px] font-mono text-zinc-600">
+        {/* Shortcut hints only when the pane is wide enough (split panes can be narrow). */}
+        <div className="hidden @2xl:flex items-center gap-3 min-w-0 overflow-hidden whitespace-nowrap">
+          <span><Kbd>Enter</Kbd> {t.dock.hintRun}</span>
+          <span><Kbd>↑↓</Kbd> {t.dock.hintHistory}</span>
+          <span><Kbd>Tab</Kbd> {t.dock.hintComplete}</span>
+          <span><Kbd>#</Kbd> {t.dock.hintDescribe}</span>
+          {onAskAgent && <span><Kbd>Ctrl+Shift+Enter</Kbd> {t.dock.hintAskClaude}</span>}
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 ml-auto flex-shrink-0 whitespace-nowrap">
           {gitBranch && (
             <span className="flex items-center space-x-1">
               <GitBranch size={10} />
@@ -501,10 +484,10 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               type="button"
               onClick={onOpenHud}
               className="flex items-center space-x-1 hover:text-zinc-300 transition-colors"
-              title="Open Token & Context Optimizer HUD"
+              title={t.dock.openHud}
             >
               <span className="size-1.5 rounded-full bg-primary" />
-              <span>{tokenSavingsText || '68% saved'}</span>
+              <span>{tokenSavingsText || t.app.tokenSaved(68)}</span>
             </button>
           )}
         </div>

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } from 'electron';
 
-app.name = 'Vulgaris';
+app.name = 'Vulgr';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename, extname } from 'node:path';
 import { get as httpGet } from 'node:http';
@@ -11,6 +11,7 @@ import os from 'node:os';
 import { PtyManager } from './ptyManager.js';
 import { ClaudeChatManager } from './claudeChatManager.js';
 import { SystemOneCompiler } from './systemOneCompiler.js';
+import { GitHubAuth } from './githubAuth.js';
 import { GitUtils } from '../src/git/gitUtils.js';
 import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
@@ -58,6 +59,8 @@ claudeChatManager.setConfigManager(configManager);
 const systemOneCompiler = new SystemOneCompiler();
 systemOneCompiler.setConfigManager(configManager);
 const skillsRegistry = new SharedSkillsRegistry();
+// Created once the app is ready: safeStorage cannot decrypt the saved token before that.
+let githubAuth: GitHubAuth;
 let memoryStore = new MemoryStore(currentCwd);
 const worktreeManager = new WorktreeManager();
 let autoSuggestEngine = new AutoSuggestEngine(currentCwd, memoryStore, skillsRegistry);
@@ -208,7 +211,7 @@ async function createWindow() {
     height: 880,
     minWidth: 900,
     minHeight: 600,
-    title: 'Vulgaris - AI Terminal Orchestrator',
+    title: 'Vulgr - AI Terminal Orchestrator',
     backgroundColor: '#0c0d12',
     show: true,
     autoHideMenuBar: true,
@@ -225,6 +228,7 @@ async function createWindow() {
 
   ptyManager.setWindow(mainWindow);
   claudeChatManager.setWindow(mainWindow);
+  githubAuth.setWindow(mainWindow);
 
   // Open external links (markdown link clicks) in the OS browser, never in-app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -278,6 +282,16 @@ async function createWindow() {
 }
 
 function setupIpcHandlers() {
+  // GitHub sign-in (OAuth device flow)
+  githubAuth = new GitHubAuth(join(app.getPath('userData'), 'github-auth.json'));
+  ipcMain.handle('auth:get-user', () => githubAuth.getUser());
+  ipcMain.handle('auth:login', () => githubAuth.startLogin());
+  ipcMain.handle('auth:cancel', () => githubAuth.cancelLogin());
+  ipcMain.handle('auth:logout', () => githubAuth.logout());
+  ipcMain.handle('auth:open-profile', (_, url: string) => {
+    if (/^https:\/\/github\.com\//.test(url)) shell.openExternal(url);
+  });
+
   // Custom Frameless Window Controls
   ipcMain.on('window:minimize', () => {
     mainWindow?.minimize();
@@ -423,7 +437,7 @@ function setupIpcHandlers() {
   });
 
   // Autonomous Agent Mesh IPC Handler
-  ipcMain.handle('mesh:run', async (_, { goal, builder, verifier, auditor, verifyCmd, maxRounds, cwd, useSandbox }) => {
+  ipcMain.handle('mesh:run', async (_, { goal, builder, verifier, auditor, verifyCmd, maxRounds, cwd, useSandbox, lang }) => {
     const mesh = new AgentMesh({
       builder,
       verifier,
@@ -433,6 +447,7 @@ function setupIpcHandlers() {
       // The project folder picked in the sidebar, not wherever the app was launched from.
       cwd: cwd || currentCwd,
       useSandbox: useSandbox ?? false,
+      lang: lang === 'en' ? 'en' : 'tr',
       onMessage: (message) => {
         mainWindow?.webContents.send('mesh:event', message);
       },
@@ -557,7 +572,7 @@ function setupIpcHandlers() {
         : [{ name: 'Markdown Document', extensions: ['md', 'markdown'] }];
 
     const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Save Vulgaris Technical Report',
+      title: 'Save Vulgr Technical Report',
       defaultPath: defaultName || `vulgaris-report-${Date.now()}.${ext}`,
       filters,
     });

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Terminal, type IMarker, type IDecoration } from '@xterm/xterm';
+import { Terminal, type IMarker, type IDecoration, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
@@ -13,6 +13,57 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import type { TerminalSession } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
+import { useTheme, type Theme } from '../theme.js';
+
+const TERMINAL_THEMES: Record<Theme, ITheme> = {
+  dark: {
+    background: '#000000',
+    foreground: '#e4e4e7',
+    cursor: '#ededed',
+    cursorAccent: '#000000',
+    selectionBackground: '#27272a',
+    black: '#18181b',
+    red: '#ef4444',
+    green: '#22c55e',
+    yellow: '#eab308',
+    blue: '#3b82f6',
+    magenta: '#a855f7',
+    cyan: '#06b6d4',
+    white: '#f4f4f5',
+    brightBlack: '#52525b',
+    brightRed: '#f87171',
+    brightGreen: '#4ade80',
+    brightYellow: '#fde047',
+    brightBlue: '#60a5fa',
+    brightMagenta: '#c084fc',
+    brightCyan: '#22d3ee',
+    brightWhite: '#ffffff',
+  },
+  light: {
+    background: '#ffffff',
+    foreground: '#27272a',
+    cursor: '#18181b',
+    cursorAccent: '#ffffff',
+    selectionBackground: '#d4d4d8',
+    black: '#18181b',
+    red: '#dc2626',
+    green: '#16a34a',
+    yellow: '#a16207',
+    blue: '#2563eb',
+    magenta: '#9333ea',
+    cyan: '#0891b2',
+    white: '#a1a1aa',
+    brightBlack: '#71717a',
+    brightRed: '#ef4444',
+    brightGreen: '#22c55e',
+    brightYellow: '#ca8a04',
+    brightBlue: '#3b82f6',
+    brightMagenta: '#a855f7',
+    brightCyan: '#06b6d4',
+    brightWhite: '#3f3f46',
+  },
+};
 
 interface XtermPaneProps {
   session: TerminalSession;
@@ -61,6 +112,13 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   onSessionState,
   onCommandFinished,
 }) => {
+  const { t } = useI18n();
+  const { theme } = useTheme();
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  // Block headers are built imperatively inside the terminal effect; read the latest strings from here.
+  const tRef = useRef(t);
+  tRef.current = t;
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
@@ -78,6 +136,11 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   const onPipeErrorRef = useRef(onPipeErrorToAgent);
   onPipeErrorRef.current = onPipeErrorToAgent;
 
+  // Follow theme switches in an already-open terminal.
+  useEffect(() => {
+    if (xtermInstance.current) xtermInstance.current.options.theme = TERMINAL_THEMES[theme];
+  }, [theme]);
+
   useEffect(() => {
     if (!isShellSession || !onRegisterCommandHandler) return;
     onRegisterCommandHandler(session.id, (command) => submitCommandRef.current?.(command));
@@ -93,29 +156,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       cursorStyle: 'bar',
       fontSize: 13,
       fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace",
-      theme: {
-        background: '#000000',
-        foreground: '#e4e4e7',
-        cursor: '#ededed',
-        cursorAccent: '#000000',
-        selectionBackground: '#27272a',
-        black: '#18181b',
-        red: '#ef4444',
-        green: '#22c55e',
-        yellow: '#eab308',
-        blue: '#3b82f6',
-        magenta: '#a855f7',
-        cyan: '#06b6d4',
-        white: '#f4f4f5',
-        brightBlack: '#52525b',
-        brightRed: '#f87171',
-        brightGreen: '#4ade80',
-        brightYellow: '#fde047',
-        brightBlue: '#60a5fa',
-        brightMagenta: '#c084fc',
-        brightCyan: '#22d3ee',
-        brightWhite: '#ffffff',
-      },
+      theme: TERMINAL_THEMES[themeRef.current],
     });
 
     const fit = new FitAddon();
@@ -300,12 +341,12 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         if (b.running) return;
         addAction(
           b,
-          'Copy output',
+          tRef.current.terminal.copyOutput,
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
           () => void navigator.clipboard.writeText(blockText(b))
         );
         if (b.exitCode !== null && b.exitCode !== 0) {
-          addAction(b, 'Fix with Claude', 'Fix', () =>
+          addAction(b, tRef.current.terminal.fixWithClaude, tRef.current.terminal.fix, () =>
             onPipeErrorRef.current('claude', `A shell command failed (exit ${b.exitCode}). Output:\n${blockText(b)}`)
           );
         }
@@ -570,7 +611,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
               onSplit('h');
             }}
             className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-            title="Split Pane Horizontally (Ctrl+Shift+D)"
+            title={t.terminal.splitH}
           >
             <SplitSquareHorizontal size={12} />
           </button>
@@ -580,7 +621,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
               onSplit('v');
             }}
             className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-            title="Split Pane Vertically (Ctrl+Shift+E)"
+            title={t.terminal.splitV}
           >
             <SplitSquareVertical size={12} />
           </button>
@@ -590,7 +631,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
               onClose();
             }}
             className="p-1 rounded text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-            title="Close Pane (Ctrl+Shift+W)"
+            title={t.terminal.closePane}
           >
             <X size={12} />
           </button>
@@ -613,7 +654,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                 onSplit('h');
               }}
               className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-              title="Split Pane Horizontally (Ctrl+Shift+D)"
+              title={t.terminal.splitH}
             >
               <SplitSquareHorizontal size={12} />
             </button>
@@ -623,7 +664,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                 onSplit('v');
               }}
               className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-              title="Split Pane Vertically (Ctrl+Shift+E)"
+              title={t.terminal.splitV}
             >
               <SplitSquareVertical size={12} />
             </button>
@@ -633,7 +674,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                 onClose();
               }}
               className="p-1 rounded text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-              title="Close Pane (Ctrl+Shift+W)"
+              title={t.terminal.closePane}
             >
               <X size={12} />
             </button>
@@ -648,7 +689,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
             <div className="p-1 rounded-md bg-amber-500/20 text-amber-300">
               <AlertTriangle size={14} className="" />
             </div>
-            <span className="font-semibold text-[11px]">Self-Correction Sniffer:</span>
+            <span className="font-semibold text-[11px]">{t.terminal.sniffer}</span>
             <span className="font-mono text-[10px] text-amber-300/90 truncate max-w-sm">
               {detectedError.slice(0, 65)}...
             </span>
@@ -661,15 +702,15 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
                 setDetectedError(null);
               }}
               className="flex items-center space-x-1 px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 text-[11px] font-semibold transition-all shadow-sm"
-              title="Send this error trace directly to Claude Code to fix"
+              title={t.terminal.sendErrorHint}
             >
               <Sparkles size={11} />
-              <span>Fix with Claude Code</span>
+              <span>{t.terminal.fixWithClaudeCode}</span>
             </button>
             <button
               onClick={() => setDetectedError(null)}
               className="p-1 rounded-md text-amber-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors ml-1"
-              title="Dismiss"
+              title={t.terminal.dismiss}
             >
               <X size={12} />
             </button>
