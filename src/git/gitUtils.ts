@@ -11,6 +11,14 @@ export interface GitDiffResult {
   filesChanged: string[];
 }
 
+/** File paths from `git status --porcelain` output. */
+function parseStatus(raw: string): string[] {
+  return raw
+    .split('\n')
+    .map((l) => l.trim().substring(3).trim())
+    .filter(Boolean);
+}
+
 export class GitUtils {
   private readonly cwd: string;
 
@@ -46,6 +54,18 @@ export class GitUtils {
   }
 
   /**
+   * Changed files only (`git status --porcelain`): one cheap git call, enough for
+   * a "there are changes" badge without building the full diff.
+   */
+  async getChangedFilesAsync(): Promise<string[]> {
+    try {
+      return parseStatus(await this.git(['status', '--porcelain']));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Non-blocking getDiff(): same result, with the git commands run in parallel.
    * `git status` failing doubles as the "not a repo" check.
    */
@@ -68,10 +88,7 @@ export class GitUtils {
         combinedDiff = combinedDiff ? `${combinedDiff}\n${untrackedNotes}` : untrackedNotes;
       }
 
-      const filesChanged = filesRaw
-        .split('\n')
-        .map((l) => l.trim().substring(3).trim())
-        .filter(Boolean);
+      const filesChanged = parseStatus(filesRaw);
 
       return { hasChanges: combinedDiff.trim().length > 0, diff: combinedDiff, filesChanged };
     } catch {
@@ -139,10 +156,7 @@ export class GitUtils {
         cwd: this.cwd,
         encoding: 'utf-8',
       });
-      const filesChanged = filesRaw
-        .split('\n')
-        .map((l) => l.trim().substring(3).trim())
-        .filter(Boolean);
+      const filesChanged = parseStatus(filesRaw);
 
       return {
         hasChanges: combinedDiff.trim().length > 0,

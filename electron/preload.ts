@@ -42,6 +42,8 @@ export interface WarpApi {
   // System & Git
   getDoctorStatus: () => Promise<any>;
   getGitDiff: (cwd?: string) => Promise<{ hasChanges: boolean; diff: string; filesChanged: string[] }>;
+  /** Changed file paths only: a cheap check for the changes badge. */
+  getGitStatus: (cwd?: string) => Promise<string[]>;
   revertGit: (cwd?: string) => Promise<boolean>;
   getGitBranch: (cwd?: string) => Promise<string | null>;
   gitCommit: (message: string, cwd?: string) => Promise<boolean>;
@@ -172,6 +174,7 @@ const api: WarpApi = {
 
   getDoctorStatus: () => ipcRenderer.invoke('system:doctor'),
   getGitDiff: (cwd?: string) => ipcRenderer.invoke('git:diff', { cwd }),
+  getGitStatus: (cwd?: string) => ipcRenderer.invoke('git:status', { cwd }),
   revertGit: (cwd?: string) => ipcRenderer.invoke('git:revert', { cwd }),
   getGitBranch: (cwd?: string) => ipcRenderer.invoke('git:branch', { cwd }),
   gitCommit: (message: string, cwd?: string) => ipcRenderer.invoke('git:commit', { message, cwd }),
