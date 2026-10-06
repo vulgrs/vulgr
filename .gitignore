@@ -11,3 +11,4 @@ dist/
 .warp-memory.json
 .vulgaris-memory.json
 .warp-config.json
+release/

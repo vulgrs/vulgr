@@ -19,6 +19,10 @@
   <img src="docs/screenshot.png" alt="Vulgr with a split tab, groups and per-pane command boxes" />
 </p>
 
+## Download
+
+Grab the latest build from [Releases](https://github.com/vulgrs/vulgr/releases): `Vulgr-<version>-arm64.dmg` (Apple Silicon), `Vulgr-<version>-x64.dmg` (Intel Mac) or `Vulgr-Setup-<version>.exe` (Windows). Beta builds are not code-signed yet — on macOS, right-click the app and choose **Open** the first time; on Windows, choose **More info → Run anyway**.
+
 ## Features
 
 - **Real terminals** — xterm.js + node-pty, so agent TUIs, colors and prompts work as they do in your normal terminal.
@@ -57,6 +61,7 @@ npm run dev:app    # start the UI dev server and the app
 | --- | --- |
 | `npm run dev:app` | Vite dev server + Electron, with hot reload for the UI |
 | `npm run build` | Type-check and build everything into `dist/` |
+| `npm run dist:mac` / `npm run dist:win` | Package the app into a DMG / Windows installer under `release/` |
 | `npm run type-check` | Type-check the main process and the UI |
 | `npm test` | Run the engine tests (after `npm run build`) |
 

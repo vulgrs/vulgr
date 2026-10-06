@@ -1,6 +1,6 @@
 {
   "name": "vulgr",
-  "version": "1.0.0",
+  "version": "0.1.0-beta",
   "productName": "Vulgr",
   "description": "Open-source terminal for working with AI coding agents (Claude Code, Codex, AGY)",
   "type": "module",
@@ -18,7 +18,9 @@
     "dev:app": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron dist/electron/main.js\"",
     "dev:ui": "vite",
     "test": "node --test dist/src/tests/**/*.test.js",
-    "postinstall": "node -e \"if (process.platform !== 'win32') { const fs = require('fs'), glob = ['prebuilds/darwin-arm64/spawn-helper', 'prebuilds/darwin-x64/spawn-helper']; glob.forEach(p => { const full = 'node_modules/node-pty/' + p; if (fs.existsSync(full)) { try { fs.chmodSync(full, 0o755); } catch {} } }); }\""
+    "postinstall": "node -e \"if (process.platform !== 'win32') { const fs = require('fs'), glob = ['prebuilds/darwin-arm64/spawn-helper', 'prebuilds/darwin-x64/spawn-helper']; glob.forEach(p => { const full = 'node_modules/node-pty/' + p; if (fs.existsSync(full)) { try { fs.chmodSync(full, 0o755); } catch {} } }); }\"",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win"
   },
   "keywords": [
     "warp",
@@ -76,6 +78,7 @@
     "clsx": "^2.1.1",
     "concurrently": "^9.1.2",
     "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
     "lucide-react": "^0.477.0",
     "postcss": "^8.5.3",
     "react": "^19.0.0",
@@ -88,5 +91,94 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "build": {
+    "appId": "tech.vulgr.app",
+    "productName": "Vulgr",
+    "copyright": "Copyright © 2026 Vulgr contributors",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/electron/**/*",
+      "dist/src/**/*",
+      "dist/ui/**/*",
+      "package.json",
+      "!**/*.map",
+      "!**/*.d.ts"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**/*"
+    ],
+    "npmRebuild": false,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png"
+    },
+    "dmg": {
+      "title": "Vulgr ${version}",
+      "background": "build/background.png",
+      "iconSize": 96,
+      "iconTextSize": 13,
+      "window": {
+        "width": 660,
+        "height": 420
+      },
+      "contents": [
+        {
+          "x": 170,
+          "y": 205,
+          "type": "file"
+        },
+        {
+          "x": 490,
+          "y": 205,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "artifactName": "Vulgr-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "ui/public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "ui/public/icon.ico",
+      "uninstallerIcon": "ui/public/icon.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Vulgr",
+      "artifactName": "Vulgr-Setup-${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "vulgrs",
+      "repo": "vulgr",
+      "releaseType": "prerelease"
+    }
   }
 }
