@@ -25,6 +25,14 @@ interface StoredAuth {
   user: GitHubUser;
 }
 
+/**
+ * Client ID of Vulgr's GitHub OAuth App (with "Enable Device Flow" on). It is
+ * public by design — the device flow needs no client secret — so it ships inside
+ * the app and released builds can sign in without any setup. GITHUB_CLIENT_ID in
+ * the environment overrides it (e.g. a separate dev app).
+ */
+const VULGR_GITHUB_CLIENT_ID = '';
+
 const DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const USER_URL = 'https://api.github.com/user';
@@ -33,7 +41,7 @@ const DEVICE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 /**
  * GitHub sign-in via the OAuth device flow: no client secret and no redirect
  * server are needed, which suits a desktop app. Requires an OAuth App with
- * "Enable Device Flow" checked; its Client ID is read from GITHUB_CLIENT_ID.
+ * "Enable Device Flow" checked; see VULGR_GITHUB_CLIENT_ID.
  */
 export class GitHubAuth {
   private window: BrowserWindow | null = null;
@@ -67,7 +75,7 @@ export class GitHubAuth {
   }
 
   async startLogin(): Promise<DeviceCodeInfo | { error: string }> {
-    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientId = process.env.GITHUB_CLIENT_ID || VULGR_GITHUB_CLIENT_ID;
     if (!clientId) {
       return { error: 'missing-client-id' };
     }
