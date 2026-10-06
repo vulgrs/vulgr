@@ -17,7 +17,7 @@ export const profile = ns(
     toLight: 'Switch to light theme',
     toDark: 'Switch to dark theme',
     errors: {
-      'missing-client-id': 'GITHUB_CLIENT_ID is not set. Add your GitHub OAuth App Client ID to the .env file.',
+      'missing-client-id': 'GitHub sign-in is not set up in this build yet.',
       expired: 'The code expired. Try signing in again.',
       denied: 'The sign-in request was denied.',
       'no-profile': 'Could not load the GitHub profile.',
@@ -40,7 +40,7 @@ export const profile = ns(
     toLight: 'Açık temaya geç',
     toDark: 'Koyu temaya geç',
     errors: {
-      'missing-client-id': 'GITHUB_CLIENT_ID ayarlanmamış. .env dosyasına GitHub OAuth App Client ID değerini ekleyin.',
+      'missing-client-id': 'Bu sürümde GitHub girişi henüz ayarlanmadı.',
       expired: 'Kodun süresi doldu. Tekrar giriş yapmayı deneyin.',
       denied: 'Giriş isteği reddedildi.',
       'no-profile': 'GitHub profili alınamadı.',
