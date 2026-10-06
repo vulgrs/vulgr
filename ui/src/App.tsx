@@ -3,6 +3,7 @@ import { TopBar } from './components/TopBar.js';
 import { PaneGrid } from './components/PaneGrid.js';
 import { PaneToolbar } from './components/PaneToolbar.js';
 import { DockSlot } from './components/DockSlot.js';
+import { Onboarding, shouldShowOnboarding } from './components/Onboarding.js';
 import { BottomCommandDock } from './components/BottomCommandDock.js';
 import { RightPanel } from './components/RightPanel.js';
 import { ClaudeChatView } from './components/ClaudeChatView.js';
@@ -127,20 +128,10 @@ export const App: React.FC = () => {
   const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  // "Nasıl kullanılır?" guide: opens by itself on the very first launch.
-  const [guideOpen, setGuideOpen] = useState(() => {
-    try {
-      return localStorage.getItem('vulgaris.guideSeen') !== '1';
-    } catch {
-      return false;
-    }
-  });
-  const closeGuide = () => {
-    setGuideOpen(false);
-    try {
-      localStorage.setItem('vulgaris.guideSeen', '1');
-    } catch {}
-  };
+  // First launch shows the welcome flow; the guide opens from Help / F1.
+  const [onboardingOpen, setOnboardingOpen] = useState(shouldShowOnboarding);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const closeGuide = () => setGuideOpen(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [chatModeOpen, setChatModeOpen] = useState(false);
   const [chatInitialPrompt, setChatInitialPrompt] = useState('');
@@ -1411,6 +1402,7 @@ export const App: React.FC = () => {
 
       {/* First-run / F1 feature guide */}
       <GuideModal isOpen={guideOpen} onClose={closeGuide} onAction={handleGuideAction} />
+      {onboardingOpen && <Onboarding onDone={() => setOnboardingOpen(false)} />}
 
       {/* Vulgr Session Timeline & Technical Report Modal */}
       <ExportReportModal
