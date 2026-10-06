@@ -1,7 +1,8 @@
 {
-  "name": "multi-cli-orchestrator",
+  "name": "vulgr",
   "version": "1.0.0",
-  "description": "Warp-like AI Native Terminal & Multi-CLI Orchestrator Desktop Application",
+  "productName": "Vulgr",
+  "description": "Open-source terminal for working with AI coding agents (Claude Code, Codex, AGY)",
   "type": "module",
   "main": "dist/electron/main.js",
   "bin": {
@@ -30,9 +31,16 @@
     "self-correction",
     "adversarial-review"
   ],
-  "author": "Advanced Agentic Coding Team",
+  "author": "Vulgr contributors",
   "license": "MIT",
   "homepage": "https://vulgr.tech",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vulgrs/vulgr.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vulgrs/vulgr/issues"
+  },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@clack/prompts": "^0.8.2",
