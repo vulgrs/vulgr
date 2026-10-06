@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Copy, Loader2, LogIn, Moon, Monitor, Sun, Terminal } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Github, Loader2, Moon, Monitor, Sun, Terminal } from 'lucide-react';
 import { useI18n, LANGUAGES, type Messages } from '../i18n/index.js';
 import { useTheme, type ThemePreference } from '../theme.js';
 import { useGitHubAuth } from '../hooks/useGitHubAuth.js';
@@ -11,7 +11,7 @@ import duoLoopIcon from '../assets/sidebar/duo-loop.svg';
 import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
 
-const STEPS = ['welcome', 'prefs', 'github', 'terminals', 'split', 'command', 'agents', 'project', 'done'] as const;
+const STEPS = ['signin', 'prefs', 'terminals', 'split', 'command', 'agents', 'project', 'done'] as const;
 type Step = (typeof STEPS)[number];
 
 const MONO = "font-['Geist_Mono',ui-monospace,monospace]";
@@ -56,25 +56,64 @@ const MockDock: React.FC<{ text: string; dim?: boolean }> = ({ text, dim }) => (
   </div>
 );
 
-const Visual: React.FC<{ step: Step; t: Messages; avatarUrl?: string; userName?: string; theme: string }> = ({
-  step,
-  t,
-  avatarUrl,
-  userName,
-  theme,
-}) => {
+/** The device code split into two boxed halves, the way GitHub's page asks for it. */
+const CodeBoxes: React.FC<{ code: string }> = ({ code }) => (
+  <div className="flex items-center gap-3">
+    {code.split('-').map((half, i) => (
+      <React.Fragment key={i}>
+        {i > 0 && <span className="text-zinc-600 text-[22px]">–</span>}
+        <div className="flex gap-1.5">
+          {half.split('').map((ch, j) => (
+            <span
+              key={j}
+              className="w-10 h-12 rounded-[8px] border border-zinc-700 bg-base-elevated flex items-center justify-center text-[24px] text-zinc-100"
+            >
+              {ch}
+            </span>
+          ))}
+        </div>
+      </React.Fragment>
+    ))}
+  </div>
+);
+
+const Visual: React.FC<{
+  step: Step;
+  t: Messages;
+  avatarUrl?: string;
+  userName?: string;
+  userCode?: string;
+  theme: string;
+}> = ({ step, t, avatarUrl, userName, userCode, theme }) => {
   switch (step) {
-    case 'welcome':
+    case 'signin':
+      if (avatarUrl)
+        return (
+          <div className="flex flex-col items-center gap-3 animate-modal-in">
+            <span className="relative">
+              <img src={avatarUrl} alt="" className="w-20 h-20 rounded-full border border-zinc-700 object-cover" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-emerald-500 border-2 border-base-app flex items-center justify-center text-white">
+                <Check size={13} />
+              </span>
+            </span>
+            <span className="text-[13px] text-zinc-300">{userName}</span>
+          </div>
+        );
+      if (userCode) return <CodeBoxes code={userCode} />;
+      return (
+        <div className="flex flex-col items-center justify-center gap-4">
+          <img src="./logo-mark.svg" alt="" className="logo-mark w-16 h-16" />
+          <div className="font-sans font-black text-[52px] leading-none tracking-tight text-zinc-100">Vulgr.</div>
+        </div>
+      );
     case 'done':
       return (
         <div className="flex flex-col items-center justify-center gap-4">
           <img src="./logo-mark.svg" alt="" className="logo-mark w-16 h-16" />
           <div className="font-sans font-black text-[52px] leading-none tracking-tight text-zinc-100">Vulgr.</div>
-          {step === 'done' && (
-            <span className="flex items-center gap-1.5 text-[11px] text-emerald-400">
-              <Check size={13} /> {t.onboarding.done.title}
-            </span>
-          )}
+          <span className="flex items-center gap-1.5 text-[11px] text-emerald-400">
+            <Check size={13} /> {t.onboarding.done.title}
+          </span>
         </div>
       );
     case 'prefs':
@@ -101,18 +140,6 @@ const Visual: React.FC<{ step: Step; t: Messages; avatarUrl?: string; userName?:
               </div>
             </div>
           ))}
-        </div>
-      );
-    case 'github':
-      return (
-        <div className="w-72 rounded-[14px] bg-base-elevated border border-zinc-800 flex items-center gap-3 px-5 py-4">
-          <span className="relative w-10 h-10 rounded-full bg-base-app border border-zinc-700 flex items-center justify-center text-zinc-500 overflow-hidden">
-            {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : <LogIn size={15} />}
-          </span>
-          <span className="flex flex-col gap-1">
-            <span className="text-[13px] text-zinc-100">{userName || t.profile.signIn}</span>
-            <span className="text-[10px] text-zinc-500">{userName ? 'GitHub' : t.profile.withGitHub}</span>
-          </span>
         </div>
       );
     case 'terminals':
@@ -214,16 +241,20 @@ export const shouldShowOnboarding = (): boolean => {
   }
 };
 
-/** First-launch welcome: Start, preferences, GitHub sign-in, then a tour of every part of the app. */
+/** First launch: GitHub sign-in up front, preferences, then a tour of every part of the app. */
 export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const { t, lang, setLang } = useI18n();
   const { theme, preference, setPreference } = useTheme();
-  const { state, login, cancel } = useGitHubAuth();
+  const { state, login, cancel, openProfile } = useGitHubAuth();
   const [index, setIndex] = useState(0);
   const [copied, setCopied] = useState(false);
   const step = STEPS[index];
   const isFirst = index === 0;
   const isLast = index === STEPS.length - 1;
+  const user = state.status === 'signed-in' ? state.user : null;
+  const pending = state.status === 'pending' ? state : null;
+  // The sign-in screen waits for a decision: sign in, or "continue without".
+  const blockedOnSignIn = step === 'signin' && !user;
 
   const finish = useCallback(() => {
     try {
@@ -234,6 +265,16 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
 
   const next = useCallback(() => (isLast ? finish() : setIndex((i) => i + 1)), [isLast, finish]);
   const back = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+
+  // GitHub's page asks for the code: put it on the clipboard as soon as it exists.
+  const copyCode = useCallback((code: string) => {
+    navigator.clipboard.writeText(code).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, []);
+  useEffect(() => {
+    if (pending?.userCode) copyCode(pending.userCode);
+  }, [pending?.userCode, copyCode]);
 
   // Take keyboard focus from the command box underneath, so keys drive this flow
   // instead of typing into a terminal.
@@ -247,15 +288,25 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
     e.stopPropagation();
     // Enter on a focused button already clicks it.
     if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'BUTTON') return;
+    if (blockedOnSignIn) {
+      if (e.key === 'Enter' && state.status === 'signed-out') void login();
+      return;
+    }
     if (e.key === 'ArrowRight' || e.key === 'Enter') next();
     if (e.key === 'ArrowLeft') back();
   };
 
-  const user = state.status === 'signed-in' ? state.user : null;
+  const s = t.onboarding.signin;
   const text =
-    step === 'welcome' || step === 'prefs' || step === 'github' || step === 'done'
-      ? { ...t.onboarding[step], points: undefined as string[] | undefined }
-      : t.onboarding[step];
+    step === 'signin'
+      ? user
+        ? { title: s.welcomeUser(user.name || user.login), body: s.signedInBody, points: undefined as string[] | undefined }
+        : pending
+          ? { title: s.codeTitle, body: s.codeBody, points: undefined }
+          : { title: s.title, body: s.body, points: undefined }
+      : step === 'prefs' || step === 'done'
+        ? { ...t.onboarding[step], points: undefined as string[] | undefined }
+        : t.onboarding[step];
 
   const themeOptions: { value: ThemePreference; label: string; icon: React.ReactNode }[] = [
     { value: 'dark', label: t.settings.themeDark, icon: <Moon size={12} /> },
@@ -282,7 +333,7 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
         className="absolute bottom-0 right-0 w-[520px] opacity-60 brightness-[2.6] [.light_&]:brightness-100 pointer-events-none"
       />
 
-      {!isLast && (
+      {!isLast && !blockedOnSignIn && (
         <button onClick={finish} className="absolute top-5 right-6 text-[11px] text-zinc-500 hover:text-zinc-100 transition-colors">
           {t.onboarding.skip}
         </button>
@@ -290,10 +341,18 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
 
       <div className="relative w-[min(760px,92vw)] rounded-[16px] border border-zinc-800 bg-base-surface shadow-2xl overflow-hidden">
         <div className="h-[260px] flex items-center justify-center border-b border-zinc-800 bg-base-app">
-          <Visual key={step} step={step} t={t} avatarUrl={user?.avatarUrl} userName={user ? user.name || user.login : undefined} theme={theme} />
+          <Visual
+            key={`${step}-${state.status}`}
+            step={step}
+            t={t}
+            avatarUrl={user?.avatarUrl}
+            userName={user ? user.name || user.login : undefined}
+            userCode={pending?.userCode}
+            theme={theme}
+          />
         </div>
 
-        <div key={step} className="px-9 pt-7 pb-6 min-h-[230px] animate-slide-in-up">
+        <div key={`${step}-${state.status}`} className="px-9 pt-7 pb-6 min-h-[230px] animate-slide-in-up">
           {!isFirst && !isLast && (
             <div className="text-[10px] text-zinc-500 mb-2">{t.onboarding.stepOf(index, STEPS.length - 2)}</div>
           )}
@@ -309,6 +368,60 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* Sign-in: signed out → one clear button; waiting → what to do in the browser */}
+          {step === 'signin' && !user && !pending && (
+            <div className="mt-6 flex flex-col items-start gap-3">
+              <button
+                onClick={() => void login()}
+                disabled={state.status === 'loading'}
+                className="flex items-center gap-2.5 px-5 py-2.5 rounded-[9px] bg-zinc-100 text-zinc-900 text-[13px] hover:bg-zinc-200 transition-colors disabled:opacity-50"
+              >
+                <Github size={15} /> {s.continueWithGitHub}
+              </button>
+              {state.status === 'signed-out' && state.error && (
+                <p className="text-[11px] text-red-400 max-w-[560px]">{t.profile.errors[state.error] ?? state.error}</p>
+              )}
+              <button onClick={next} className="text-[11px] text-zinc-500 hover:text-zinc-100 transition-colors">
+                {s.skipForNow}
+              </button>
+            </div>
+          )}
+
+          {step === 'signin' && pending && (
+            <div className="mt-5 space-y-4">
+              <ol className="space-y-1.5">
+                {[s.codeStep1, copied ? s.codeStep2Copied : s.codeStep2, s.codeStep3].map((line, i) => (
+                  <li key={i} className="flex items-center gap-2.5 text-[11.5px] text-zinc-300">
+                    <span className="w-4 h-4 rounded-full border border-zinc-700 text-[9px] text-zinc-400 flex items-center justify-center flex-shrink-0">
+                      {i + 1}
+                    </span>
+                    {line}
+                  </li>
+                ))}
+              </ol>
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                  <Loader2 size={11} className="animate-spin" /> {t.profile.waiting}
+                </span>
+                <button
+                  onClick={() => copyCode(pending.userCode)}
+                  className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-100"
+                >
+                  {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />} {t.profile.copyCode}
+                </button>
+                <button
+                  onClick={() => openProfile(pending.verificationUri)}
+                  className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-100"
+                >
+                  <ExternalLink size={11} /> {s.reopen}
+                </button>
+                <button onClick={cancel} className="text-[11px] text-zinc-500 hover:text-zinc-100">
+                  {t.common.cancel}
+                </button>
+              </div>
+            </div>
           )}
 
           {step === 'prefs' && (
@@ -332,58 +445,14 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
               </div>
             </div>
           )}
-
-          {step === 'github' && (
-            <div className="mt-5">
-              {user ? (
-                <div className="flex items-center gap-2 text-[12px] text-emerald-400">
-                  <Check size={14} /> {t.onboarding.github.signedInAs(user.name || user.login)}
-                </div>
-              ) : state.status === 'pending' ? (
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(state.userCode);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 1200);
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-[7px] border border-zinc-700 bg-base-elevated text-[15px] tracking-[0.2em] text-zinc-100"
-                    title={t.profile.copyCode}
-                  >
-                    {state.userCode}
-                    {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} className="text-zinc-500" />}
-                  </button>
-                  <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                    <Loader2 size={11} className="animate-spin" /> {t.profile.waiting}
-                  </span>
-                  <button onClick={cancel} className="text-[11px] text-zinc-500 hover:text-zinc-100">
-                    {t.common.cancel}
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <button
-                    onClick={() => void login()}
-                    className="flex items-center gap-2 px-4 py-2 rounded-[8px] bg-zinc-100 text-zinc-900 text-[12px] hover:bg-zinc-200 transition-colors"
-                  >
-                    <LogIn size={13} /> {t.profile.signInTitle}
-                  </button>
-                  {state.status === 'signed-out' && state.error && (
-                    <p className="text-[11px] text-red-400 max-w-[560px]">{t.profile.errors[state.error] ?? state.error}</p>
-                  )}
-                  <p className="text-[10.5px] text-zinc-500">{t.onboarding.github.later}</p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="flex items-center justify-between px-9 pb-6">
           <div className="flex items-center gap-1.5">
-            {STEPS.map((s, i) => (
+            {STEPS.map((stepName, i) => (
               <button
-                key={s}
-                onClick={() => setIndex(i)}
+                key={stepName}
+                onClick={() => !blockedOnSignIn && setIndex(i)}
                 className={`h-1.5 rounded-full transition-all ${i === index ? 'w-5 bg-zinc-200' : 'w-1.5 bg-zinc-700 hover:bg-zinc-500'}`}
                 aria-label={String(i + 1)}
               />
@@ -398,13 +467,15 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
                 <ArrowLeft size={13} /> {t.onboarding.back}
               </button>
             )}
-            <button
-              onClick={next}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-[8px] bg-zinc-100 text-zinc-900 text-[12px] hover:bg-zinc-200 transition-colors"
-            >
-              {isFirst ? t.onboarding.start : isLast ? t.onboarding.finish : t.onboarding.next}
-              {!isLast && <ArrowRight size={13} />}
-            </button>
+            {!blockedOnSignIn && (
+              <button
+                onClick={next}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-[8px] bg-zinc-100 text-zinc-900 text-[12px] hover:bg-zinc-200 transition-colors"
+              >
+                {isLast ? t.onboarding.finish : t.onboarding.next}
+                {!isLast && <ArrowRight size={13} />}
+              </button>
+            )}
           </div>
         </div>
       </div>

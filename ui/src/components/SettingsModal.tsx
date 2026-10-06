@@ -27,6 +27,8 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfigChanged?: (config: WarpConfig) => void;
+  /** Re-open the first-launch welcome flow. */
+  onShowWelcome?: () => void;
 }
 
 const claudeModels = (t: Messages): OptionItem[] => [
@@ -66,6 +68,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   onConfigChanged,
+  onShowWelcome,
 }) => {
   const { t, lang, setLang } = useI18n();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
@@ -188,6 +191,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </Field>
                     </CardContent>
                   </Card>
+                  {onShowWelcome && (
+                    <Card size="sm">
+                      <CardHeader>
+                        <CardTitle>{t.settings.welcomeTitle}</CardTitle>
+                        <CardDescription>{t.settings.welcomeDescription}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button variant="outline" onClick={onShowWelcome}>
+                          {t.settings.welcomeButton}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </ScrollArea>
             </TabsContent>

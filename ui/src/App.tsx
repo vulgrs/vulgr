@@ -1424,6 +1424,10 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
+        onShowWelcome={() => {
+          setSettingsModalOpen(false);
+          setOnboardingOpen(true);
+        }}
       />
 
       {/* First-run / F1 feature guide */}
