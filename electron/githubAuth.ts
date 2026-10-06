@@ -26,12 +26,12 @@ interface StoredAuth {
 }
 
 /**
- * Client ID of Vulgr's GitHub OAuth App (with "Enable Device Flow" on). It is
- * public by design — the device flow needs no client secret — so it ships inside
- * the app and released builds can sign in without any setup. GITHUB_CLIENT_ID in
- * the environment overrides it (e.g. a separate dev app).
+ * Client ID of the "Vulgr" GitHub App (owner @ahmetulkr, App ID 5211773) with
+ * "Enable Device Flow" on. It is public by design — the device flow needs no
+ * client secret — so it ships inside the app and released builds can sign in
+ * without any setup. GITHUB_CLIENT_ID in the environment overrides it.
  */
-const VULGR_GITHUB_CLIENT_ID = '';
+const VULGR_GITHUB_CLIENT_ID = 'Iv23liFLUceKxsoc5zZe';
 
 const DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token';
