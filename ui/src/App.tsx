@@ -32,6 +32,7 @@ import type {
   ReportCommandBlock,
   ContextTelemetry,
   TerminalGroup,
+  WorkEntry,
   PastProjectConversation,
   MemoryData,
 } from './types/warp.js';
@@ -166,12 +167,18 @@ export const App: React.FC = () => {
     if (!entry) return;
     setTabs((prev) =>
       prev.map((tab) => {
-        if (!tab.sessions.some((s) => s.id === sessionId)) return tab;
+        const pane = tab.sessions.find((s) => s.id === sessionId);
+        if (!pane) return tab;
+        const same = (e?: WorkEntry) => !!e && e.text === entry.text && e.prompt === entry.prompt;
+        // A command is reported on submit and again on finish; log it once.
+        if (same(pane.workLog?.[pane.workLog.length - 1])) return tab;
+        // The pane keeps its own log too, so each pane of a split tab is named after its own work.
+        const sessions = tab.sessions.map((s) =>
+          s.id === sessionId ? { ...s, workLog: [...(s.workLog ?? []), entry].slice(-10) } : s
+        );
         const log = tab.workLog ?? [];
-        const last = log[log.length - 1];
-        if (last && last.text === entry.text && last.prompt === entry.prompt) return tab;
-        const workLog = [...log, entry].slice(-10);
-        return tab.autoTitle ? { ...tab, workLog, title: titleFromWork(workLog) } : { ...tab, workLog };
+        const workLog = same(log[log.length - 1]) ? log : [...log, entry].slice(-10);
+        return tab.autoTitle ? { ...tab, sessions, workLog, title: titleFromWork(workLog) } : { ...tab, sessions, workLog };
       })
     );
   }, []);
@@ -600,6 +607,12 @@ export const App: React.FC = () => {
   );
 
   // Session inside active tab management
+  // Sidebar: pick one pane of a (split) tab.
+  const handleSelectPane = (tabId: string, sessionId: string) => {
+    setActiveTabId(tabId);
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, activeSessionId: sessionId } : t)));
+  };
+
   const handleSetActiveSession = (sessionId: string) => {
     setTabs((prev) =>
       prev.map((t) => (t.id === activeTabId ? { ...t, activeSessionId: sessionId } : t))
@@ -1224,6 +1237,7 @@ export const App: React.FC = () => {
             tabs={tabs}
             activeTabId={activeTabId}
             onSelectTab={setActiveTabId}
+            onSelectPane={handleSelectPane}
             onCloseTab={handleCloseTab}
             onRenameTab={handleRenameTab}
             onNewTerminal={handleNewTerminal}

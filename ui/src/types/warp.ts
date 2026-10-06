@@ -7,6 +7,8 @@ export interface TerminalSession {
   command?: string;
   cwd: string;
   createdAt: string;
+  /** Work done in this pane alone; names the pane's row in the sidebar when the tab is split. */
+  workLog?: WorkEntry[];
 }
 
 export interface WorkspaceTab {

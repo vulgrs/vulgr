@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, FolderPlus, Brain, Trash2, Pencil, X } from 'lucide-react';
+import { Plus, FolderPlus, Brain, Trash2, Pencil, X, Terminal } from 'lucide-react';
 import type {
   WorkspaceTab,
   TerminalGroup,
@@ -9,6 +9,7 @@ import type {
 } from '../types/warp.js';
 import { ProfileCard } from './ProfileCard.js';
 import { useI18n } from '../i18n/index.js';
+import { titleFromWork } from '../utils/workTitle.js';
 import searchIcon from '../assets/sidebar/search.svg';
 import plusIcon from '../assets/sidebar/plus.svg';
 import sidebarToggleIcon from '../assets/sidebar/sidebar-toggle.svg';
@@ -29,6 +30,8 @@ interface SidebarProps {
   tabs: WorkspaceTab[];
   activeTabId: string;
   onSelectTab: (tabId: string) => void;
+  /** Focus one pane of a split tab. */
+  onSelectPane?: (tabId: string, sessionId: string) => void;
   onCloseTab?: (tabId: string) => void;
   /** Rename a terminal tab; an empty name brings back its automatic title. */
   onRenameTab?: (tabId: string, name: string) => void;
@@ -105,7 +108,9 @@ const SessionCard: React.FC<{
   renameLabel?: string;
   /** Tab id put on the drag payload; the card is draggable only when set. */
   dragId?: string;
-}> = ({ title, meta, active = false, untitled = false, tooltip, onClick, onClose, closeLabel, onRename, renameLabel, dragId }) => {
+  /** Rows shown inside the card under its title (the panes of a split tab). */
+  children?: React.ReactNode;
+}> = ({ title, meta, active = false, untitled = false, tooltip, onClick, onClose, closeLabel, onRename, renameLabel, dragId, children }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -132,53 +137,58 @@ const SessionCard: React.FC<{
       }}
     >
       <div
-        role="button"
-        tabIndex={0}
-        onClick={() => !editing && onClick()}
-        onKeyDown={(e) => !editing && e.key === 'Enter' && onClick()}
-        title={editing ? undefined : tooltip}
-        className={`w-full h-[38px] flex flex-col justify-center gap-[3px] pl-[12px] ${
-          onClose || onRename ? 'pr-10' : 'pr-2'
-        } rounded-[7px] bg-base-elevated border text-left cursor-pointer transition-colors ${
+        className={`rounded-[7px] bg-base-elevated border transition-colors ${
           active || editing ? 'border-zinc-600' : 'border-zinc-800 hover:border-zinc-700'
         }`}
       >
-        <div className="flex items-center gap-[5px] min-w-0">
-          <DesignIcon src={agentIcon} w={5} h={6} />
-          {editing ? (
-            <input
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onFocus={(e) => e.target.select()}
-              onBlur={commit}
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                if (e.key === 'Enter') commit();
-                if (e.key === 'Escape') setEditing(false);
-              }}
-              className={`${titleClass} flex-1 min-w-0 bg-transparent outline-none text-zinc-100`}
-            />
-          ) : (
-            <span
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                startEditing();
-              }}
-              className={`${titleClass} truncate ${untitled ? 'italic' : ''}`}
-            >
-              {title}
-            </span>
-          )}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => !editing && onClick()}
+          onKeyDown={(e) => !editing && e.key === 'Enter' && onClick()}
+          title={editing ? undefined : tooltip}
+          className={`w-full h-[38px] flex flex-col justify-center gap-[3px] pl-[12px] ${
+            onClose || onRename ? 'pr-10' : 'pr-2'
+          } text-left cursor-pointer`}
+        >
+          <div className="flex items-center gap-[5px] min-w-0">
+            <DesignIcon src={agentIcon} w={5} h={6} />
+            {editing ? (
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onBlur={commit}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') commit();
+                  if (e.key === 'Escape') setEditing(false);
+                }}
+                className={`${titleClass} flex-1 min-w-0 bg-transparent outline-none text-zinc-100`}
+              />
+            ) : (
+              <span
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  startEditing();
+                }}
+                className={`${titleClass} truncate ${untitled ? 'italic' : ''}`}
+              >
+                {title}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-[4px] pl-[12px] min-w-0">
+            <DesignIcon src={branchIcon} w={3} h={3} />
+            <span className="truncate text-[7px] leading-none text-zinc-500">{meta}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-[4px] pl-[12px] min-w-0">
-          <DesignIcon src={branchIcon} w={3} h={3} />
-          <span className="truncate text-[7px] leading-none text-zinc-500">{meta}</span>
-        </div>
+        {children && <div className="px-[5px] pb-[5px] space-y-[2px]">{children}</div>}
       </div>
       {!editing && (onRename || onClose) && (
-        <div className="absolute top-1/2 -translate-y-1/2 right-1.5 flex items-center opacity-0 group-hover/card:opacity-100 transition-opacity">
+        <div className="absolute top-[19px] -translate-y-1/2 right-1.5 flex items-center opacity-0 group-hover/card:opacity-100 transition-opacity">
           {onRename && (
             <button
               onClick={startEditing}
@@ -203,6 +213,38 @@ const SessionCard: React.FC<{
   );
 };
 
+/** One pane of a split tab, listed inside the tab's card. */
+const PaneRow: React.FC<{
+  title: string;
+  untitled: boolean;
+  meta: string;
+  active: boolean;
+  onClick: () => void;
+}> = ({ title, untitled, meta, active, onClick }) => (
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick();
+    }}
+    className={`w-full h-[28px] flex items-center gap-[7px] px-[7px] rounded-[5px] text-left transition-colors ${
+      active ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'
+    }`}
+  >
+    <span className="w-[15px] h-[15px] rounded-full bg-base-app border border-zinc-800 flex items-center justify-center flex-shrink-0 text-zinc-500">
+      <Terminal size={7} />
+    </span>
+    <span className="min-w-0 flex-1 flex flex-col gap-[2px]">
+      <span className={`truncate text-[8px] leading-none ${active ? 'text-zinc-100' : 'text-zinc-400'} ${untitled ? 'italic' : ''}`}>
+        {title}
+      </span>
+      <span className="flex items-center gap-[3px] min-w-0">
+        <DesignIcon src={branchIcon} w={3} h={3} />
+        <span className="truncate text-[6.5px] leading-none text-zinc-500">{meta}</span>
+      </span>
+    </span>
+  </button>
+);
+
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onToggleSidebar,
@@ -210,6 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   tabs,
   activeTabId,
   onSelectTab,
+  onSelectPane,
   onCloseTab,
   onRenameTab,
   onNewTerminal,
@@ -347,13 +390,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const renderTabCard = (tab: WorkspaceTab) => {
     const type = tab.sessions[0]?.type || 'shell';
+    const split = tab.sessions.length > 1;
     return (
       <SessionCard
         key={tab.id}
         dragId={onMoveTab ? tab.id : undefined}
         title={tab.title || t.sidebar.untitled}
         untitled={!tab.title}
-        meta={gitBranch || typeLabel[type]}
+        meta={
+          split
+            ? [gitBranch, t.sidebar.panes(tab.sessions.length)].filter(Boolean).join(' · ')
+            : gitBranch || typeLabel[type]
+        }
         active={tab.id === activeTabId}
         tooltip={`${typeLabel[type]}${tab.sessions.length > 1 ? ` · ${t.sidebar.panes(tab.sessions.length)}` : ''}`}
         onClick={() => onSelectTab(tab.id)}
@@ -361,7 +409,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         closeLabel={t.sidebar.closeTerminal}
         onRename={onRenameTab ? (name) => onRenameTab(tab.id, name) : undefined}
         renameLabel={t.sidebar.renameTerminal}
-      />
+      >
+        {split &&
+          tab.sessions.map((session) => (
+            <PaneRow
+              key={session.id}
+              title={session.workLog?.length ? titleFromWork(session.workLog) : t.sidebar.untitled}
+              untitled={!session.workLog?.length}
+              meta={gitBranch || typeLabel[session.type]}
+              active={tab.id === activeTabId && session.id === tab.activeSessionId}
+              onClick={() => (onSelectPane ? onSelectPane(tab.id, session.id) : onSelectTab(tab.id))}
+            />
+          ))}
+      </SessionCard>
     );
   };
 
@@ -544,13 +604,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     dropTarget === group.id ? 'bg-white/5 outline outline-1 outline-dashed outline-zinc-700' : ''
                   }`}
                 >
-                  <div className="group/folder flex items-center gap-1 h-[14px]">
+                  <div className="group/folder flex items-center gap-1 h-[30px] pl-[6px] pr-[4px] rounded-[7px] hover:bg-base-elevated transition-colors">
                     <button
                       onClick={() => !renaming && toggleGroup(group.id)}
                       onDoubleClick={() => startRenamingGroup(group)}
                       className="flex items-center gap-[8px] min-w-0 flex-1 text-left"
                     >
-                      <DesignIcon src={folderIcon} w={7} h={6.13} />
+                      {/* Folder tile marks a group apart from terminal cards */}
+                      <span className="w-[19px] h-[19px] rounded-[5px] bg-base-elevated border border-zinc-800 flex items-center justify-center flex-shrink-0">
+                        <DesignIcon src={folderIcon} w={7} h={6.13} />
+                      </span>
                       {renaming ? (
                         <input
                           autoFocus
@@ -568,13 +631,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         />
                       ) : (
                         <>
-                          <span className="truncate text-[9px] text-zinc-100">{group.name}</span>
-                          <span className="text-[7px] text-zinc-600 flex-shrink-0">{groupTabs.length}</span>
+                          <span className="min-w-0 flex flex-col gap-[3px]">
+                            <span className="truncate text-[9px] leading-none text-zinc-100">{group.name}</span>
+                            <span className="text-[7px] leading-none text-zinc-500">
+                              {t.sidebar.groupCount(groupTabs.length)}
+                            </span>
+                          </span>
                           <DesignIcon
                             src={chevronDownIcon}
                             w={4}
                             h={2}
-                            className={`transition-transform ${open ? '' : '-rotate-90'}`}
+                            className={`flex-shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
                           />
                         </>
                       )}
@@ -615,7 +682,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <div className="min-h-0 overflow-hidden">
-                      <div className="pt-[7px] space-y-[7px]">
+                      {/* The rail ties the terminals to their group. */}
+                      <div className="ml-[15px] pl-[9px] border-l border-zinc-800 pt-[7px] space-y-[7px]">
                         {groupTabs.map((tab) => renderTabCard(tab))}
                         {groupTabs.length === 0 && (
                           <button
