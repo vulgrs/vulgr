@@ -415,6 +415,8 @@ function setupIpcHandlers() {
     return git.getDiffAsync();
   });
 
+  ipcMain.handle('git:status', (_, { cwd = process.cwd() } = {}) => new GitUtils(cwd).getChangedFilesAsync());
+
   ipcMain.handle('git:revert', (_, { cwd = process.cwd() }) => {
     const git = new GitUtils(cwd);
     git.revertAllChanges();

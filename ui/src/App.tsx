@@ -300,20 +300,26 @@ export const App: React.FC = () => {
     refreshSandboxes();
     fetchContextTelemetry();
 
-    // Periodic refresh every 5 seconds to show diff badge / branch changes / token savings.
-    // Skipped while the window is hidden/minimized, and never overlaps a refresh
-    // that is still running (git can be slow on big repos).
+    // Refresh the changes badge / branch / sandboxes / token savings every 5 s,
+    // but only while the window is in front (and immediately when it comes back),
+    // never overlapping a refresh that is still running (git can be slow on big
+    // repos). The full diff is only built while the Changes view is open.
     let inFlight = false;
-    const diffTimer = setInterval(async () => {
-      if (inFlight || document.hidden) return;
+    const tick = async () => {
+      if (inFlight || document.hidden || !document.hasFocus()) return;
       inFlight = true;
       try {
-        await Promise.all([refreshGitDiff(), refreshGitBranch(), refreshSandboxes(), fetchContextTelemetry()]);
+        await Promise.all([refreshChanges(), refreshGitBranch(), refreshSandboxes(), fetchContextTelemetry()]);
       } finally {
         inFlight = false;
       }
-    }, 5000);
-    return () => clearInterval(diffTimer);
+    };
+    const diffTimer = setInterval(tick, 5000);
+    window.addEventListener('focus', tick);
+    return () => {
+      clearInterval(diffTimer);
+      window.removeEventListener('focus', tick);
+    };
   }, [fetchContextTelemetry, refreshProjectData]);
 
   const refreshSandboxes = async () => {
@@ -339,6 +345,25 @@ export const App: React.FC = () => {
     }
   };
 
+  // Cheap check for the badge: changed file names only, no diff.
+  const refreshGitStatus = async () => {
+    if (!window.warpApi?.getGitStatus) return refreshGitDiff();
+    try {
+      const files: string[] = (await window.warpApi.getGitStatus()) || [];
+      setGitFiles((prev) => (sameJson(prev, files) ? prev : files));
+    } catch {}
+  };
+
+  // Full diff while the Changes view is visible, file list otherwise.
+  const changesVisible = rightPanelOpen || diffOpen;
+  const changesVisibleRef = useRef(changesVisible);
+  changesVisibleRef.current = changesVisible;
+  const refreshChanges = () => (changesVisibleRef.current ? refreshGitDiff() : refreshGitStatus());
+  // Opening the Changes view loads the full diff right away.
+  useEffect(() => {
+    if (changesVisible) void refreshGitDiff();
+  }, [changesVisible]);
+
   const refreshGitBranch = async () => {
     if (window.warpApi?.getGitBranch) {
       try {
@@ -357,6 +382,7 @@ export const App: React.FC = () => {
   };
 
   const handleOpenExportModal = async () => {
+    await refreshGitDiff();
     if (window.warpApi?.getMemory) {
       try {
         const mem = await window.warpApi.getMemory();
@@ -1207,7 +1233,7 @@ export const App: React.FC = () => {
           setRightPanelOpen(!rightPanelOpen);
         }}
         doctor={doctor}
-        hasUncommittedDiff={gitDiff.trim().length > 0}
+        hasUncommittedDiff={gitFiles.length > 0}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         onOpenPalette={() => setPaletteOpen(true)}
@@ -1330,7 +1356,7 @@ export const App: React.FC = () => {
       <StatusBar
         cwd={cwd}
         gitBranch={gitBranch}
-        isDirty={gitDiff.trim().length > 0 || gitFiles.length > 0}
+        isDirty={gitFiles.length > 0}
         doctor={doctor}
         paneCount={currentTab?.sessions.length || 0}
         activeSession={activeSession}
