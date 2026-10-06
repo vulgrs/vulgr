@@ -262,7 +262,7 @@ async function createWindow() {
     mainWindow?.focus();
   });
 
-  const devServerActive = await canConnectToDevServer();
+  const devServerActive = !app.isPackaged && (await canConnectToDevServer());
   const builtUiPath = join(__dirname, '../ui/index.html');
 
   if (devServerActive) {
