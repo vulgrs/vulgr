@@ -32,6 +32,7 @@
   ],
   "author": "Advanced Agentic Coding Team",
   "license": "MIT",
+  "homepage": "https://vulgr.tech",
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@clack/prompts": "^0.8.2",
