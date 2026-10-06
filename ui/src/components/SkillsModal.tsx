@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.js';
 import type { SharedSkill, SkillCategory, MemoryData } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface SkillsModalProps {
   isOpen: boolean;
@@ -36,6 +37,8 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
   onRunInTerminal,
   onInsertIntoInput,
 }) => {
+  const { t } = useI18n();
+  const k = t.skills;
   const [activeTab, setActiveTab] = useState<'skills' | 'memory' | 'create'>('skills');
   const [skills, setSkills] = useState<SharedSkill[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -162,7 +165,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
     const parameters = paramNames.map((name) => ({
       name,
       label: name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' '),
-      description: `Parameter ${name}`,
+      description: k.paramDescription(name),
       defaultValue: '',
     }));
 
@@ -170,7 +173,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
       id: `custom:${Date.now()}`,
       name: newSkillName.trim(),
       category: newSkillCategory,
-      description: newSkillDesc.trim() || 'Custom user skill',
+      description: newSkillDesc.trim() || k.customSkill,
       commandTemplate: newSkillTemplate.trim(),
       parameters,
       tags: newSkillTags.split(',').map((t) => t.trim()).filter(Boolean),
@@ -240,13 +243,13 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <DialogTitle>Warp Skills & Workspace Memory</DialogTitle>
+                <DialogTitle>{k.title}</DialogTitle>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-500/15 text-zinc-300 border border-zinc-500/30">
-                  Universal Mesh Shared
+                  {k.badge}
                 </span>
               </div>
               <DialogDescription>
-                Reusable parametric commands and token-optimized persistent agent memory
+                {k.description}
               </DialogDescription>
             </div>
           </div>
@@ -263,7 +266,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
  }`}
               >
                 <Zap size={13} />
-                <span>Shared Skills</span>
+                <span>{k.tabSkills}</span>
               </button>
 
               <button
@@ -275,7 +278,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
  }`}
               >
                 <Brain size={13} />
-                <span>Memory Store</span>
+                <span>{k.tabMemory}</span>
               </button>
 
               <button
@@ -287,7 +290,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
  }`}
               >
                 <Plus size={13} />
-                <span>New Skill</span>
+                <span>{k.tabCreate}</span>
               </button>
             </div>
 
@@ -303,7 +306,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                 <Search size={14} className="absolute left-3 top-2.5 text-zinc-500" />
                 <input
                   type="text"
-                  placeholder="Search skills, git, docker, port, ai..."
+                  placeholder={k.searchPlaceholder}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-4 py-1.5 bg-black/40 border border-zinc-800 rounded-xl text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500/60 font-mono transition-all"
@@ -322,7 +325,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
  }`}
                   >
-                    {cat}
+                    {k.categories[cat] ?? cat}
                   </button>
                 ))}
               </div>
@@ -334,7 +337,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
               <div className="w-80 overflow-y-auto p-3 space-y-1.5 bg-black/20">
                 {filteredSkills.length === 0 ? (
                   <div className="p-8 text-center text-xs text-zinc-500 font-mono">
-                    No matching skills found.
+                    {k.noMatches}
                   </div>
                 ) : (
                   filteredSkills.map((skill) => {
@@ -365,7 +368,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                               <button
                                 onClick={(e) => handleDeleteSkill(skill.id, e)}
                                 className="opacity-0 group-hover:opacity-100 p-1 rounded hover:text-red-400 transition-opacity"
-                                title="Delete Custom Skill"
+                                title={k.deleteSkill}
                               >
                                 <Trash2 size={11} />
                               </button>
@@ -403,7 +406,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                       <div className="space-y-3 bg-base-surface p-4 rounded-xl border border-zinc-900">
                         <div className="flex items-center space-x-1.5 text-xs font-semibold text-zinc-300">
                           <Sliders size={13} className="text-zinc-400" />
-                          <span>Parameters & Variables</span>
+                          <span>{k.parameters}</span>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -431,7 +434,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                               ) : (
                                 <input
                                   type="text"
-                                  placeholder={param.defaultValue || `Enter ${param.name}...`}
+                                  placeholder={param.defaultValue || k.enterParam(param.name)}
                                   value={paramValues[param.name] || ''}
                                   onChange={(e) =>
                                     setParamValues((prev) => ({ ...prev, [param.name]: e.target.value }))
@@ -453,9 +456,9 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                       <div className="flex items-center justify-between text-xs text-zinc-400">
                         <span className="font-mono text-[11px] flex items-center space-x-1.5">
                           <Code2 size={13} className="text-zinc-400" />
-                          <span>Rendered Shell Command Preview</span>
+                          <span>{k.preview}</span>
                         </span>
-                        <span className="text-[10px] text-zinc-500">Live updated</span>
+                        <span className="text-[10px] text-zinc-500">{k.liveUpdated}</span>
                       </div>
 
                       <div className="relative p-4 rounded-xl bg-black/60 border border-zinc-500/30 shadow-[inset_0_2px_8px_rgba(0,0,0,0.5)] font-mono text-xs text-zinc-300 break-all leading-relaxed">
@@ -466,7 +469,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                   </div>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-xs text-zinc-500 font-mono">
-                    Select a skill to inspect its parameters.
+                    {k.selectSkill}
                   </div>
                 )}
 
@@ -479,7 +482,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                         className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-white/[0.1] text-xs font-medium text-zinc-200 border border-zinc-800 transition-all"
                       >
                         {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                        <span>{copied ? 'Copied!' : 'Copy'}</span>
+                        <span>{copied ? k.copied : k.copy}</span>
                       </button>
 
                       <button
@@ -487,7 +490,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                         className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-white/[0.1] text-xs font-medium text-zinc-200 border border-zinc-800 transition-all"
                       >
                         <Terminal size={13} />
-                        <span>Insert into Dock</span>
+                        <span>{k.insertIntoDock}</span>
                       </button>
                     </div>
 
@@ -496,7 +499,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                       className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-zinc-500 to-zinc-600 hover:from-zinc-400 hover:to-zinc-500 text-black font-semibold text-xs shadow-[0_0_20px_rgba(0,216,255,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98]"
                     >
                       <Play size={13} className="fill-current" />
-                      <span>Run in Active Terminal</span>
+                      <span>{k.runInTerminal}</span>
                     </button>
                   </div>
                 )}
@@ -512,22 +515,22 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
               <div>
                 <h3 className="text-sm font-bold text-zinc-100 flex items-center space-x-2">
                   <Brain size={16} className="text-zinc-400" />
-                  <span>Workspace Knowledge & Persistent Rules</span>
+                  <span>{k.memoryTitle}</span>
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Saved in <code className="text-zinc-300">.warp-memory.json</code>. Injected as a compact &lt;60 token snippet to agents.
+                  {k.memorySavedIn} <code className="text-zinc-300">.warp-memory.json</code>. {k.memoryInjected}
                 </p>
               </div>
 
               <div className="px-2.5 py-1 rounded-lg bg-zinc-500/10 border border-zinc-500/30 text-zinc-300 text-[11px] font-mono">
-                {Object.keys(memoryData?.facts || {}).length} facts • {memoryData?.rules.length || 0} rules
+                {k.memoryCounts(Object.keys(memoryData?.facts || {}).length, memoryData?.rules.length || 0)}
               </div>
             </div>
 
             {/* Facts Grid */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
-                <span>1. Project Facts (Key-Value Insights)</span>
+                <span>{k.factsTitle}</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -556,14 +559,14 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
               <div className="flex items-center space-x-2 pt-1">
                 <input
                   type="text"
-                  placeholder="Key (e.g. build_tool)"
+                  placeholder={k.factKey}
                   value={newFactKey}
                   onChange={(e) => setNewFactKey(e.target.value)}
                   className="w-1/3 px-3 py-1.5 bg-black/40 border border-zinc-800 rounded-lg text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500/60"
                 />
                 <input
                   type="text"
-                  placeholder="Value (e.g. vite v6)"
+                  placeholder={k.factValue}
                   value={newFactVal}
                   onChange={(e) => setNewFactVal(e.target.value)}
                   className="flex-1 px-3 py-1.5 bg-black/40 border border-zinc-800 rounded-lg text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500/60"
@@ -572,7 +575,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                   onClick={handleAddFact}
                   className="px-3 py-1.5 rounded-lg bg-zinc-600 hover:bg-zinc-500 text-zinc-100 text-xs font-semibold transition-all"
                 >
-                  Add Fact
+                  {k.addFact}
                 </button>
               </div>
             </div>
@@ -580,7 +583,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
             {/* Learned Rules */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs font-semibold text-zinc-300">
-                <span>2. Agent Behavior Rules (Never repeated mistakes)</span>
+                <span>{k.rulesTitle}</span>
               </div>
 
               <div className="space-y-1.5">
@@ -604,7 +607,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
               <div className="flex items-center space-x-2 pt-1">
                 <input
                   type="text"
-                  placeholder="Add a new rule (e.g. 'Use PowerShell semicolon instead of && on Windows')"
+                  placeholder={k.rulePlaceholder}
                   value={newRule}
                   onChange={(e) => setNewRule(e.target.value)}
                   className="flex-1 px-3 py-1.5 bg-black/40 border border-zinc-800 rounded-lg text-xs text-zinc-100 font-mono focus:outline-none focus:border-zinc-500/60"
@@ -613,7 +616,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                   onClick={handleAddRule}
                   className="px-3 py-1.5 rounded-lg bg-zinc-600 hover:bg-zinc-500 text-zinc-100 text-xs font-semibold transition-all"
                 >
-                  Add Rule
+                  {k.addRule}
                 </button>
               </div>
             </div>
@@ -622,10 +625,10 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
             <div className="space-y-2">
               <div className="text-xs font-semibold text-zinc-400 flex items-center space-x-1.5">
                 <Sparkles size={13} className="text-amber-400" />
-                <span>Compact System Prompt Injection Snippet</span>
+                <span>{k.snippetTitle}</span>
               </div>
               <pre className="p-3 bg-black/60 border border-zinc-500/30 rounded-xl text-xs font-mono text-zinc-200 whitespace-pre-wrap">
-                {memoryPromptSnippet || 'Loading prompt snippet...'}
+                {memoryPromptSnippet || k.snippetLoading}
               </pre>
             </div>
           </div>
@@ -637,20 +640,20 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
             <div>
               <h3 className="text-sm font-bold text-zinc-100 flex items-center space-x-2">
                 <Plus size={16} className="text-emerald-400" />
-                <span>Create New Custom Parametric Skill</span>
+                <span>{k.createTitle}</span>
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Use <code className="text-zinc-300">{'{{variable_name}}'}</code> syntax to make parameters interactive.
+                {k.createHintBefore} <code className="text-zinc-300">{'{{variable_name}}'}</code> {k.createHintAfter}
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-300">Skill Name</label>
+                <label className="text-xs font-medium text-zinc-300">{k.skillName}</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Deploy to Staging Cluster"
+                  placeholder={k.skillNamePlaceholder}
                   value={newSkillName}
                   onChange={(e) => setNewSkillName(e.target.value)}
                   className="w-full px-3 py-2 bg-black/40 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500/60"
@@ -658,27 +661,27 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-300">Category</label>
+                <label className="text-xs font-medium text-zinc-300">{k.category}</label>
                 <select
                   value={newSkillCategory}
                   onChange={(e) => setNewSkillCategory(e.target.value as SkillCategory)}
                   className="w-full px-3 py-2 bg-black/40 border border-zinc-800 rounded-xl text-xs text-zinc-100 font-mono focus:outline-none focus:border-emerald-500/60"
                 >
-                  <option value="git">Git</option>
-                  <option value="docker">Docker</option>
-                  <option value="node">Node & Dev</option>
-                  <option value="system">System</option>
-                  <option value="ai">AI</option>
-                  <option value="custom">Custom</option>
+                  <option value="git">{k.categoryOptions.git}</option>
+                  <option value="docker">{k.categoryOptions.docker}</option>
+                  <option value="node">{k.categoryOptions.node}</option>
+                  <option value="system">{k.categoryOptions.system}</option>
+                  <option value="ai">{k.categoryOptions.ai}</option>
+                  <option value="custom">{k.categoryOptions.custom}</option>
                 </select>
               </div>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-zinc-300">Description</label>
+              <label className="text-xs font-medium text-zinc-300">{k.skillDescription}</label>
               <input
                 type="text"
-                placeholder="What this skill accomplishes"
+                placeholder={k.skillDescriptionPlaceholder}
                 value={newSkillDesc}
                 onChange={(e) => setNewSkillDesc(e.target.value)}
                 className="w-full px-3 py-2 bg-black/40 border border-zinc-800 rounded-xl text-xs text-zinc-100 focus:outline-none focus:border-emerald-500/60"
@@ -687,7 +690,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
 
             <div className="space-y-1">
               <label className="text-xs font-medium text-zinc-300 flex items-center justify-between">
-                <span>Command Template (Shell)</span>
+                <span>{k.template}</span>
                 <span className="text-[10px] text-zinc-400 font-mono">{'e.g. kubectl apply -f ./k8s/{{environment}}.yaml'}</span>
               </label>
               <textarea
@@ -701,7 +704,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-zinc-300">Tags (comma-separated)</label>
+              <label className="text-xs font-medium text-zinc-300">{k.tags}</label>
               <input
                 type="text"
                 placeholder="k8s, deploy, prod"
@@ -716,7 +719,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                 type="submit"
                 className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all"
               >
-                Save Custom Skill
+                {k.saveSkill}
               </button>
             </div>
           </form>

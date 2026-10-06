@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { TopBar } from './components/TopBar.js';
 import { PaneGrid } from './components/PaneGrid.js';
+import { PaneToolbar } from './components/PaneToolbar.js';
+import { DockSlot } from './components/DockSlot.js';
 import { BottomCommandDock } from './components/BottomCommandDock.js';
 import { RightPanel } from './components/RightPanel.js';
 import { ClaudeChatView } from './components/ClaudeChatView.js';
@@ -18,6 +20,8 @@ import { TokenOptimizerHUD } from './components/TokenOptimizerHUD.js';
 import { GuideModal, type GuideAction } from './components/GuideModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
+import { useI18n } from './i18n/index.js';
+import { describeCommand, titleFromWork } from './utils/workTitle.js';
 import type {
   WorkspaceTab,
   TerminalSession,
@@ -27,7 +31,7 @@ import type {
   SessionReportData,
   ReportCommandBlock,
   ContextTelemetry,
-  ProjectFileItem,
+  TerminalGroup,
   PastProjectConversation,
   MemoryData,
 } from './types/warp.js';
@@ -49,11 +53,48 @@ const loadPersisted = <T,>(key: string, fallback: T): T => {
 
 const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
+const SESSIONS_KEY = 'vulgr.sessions';
+
+interface SavedSessions {
+  tabs: WorkspaceTab[];
+  activeTabId: string;
+  groups?: TerminalGroup[];
+}
+
+/**
+ * Terminals (and their sidebar groups) saved from the last run. Each pane comes
+ * back as a fresh shell (scrollback isn't kept); duo-agent tabs are not saved
+ * since their loop can't resume.
+ */
+const loadSavedSessions = (): Required<SavedSessions> | null => {
+  const saved = loadPersisted<SavedSessions | null>(SESSIONS_KEY, null);
+  if (!saved?.tabs?.length) return null;
+  const tabs = saved.tabs.map((tab) => ({
+    ...tab,
+    sessions: tab.sessions.map((s) => ({ ...s, command: '' })),
+  }));
+  const activeTabId = tabs.some((tab) => tab.id === saved.activeTabId) ? saved.activeTabId : tabs[0].id;
+  return { tabs, activeTabId, groups: saved.groups ?? [] };
+};
+
+const saveSessions = (tabs: WorkspaceTab[], activeTabId: string, groups: TerminalGroup[]) => {
+  const kept = tabs.filter((tab) => !tab.id.startsWith('tab-squad-'));
+  try {
+    if (kept.length || groups.length) {
+      const data: SavedSessions = { tabs: kept, activeTabId, groups };
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify(data));
+    } else localStorage.removeItem(SESSIONS_KEY);
+  } catch {}
+};
+
 export const App: React.FC = () => {
-  const [tabs, setTabs] = useState<WorkspaceTab[]>([
+  const { t } = useI18n();
+  const [savedSessions] = useState(loadSavedSessions);
+  const [tabs, setTabs] = useState<WorkspaceTab[]>(() => savedSessions?.tabs ?? [
     {
       id: 'tab-1',
-      title: 'Terminal 1',
+      title: '',
+      autoTitle: true,
       layout: 'single',
       activeSessionId: 'sess-1',
       sessions: [
@@ -68,7 +109,8 @@ export const App: React.FC = () => {
     },
   ]);
 
-  const [activeTabId, setActiveTabId] = useState('tab-1');
+  const [activeTabId, setActiveTabId] = useState(() => savedSessions?.activeTabId ?? 'tab-1');
+  const [groups, setGroups] = useState<TerminalGroup[]>(() => savedSessions?.groups ?? []);
   const [doctor, setDoctor] = useState<DoctorStatus | null>(null);
   const [diffOpen, setDiffOpen] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(() => loadPersisted('warp.rightPanelOpen', true));
@@ -106,8 +148,6 @@ export const App: React.FC = () => {
   const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
 
   // Project Workspace & Memory State
-  const [recentProjects, setRecentProjects] = useState<string[]>([]);
-  const [projectFiles, setProjectFiles] = useState<ProjectFileItem[]>([]);
   const [pastConversations, setPastConversations] = useState<PastProjectConversation[]>([]);
   const [projectMemory, setProjectMemory] = useState<MemoryData | null>(null);
 
@@ -119,14 +159,32 @@ export const App: React.FC = () => {
   // A squad step runs a command in a pane and waits for XtermPane to report
   // that it finished (exit code + output). One waiter per pane at a time.
   const paneWaiters = useRef<Record<string, (result: PaneRunResult) => void>>({});
+
+  // Every tab logs its work; auto-titled ones are named after it (see utils/workTitle).
+  const recordWork = useCallback((sessionId: string, command: string) => {
+    const entry = describeCommand(command);
+    if (!entry) return;
+    setTabs((prev) =>
+      prev.map((tab) => {
+        if (!tab.sessions.some((s) => s.id === sessionId)) return tab;
+        const log = tab.workLog ?? [];
+        const last = log[log.length - 1];
+        if (last && last.text === entry.text && last.prompt === entry.prompt) return tab;
+        const workLog = [...log, entry].slice(-10);
+        return tab.autoTitle ? { ...tab, workLog, title: titleFromWork(workLog) } : { ...tab, workLog };
+      })
+    );
+  }, []);
+
   const handleCommandFinished = useCallback(
-    (sessionId: string, result: { exitCode: number; output: string }) => {
+    (sessionId: string, result: { command?: string; exitCode: number; output: string }) => {
+      if (result.command) recordWork(sessionId, result.command);
       const resolve = paneWaiters.current[sessionId];
       if (!resolve) return;
       delete paneWaiters.current[sessionId];
       resolve({ exitCode: result.exitCode, output: result.output });
     },
-    []
+    [recordWork]
   );
 
   const squadDeps: SquadDeps = {
@@ -184,6 +242,10 @@ export const App: React.FC = () => {
     currentTab?.sessions[0] ||
     null;
 
+  // Sessions are saved as they change, so terminals and their titles survive a restart.
+  useEffect(() => {
+    saveSessions(tabs, activeTabId, groups);
+  }, [tabs, activeTabId, groups]);
   useEffect(() => {
     localStorage.setItem('warp.sidebarOpen', JSON.stringify(sidebarOpen));
   }, [sidebarOpen]);
@@ -211,17 +273,13 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const refreshProjectData = useCallback(async (targetDir?: string) => {
+  const refreshProjectData = useCallback(async (_targetDir?: string) => {
     if (!window.warpApi) return;
     try {
-      const [files, recents, convs, mem] = await Promise.all([
-        window.warpApi.listProjectFiles ? window.warpApi.listProjectFiles(targetDir) : Promise.resolve([]),
-        window.warpApi.getRecentProjects ? window.warpApi.getRecentProjects() : Promise.resolve([]),
+      const [convs, mem] = await Promise.all([
         window.warpApi.getProjectConversations ? window.warpApi.getProjectConversations() : Promise.resolve([]),
         window.warpApi.getMemory ? window.warpApi.getMemory() : Promise.resolve(null),
       ]);
-      if (files) setProjectFiles(files);
-      if (recents) setRecentProjects(recents);
       if (convs) setPastConversations(convs);
       if (mem) setProjectMemory(mem);
     } catch (err) {
@@ -322,7 +380,7 @@ export const App: React.FC = () => {
   };
 
   const reportData: SessionReportData = useMemo(() => ({
-    title: currentTab?.title || 'Vulgaris Terminal Session',
+    title: currentTab?.title || 'Vulgr Terminal Session',
     workspacePath: cwd,
     branch: gitBranch,
     timestamp: new Date().toLocaleString(),
@@ -388,20 +446,24 @@ export const App: React.FC = () => {
   // Commands waiting for a freshly created shell pane to register its handler.
   const pendingShellCommands = useRef<Record<string, string>>({});
   const dispatchToShell = (sessionId: string, command: string) => {
+    recordWork(sessionId, command);
     const handler = shellCommandHandlers.current[sessionId];
     if (handler) handler(command);
     else pendingShellCommands.current[sessionId] = command;
   };
 
-  const createShellTab = (title: string, command?: string): string => {
+  /** New single-pane tab, optionally filed under a sidebar group. An empty title shows as "Untitled". */
+  const createShellTab = (title: string, command?: string, groupId?: string): string => {
     const newTabId = `tab-${Date.now()}`;
     const newSessionId = `sess-${Date.now()}`;
     const newTab: WorkspaceTab = {
       id: newTabId,
       title,
+      autoTitle: true,
+      groupId,
       layout: 'single',
       activeSessionId: newSessionId,
-      sessions: [{ id: newSessionId, title, type: 'shell', cwd, createdAt: new Date().toISOString() }],
+      sessions: [{ id: newSessionId, title: title || 'Shell', type: 'shell', cwd, createdAt: new Date().toISOString() }],
     };
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTabId);
@@ -428,7 +490,8 @@ export const App: React.FC = () => {
           return {
             ...t,
             sessions,
-            layout: sessions.length > 1 ? 'split-h' : 'single',
+            // Keep the direction a split just chose; a plain add goes side by side.
+            layout: sessions.length > 1 ? (t.layout === 'single' ? 'split-h' : t.layout) : 'single',
             activeSessionId: id,
             paneSizes: undefined,
           };
@@ -463,7 +526,7 @@ export const App: React.FC = () => {
     // real exit code instead of a guess about when an agent went quiet.
     const builderSession: TerminalSession = {
       id: builderSessionId,
-      title: `${squadAgentLabel(config.builder)} (yazan)`,
+      title: t.app.squadBuilderPane(squadAgentLabel(config.builder)),
       type: 'shell',
       command: '',
       cwd,
@@ -472,7 +535,7 @@ export const App: React.FC = () => {
 
     const verifierSession: TerminalSession = {
       id: verifierSessionId,
-      title: `${squadAgentLabel(config.verifier)} (kontrol eden)`,
+      title: t.app.squadVerifierPane(squadAgentLabel(config.verifier)),
       type: 'shell',
       command: '',
       cwd,
@@ -481,7 +544,7 @@ export const App: React.FC = () => {
 
     const squadTab: WorkspaceTab = {
       id: newTabId,
-      title: `İkili: ${squadAgentLabel(config.builder)} ⇄ ${squadAgentLabel(config.verifier)}`,
+      title: t.app.squadTab(squadAgentLabel(config.builder), squadAgentLabel(config.verifier)),
       layout: 'split-h',
       activeSessionId: builderSessionId,
       paneSizes: [50, 50],
@@ -496,7 +559,7 @@ export const App: React.FC = () => {
 
   // Tab management
   const handleAddTab = (type: SessionType = 'shell') => {
-    const title = AGENT_TITLES[type] || `Terminal ${tabs.length + 1}`;
+    const title = AGENT_TITLES[type] || '';
     const sessionId = createShellTab(title);
     if (type !== 'shell') {
       buildAgentCommand(type).then((command) => dispatchToShell(sessionId, command));
@@ -643,37 +706,42 @@ export const App: React.FC = () => {
     }
   };
 
-  // Workspace Project Management & Memory Handlers
-  const handleOpenProjectFolder = async () => {
-    if (!window.warpApi?.openProjectFolder) return;
-    try {
-      const res = await window.warpApi.openProjectFolder();
-      if (res && res.path) {
-        setCwd(res.path);
-        if (res.recentProjects) setRecentProjects(res.recentProjects);
-        await refreshProjectData(res.path);
-        refreshGitDiff();
-        refreshGitBranch();
-      }
-    } catch (err) {
-      console.error('[Project] Error opening project folder:', err);
-    }
+  // Sidebar terminals & groups
+  const handleNewTerminal = (groupId?: string) => {
+    createShellTab('', undefined, groupId);
   };
 
-  const handleSelectRecentProject = async (path: string) => {
-    if (!window.warpApi?.setProjectFolder) return;
-    try {
-      const res = await window.warpApi.setProjectFolder(path);
-      if (res && res.path) {
-        setCwd(res.path);
-        if (res.recentProjects) setRecentProjects(res.recentProjects);
-        await refreshProjectData(res.path);
-        refreshGitDiff();
-        refreshGitBranch();
-      }
-    } catch (err) {
-      console.error('[Project] Error switching project:', err);
-    }
+  // Sidebar rename: a typed name is kept for good; an empty one goes back to the work-based title.
+  const handleRenameTab = (tabId: string, name: string) => {
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id !== tabId
+          ? tab
+          : name
+            ? { ...tab, title: name, autoTitle: false }
+            : { ...tab, autoTitle: true, title: tab.workLog?.length ? titleFromWork(tab.workLog) : '' }
+      )
+    );
+  };
+
+  const handleCreateGroup = (): string => {
+    const id = `group-${Date.now()}`;
+    setGroups((prev) => [...prev, { id, name: t.sidebar.newGroupName }]);
+    return id;
+  };
+
+  const handleRenameGroup = (groupId: string, name: string) => {
+    setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, name } : g)));
+  };
+
+  // Deleting a group keeps its terminals open; they just become ungrouped.
+  const handleDeleteGroup = (groupId: string) => {
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    setTabs((prev) => prev.map((tab) => (tab.groupId === groupId ? { ...tab, groupId: undefined } : tab)));
+  };
+
+  const handleMoveTab = (tabId: string, groupId: string | null) => {
+    setTabs((prev) => prev.map((tab) => (tab.id === tabId ? { ...tab, groupId: groupId ?? undefined } : tab)));
   };
 
   const handleAddMemoryRule = async (rule: string) => {
@@ -725,16 +793,16 @@ export const App: React.FC = () => {
   const [dockInsert, setDockInsert] = useState<{ text: string; nonce: number } | null>(null);
   const insertIntoDock = (text: string) => setDockInsert({ text, nonce: Date.now() });
 
-  const handleInsertFilePath = (filePath: string) => {
-    insertIntoDock(/\s/.test(filePath) ? `"${filePath}"` : filePath);
-  };
-
   // Ctrl+Shift+Enter in the dock / re-opening a past conversation: start Claude
   // in the active shell with the text as its first prompt (`claude "<prompt>"`).
-  const handleAskAgent = async (prompt: string, agent: SessionType = 'claude') => {
+  const handleAskAgent = async (
+    prompt: string,
+    agent: SessionType = 'claude',
+    target: TerminalSession | null = activeSession
+  ) => {
     const text = prompt.trim();
-    if (!text || !activeSession || activeSession.type !== 'shell') return;
-    const sessionId = activeSession.id;
+    if (!text || !target || target.type !== 'shell') return;
+    const sessionId = target.id;
     if (sessionUi[sessionId]?.busy) {
       // A program already owns the terminal (e.g. Claude is open): type into it.
       window.warpApi.writeTerminal(sessionId, text + '\r');
@@ -792,15 +860,9 @@ export const App: React.FC = () => {
   // Per-shell-session UI state reported by XtermPane: whether a command is
   // currently running (dock hides so the program's own UI owns the terminal)
   // and the shell's current directory.
-  // Shell sessions that have run at least one command; until then the dock
-  // offers quick-start buttons so a new user has an obvious first step.
-  const [sessionsWithCommands, setSessionsWithCommands] = useState<Set<string>>(() => new Set());
   const [sessionUi, setSessionUi] = useState<Record<string, { busy: boolean; cwd: string; agent?: boolean }>>({});
   const handleSessionState = useCallback(
     (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => {
-      if (state.busy) {
-        setSessionsWithCommands((prev) => (prev.has(sessionId) ? prev : new Set(prev).add(sessionId)));
-      }
       setSessionUi((prev) => {
         const cur = prev[sessionId];
         if (cur && cur.busy === state.busy && cur.cwd === state.cwd && cur.agent === state.agent) return prev;
@@ -809,46 +871,55 @@ export const App: React.FC = () => {
     },
     []
   );
-  const activeSessionUi = activeSession ? sessionUi[activeSession.id] : undefined;
-  // While an agent CLI runs, Vulgaris's own input area is removed entirely.
-  const dockSlotVisible =
-    (!activeSession || activeSession.type === 'shell') && !(activeSessionUi?.busy && activeSessionUi?.agent);
-  const dockVisible = dockSlotVisible && !activeSessionUi?.busy;
-
-  // While a command owns the terminal the dock is swapped for a strip of the
-  // same height. Keeping the slot size constant means the PTY is never resized
-  // when a command starts/ends, which would make ConPTY repaint and shift the
-  // block headers drawn over the scrollback.
-  const dockSlotRef = useRef<HTMLDivElement>(null);
-  const [dockHeight, setDockHeight] = useState<number | null>(null);
-  useEffect(() => {
-    const el = dockSlotRef.current;
-    if (!el || !dockVisible) return;
-    const measure = () => setDockHeight(el.offsetHeight);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [dockVisible, dockSlotVisible]);
-
-  const handleSendInputToActive = (text: string) => {
+  // Send dock input to one pane's terminal.
+  const sendInputTo = (session: TerminalSession | null, text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || !session) return;
 
-    if (activeSession) {
-      const id = activeSession.id;
-      setSessionsWithCommands((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-    }
+    if (session.type === 'shell') recordWork(session.id, trimmed);
 
-    if (window.warpApi && activeSession) {
+    if (window.warpApi) {
       // Shell sessions are chat-style: the pane runs the command in its own
-      // PowerShell session. Agent sessions still take raw PTY input.
-      if (activeSession.type === 'shell') {
-        shellCommandHandlers.current[activeSession.id]?.(trimmed);
+      // shell session. Agent sessions still take raw PTY input.
+      if (session.type === 'shell') {
+        shellCommandHandlers.current[session.id]?.(trimmed);
       } else {
-        window.warpApi.writeTerminal(activeSession.id, text);
+        window.warpApi.writeTerminal(session.id, text);
       }
     }
+  };
+  const handleSendInputToActive = (text: string) => sendInputTo(activeSession, text);
+
+  // Every pane gets its own dock, wired to that pane's terminal. It is removed
+  // while an agent CLI owns the pane (the agent draws its own input) and held at
+  // the same height while an ordinary command runs.
+  const renderDock = (session: TerminalSession) => {
+    const ui = sessionUi[session.id];
+    if (session.type !== 'shell' || (ui?.busy && ui?.agent)) return null;
+    return (
+      <DockSlot showDock={!ui?.busy} placeholder={t.app.commandRunning}>
+        <BottomCommandDock
+          activeSession={session}
+          onSendInput={(text) => sendInputTo(session, text)}
+          primaryModel={primaryModel}
+          onSelectModel={setPrimaryModel}
+          gitBranch={gitBranch}
+          cwd={ui?.cwd || cwd}
+          onContinueWorking={() => sendInputTo(session, '\r')}
+          onCommitAndPush={() => setRightPanelOpen(true)}
+          onExplainActive={() => handlePipeErrorToAgent('claude', 'Please diagnose recent terminal command output.')}
+          onFixActive={() => handlePipeErrorToAgent('claude', 'Auto-fix detected error in terminal.')}
+          onAskClaude={(prompt) => {
+            setChatInitialPrompt(prompt);
+            setChatModeOpen(true);
+          }}
+          onOpenHud={() => setHudOpen(true)}
+          onAskAgent={(prompt) => void handleAskAgent(prompt, 'claude', session)}
+          insertRequest={session.id === activeSession?.id ? dockInsert : null}
+          tokenSavingsText={t.app.tokenSaved(contextTelemetry?.savingsPercentage ?? 68)}
+        />
+      </DockSlot>
+    );
   };
 
   const handleGuideAction = (action: GuideAction) => {
@@ -858,10 +929,6 @@ export const App: React.FC = () => {
         break;
       case 'launchClaude':
         handleLaunchAgent('claude');
-        break;
-      case 'openFolder':
-        setSidebarOpen(true);
-        void handleOpenProjectFolder();
         break;
       case 'openSkills':
         setSkillsModalOpen(true);
@@ -891,106 +958,106 @@ export const App: React.FC = () => {
   // Command Palette: catalog of every action a power user might reach for
   const paletteActions: CommandPaletteAction[] = useMemo(
     () => [
-      { id: 'guide', label: 'Nasıl kullanılır? (Yardım)', group: 'Help', shortcut: 'F1', keywords: 'help yardım rehber guide nasıl', run: () => setGuideOpen(true) },
-      { id: 'new-tab', label: 'New Terminal Tab', group: 'Tabs', shortcut: 'Ctrl+Shift+T', run: handleAddTab },
+      { id: 'guide', label: t.app.actions.guide, group: t.app.groups.help, shortcut: 'F1', keywords: 'help yardım rehber guide nasıl', run: () => setGuideOpen(true) },
+      { id: 'new-tab', label: t.app.actions.newTab, group: t.app.groups.tabs, shortcut: 'Ctrl+Shift+T', run: handleAddTab },
       {
         id: 'next-tab',
-        label: 'Next Tab',
-        group: 'Tabs',
+        label: t.app.actions.nextTab,
+        group: t.app.groups.tabs,
         shortcut: 'Ctrl+Tab',
         run: () => cycleTab(1),
       },
       {
         id: 'prev-tab',
-        label: 'Previous Tab',
-        group: 'Tabs',
+        label: t.app.actions.prevTab,
+        group: t.app.groups.tabs,
         shortcut: 'Ctrl+Shift+Tab',
         run: () => cycleTab(-1),
       },
       {
         id: 'launch-shell',
-        label: 'Launch Shell Pane',
-        group: 'Launch',
+        label: t.app.actions.launchShell,
+        group: t.app.groups.launch,
         keywords: 'terminal bash powershell',
         run: () => handleLaunchAgent('shell'),
       },
       {
         id: 'launch-claude',
-        label: 'Launch Claude Code',
-        group: 'Launch',
+        label: t.app.actions.launchClaude,
+        group: t.app.groups.launch,
         keywords: 'anthropic ai',
         run: () => handleLaunchAgent('claude'),
       },
       {
         id: 'launch-agy',
-        label: 'Launch AGY Engine',
-        group: 'Launch',
+        label: t.app.actions.launchAgy,
+        group: t.app.groups.launch,
         keywords: 'antigravity google',
         run: () => handleLaunchAgent('agy'),
       },
       {
         id: 'launch-codex',
-        label: 'Launch Codex CLI',
-        group: 'Launch',
+        label: t.app.actions.launchCodex,
+        group: t.app.groups.launch,
         keywords: 'openai',
         run: () => handleLaunchAgent('codex'),
       },
       {
         id: 'launch-live-squad',
-        label: 'Launch Live Autonomous Squad (Split View)',
-        group: 'Autonomous',
+        label: t.app.actions.liveSquad,
+        group: t.app.groups.autonomous,
         shortcut: 'Ctrl+Shift+S',
         keywords: 'squad team pair claude agy split live',
         run: () => setSquadModalOpen(true),
       },
       {
         id: 'split-h',
-        label: 'Split Active Pane Horizontally',
-        group: 'Panes',
+        label: t.app.actions.splitH,
+        group: t.app.groups.panes,
         shortcut: 'Ctrl+Shift+D',
         run: () => activeSession && handleSplitSession(activeSession.id, 'h'),
       },
       {
         id: 'split-v',
-        label: 'Split Active Pane Vertically',
-        group: 'Panes',
+        label: t.app.actions.splitV,
+        group: t.app.groups.panes,
         shortcut: 'Ctrl+Shift+E',
         run: () => activeSession && handleSplitSession(activeSession.id, 'v'),
       },
       {
         id: 'close-pane',
-        label: 'Close Active Pane',
-        group: 'Panes',
+        label: t.app.actions.closePane,
+        group: t.app.groups.panes,
         shortcut: 'Ctrl+Shift+W',
         run: () => activeSession && handleCloseSession(activeSession.id),
       },
       {
         id: 'open-skills',
-        label: 'Open Shared Skills & Workspace Memory',
-        group: 'Skills',
+        label: t.app.actions.openSkills,
+        group: t.app.groups.skills,
         shortcut: 'Ctrl+Shift+K',
         keywords: 'skills memory workflows snippets templates docker git prompt',
         run: () => setSkillsModalOpen(true),
       },
       {
         id: 'open-sandbox',
-        label: 'Inspect Agent Worktree Sandboxes',
-        group: 'Git',
+        label: t.app.actions.openSandbox,
+        group: t.app.groups.git,
         shortcut: 'Ctrl+Shift+U',
         keywords: 'sandbox worktree branch merge isolate test',
         run: () => setSandboxDrawerOpen(true),
       },
       {
         id: 'toggle-sidebar',
-        label: 'Toggle Sidebar',
-        group: 'View',
+        label: t.app.actions.toggleSidebar,
+        group: t.app.groups.view,
         shortcut: 'Ctrl+Shift+B',
         run: () => setSidebarOpen((v) => !v),
       },
       {
         id: 'toggle-diff',
-        label: 'Toggle Git Diff Drawer',
-        group: 'Git',
+        label: t.app.actions.toggleDiff,
+        group: t.app.groups.git,
         shortcut: 'Ctrl+Shift+G',
         keywords: 'diff review',
         run: () => {
@@ -1000,44 +1067,44 @@ export const App: React.FC = () => {
       },
       {
         id: 'git-rollback',
-        label: 'Git Rollback (reset --hard)',
-        group: 'Git',
+        label: t.app.actions.gitRollback,
+        group: t.app.groups.git,
         keywords: 'revert discard clean',
         run: handleRevertGit,
       },
       {
         id: 'refresh-doctor',
-        label: 'Refresh System Health (Doctor)',
-        group: 'System',
+        label: t.app.actions.refreshDoctor,
+        group: t.app.groups.system,
         keywords: 'tools status',
         run: refreshDoctor,
       },
       {
         id: 'open-settings',
-        label: 'Settings & CLI Flags (Claude, AGY, Codex)',
-        group: 'Settings',
+        label: t.app.actions.openSettings,
+        group: t.app.groups.settings,
         shortcut: 'Ctrl+,',
         keywords: 'settings preferences config dangerously-skip-permissions models shell font theme permissions',
         run: () => setSettingsModalOpen(true),
       },
       {
         id: 'export-report',
-        label: 'Export Technical Report (Markdown / HTML / JSON)',
-        group: 'Export',
+        label: t.app.actions.exportReport,
+        group: t.app.groups.export,
         shortcut: 'Ctrl+Shift+X',
         keywords: 'export report markdown html timeline audit json summary',
         run: handleOpenExportModal,
       },
       {
         id: 'open-token-hud',
-        label: 'Token & Context Optimizer HUD',
-        group: 'AI & Context',
+        label: t.app.actions.tokenHud,
+        group: t.app.groups.ai,
         shortcut: 'Ctrl+Shift+O',
         keywords: 'token context optimizer memory quota subscription savings cost',
         run: () => setHudOpen(true),
       },
     ],
-    [activeSession, tabs, activeTabId, cwd, handleOpenExportModal]
+    [activeSession, tabs, activeTabId, cwd, handleOpenExportModal, t]
   );
 
   // Global keyboard shortcuts. Everything uses Ctrl/Cmd+Shift+<key> (VSCode/Warp
@@ -1140,13 +1207,9 @@ export const App: React.FC = () => {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         onOpenPalette={() => setPaletteOpen(true)}
-        onOpenMeshModal={() => setMeshModalOpen(true)}
-        onOpenSquadModal={() => setSquadModalOpen(true)}
         onOpenSkillsModal={() => setSkillsModalOpen(true)}
-        onOpenSettings={() => setSettingsModalOpen(true)}
         onOpenExportReport={handleOpenExportModal}
         onOpenChat={() => setChatModeOpen(true)}
-        onLaunchClaude={() => handleLaunchAgent('claude')}
         onOpenGuide={() => setGuideOpen(true)}
       />
 
@@ -1157,24 +1220,26 @@ export const App: React.FC = () => {
           <Sidebar
             isOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen((v) => !v)}
-            cwd={cwd}
             gitBranch={gitBranch}
             tabs={tabs}
             activeTabId={activeTabId}
             onSelectTab={setActiveTabId}
+            onCloseTab={handleCloseTab}
+            onRenameTab={handleRenameTab}
+            onNewTerminal={handleNewTerminal}
+            groups={groups}
+            onCreateGroup={handleCreateGroup}
+            onRenameGroup={handleRenameGroup}
+            onDeleteGroup={handleDeleteGroup}
+            onMoveTab={handleMoveTab}
             onNewSession={(type) => handleAddTab(type || 'shell')}
             onLaunchAgent={handleLaunchAgent}
             onOpenPalette={() => setPaletteOpen(true)}
             onOpenSquads={() => setSquadModalOpen(true)}
+            onOpenMesh={() => setMeshModalOpen(true)}
             onOpenSkills={() => setSkillsModalOpen(true)}
             onOpenSettings={() => setSettingsModalOpen(true)}
             pastRuns={[]}
-            recentProjects={recentProjects}
-            onOpenProjectFolder={handleOpenProjectFolder}
-            onSelectRecentProject={handleSelectRecentProject}
-            projectFiles={projectFiles}
-            onRefreshFiles={() => refreshProjectData(cwd)}
-            onInsertFilePath={handleInsertFilePath}
             pastConversations={pastConversations}
             onSelectConversation={(conv) => {
               if (conv.prompt) void handleAskAgent(conv.prompt, conv.agent || 'claude');
@@ -1201,9 +1266,13 @@ export const App: React.FC = () => {
             />
           )}
 
-          {/* Full-bleed terminal canvas — no chrome, no header. The active CLI
-              (Claude/AGY/Codex/Shell) renders edge-to-edge with zero app-level
-              decoration on top of it. */}
+          {/* Terminal name + split controls, then the full-bleed terminal canvas. */}
+          {currentTab && currentTab.sessions.length > 0 && (
+            <PaneToolbar
+              tab={currentTab}
+              onSplit={(direction) => activeSession && handleSplitSession(activeSession.id, direction)}
+            />
+          )}
           <div className="flex-1 min-w-0 min-h-0 flex bg-base-app">
             {currentTab && (
               <PaneGrid
@@ -1217,71 +1286,11 @@ export const App: React.FC = () => {
                 onRegisterCommandHandler={registerShellCommandHandler}
                 onSessionState={handleSessionState}
                 onCommandFinished={handleCommandFinished}
+                renderDock={renderDock}
               />
             )}
           </div>
 
-          {/* Bottom Command Dock — scoped to the center column only, so it never
-              slides underneath the sidebar. Only for plain shell sessions: agent
-              CLIs (Claude/AGY/Codex) render their own full-height chat/input
-              inside the PTY itself, so showing our own input bar on top of
-              theirs would duplicate it. */}
-          {dockSlotVisible && (
-            <div
-              ref={dockSlotRef}
-              className="flex-shrink-0"
-              style={!dockVisible && dockHeight ? { height: dockHeight } : undefined}
-            >
-            {dockVisible ? (
-            <BottomCommandDock
-              activeSession={activeSession}
-              onSendInput={handleSendInputToActive}
-              primaryModel={primaryModel}
-              onSelectModel={setPrimaryModel}
-              gitBranch={gitBranch}
-              cwd={activeSessionUi?.cwd || cwd}
-              onContinueWorking={() => {
-                if (activeSession) handleSendInputToActive('\r');
-              }}
-              onCommitAndPush={() => {
-                setRightPanelOpen(true);
-              }}
-              onExplainActive={() => {
-                if (activeSession) {
-                  handlePipeErrorToAgent('claude', 'Please diagnose recent terminal command output.');
-                }
-              }}
-              onFixActive={() => {
-                if (activeSession) {
-                  handlePipeErrorToAgent('claude', 'Auto-fix detected error in terminal.');
-                }
-              }}
-              onAskClaude={(prompt) => {
-                setChatInitialPrompt(prompt);
-                setChatModeOpen(true);
-              }}
-              onOpenHud={() => setHudOpen(true)}
-              onAskAgent={(prompt) => void handleAskAgent(prompt)}
-              insertRequest={dockInsert}
-              quickActions={
-                activeSession && !sessionsWithCommands.has(activeSession.id)
-                  ? [
-                      { label: "Claude'u başlat", title: 'Claude Code bu terminalde açılır; ne yapılacağını ona yazarsınız', onClick: () => handleLaunchAgent('claude') },
-                      { label: "Codex'i başlat", title: 'OpenAI Codex CLI bu terminalde açılır', onClick: () => handleLaunchAgent('codex') },
-                      { label: 'Proje klasörü aç', title: 'Çalışacağınız klasörü seçin', onClick: handleOpenProjectFolder },
-                      { label: 'Nasıl kullanılır?', title: 'Tüm özelliklerin kısa açıklaması (F1)', onClick: () => setGuideOpen(true) },
-                    ]
-                  : undefined
-              }
-              tokenSavingsText={`${contextTelemetry?.savingsPercentage ?? 68}% saved`}
-            />
-            ) : (
-              <div className="h-full bg-base-app border-t border-zinc-900/70 px-4 pt-3 text-[11px] font-mono text-zinc-600 select-none">
-                Komut çalışıyor — klavye girdisi terminale gidiyor · durdurmak için Ctrl+C
-              </div>
-            )}
-            </div>
-          )}
         </div>
 
         {/* Right Split Panel: Changes / Sandbox */}
@@ -1389,7 +1398,7 @@ export const App: React.FC = () => {
       {/* First-run / F1 feature guide */}
       <GuideModal isOpen={guideOpen} onClose={closeGuide} onAction={handleGuideAction} />
 
-      {/* Vulgaris Session Timeline & Technical Report Modal */}
+      {/* Vulgr Session Timeline & Technical Report Modal */}
       <ExportReportModal
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}

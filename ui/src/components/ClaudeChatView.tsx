@@ -26,6 +26,7 @@ import {
   type ChatReducerState,
 } from '../utils/claudeStreamParser.js';
 import type { ChatMessage } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface ClaudeChatViewProps {
   isOpen: boolean;
@@ -89,6 +90,7 @@ function renderRichText(text: string): React.ReactNode {
 }
 
 const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
 
   if (message.kind === 'user') {
@@ -149,7 +151,7 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
           }`}
         >
           <div className="flex items-center gap-1.5 mb-1 text-[10px] uppercase tracking-wide opacity-70">
-            {message.isError && <AlertTriangle size={10} />} output
+            {message.isError && <AlertTriangle size={10} />} {t.terminal.output}
           </div>
           <pre className="whitespace-pre-wrap break-words">{shown}</pre>
           {long && (
@@ -157,7 +159,7 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
               onClick={() => setExpanded((v) => !v)}
               className="mt-1 text-[10px] text-zinc-500 hover:text-zinc-300"
             >
-              {expanded ? 'Show less' : 'Show more'}
+              {expanded ? t.terminal.showLess : t.terminal.showMore}
             </button>
           )}
         </div>
@@ -184,6 +186,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   initialPrompt,
   onClearInitialPrompt,
 }) => {
+  const { t } = useI18n();
   const [state, setState] = useState<ChatReducerState>(initialChatState);
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
@@ -290,7 +293,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-900/70 bg-zinc-950/60">
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles size={15} className="text-violet-400 flex-shrink-0" />
-            <span className="text-[13px] font-semibold text-zinc-200">Claude Code Chat</span>
+            <span className="text-[13px] font-semibold text-zinc-200">{t.terminal.chatTitle}</span>
             {meta.model && (
               <span className="text-[10px] font-mono text-zinc-500 truncate">· {meta.model}</span>
             )}
@@ -300,14 +303,14 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
             <button
               onClick={handleNewChat}
               className="px-2 py-1 rounded-md text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 flex items-center gap-1"
-              title="Start a new conversation"
+              title={t.terminal.newChatHint}
             >
-              <RotateCcw size={12} /> New
+              <RotateCcw size={12} /> {t.terminal.newChat}
             </button>
             <button
               onClick={onClose}
               className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
-              title="Close chat"
+              title={t.terminal.closeChat}
             >
               <X size={15} />
             </button>
@@ -321,10 +324,9 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
               <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-violet-400 mb-3">
                 <Sparkles size={22} />
               </div>
-              <p className="text-sm font-semibold text-zinc-300">Ask Claude Code to build something</p>
+              <p className="text-sm font-semibold text-zinc-300">{t.terminal.emptyTitle}</p>
               <p className="text-[12px] text-zinc-500 mt-1 max-w-sm">
-                Try “create a todo app”. Output streams here as chat, file changes show in the diff
-                panel on the right.
+                {t.terminal.emptyHint}
               </p>
             </div>
           )}
@@ -334,7 +336,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
           {running && state.streamingText === '' && (
             <div className="flex justify-start">
               <div className="rounded-2xl rounded-bl-sm bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-zinc-500 flex items-center gap-2 text-[12px]">
-                <Loader2 size={13} className="animate-spin" /> Claude is working…
+                <Loader2 size={13} className="animate-spin" /> {t.terminal.working}
               </div>
             </div>
           )}
@@ -353,16 +355,16 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
                 }
               }}
               rows={1}
-              placeholder={running ? 'Claude is working… (you can queue a follow-up)' : 'Message Claude Code…'}
+              placeholder={running ? t.terminal.workingPlaceholder : t.terminal.messagePlaceholder}
               className="flex-1 resize-none max-h-40 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-violet-600/60 outline-none px-3 py-2.5 text-[13px] text-zinc-200 placeholder:text-zinc-600"
             />
             {running ? (
               <button
                 onClick={handleStop}
                 className="h-10 px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white flex items-center gap-1.5 text-[12px] font-semibold"
-                title="Stop the current turn"
+                title={t.terminal.stopHint}
               >
-                <Square size={13} /> Stop
+                <Square size={13} /> {t.terminal.stop}
               </button>
             ) : (
               <button
@@ -370,7 +372,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
                 disabled={!input.trim()}
                 className="h-10 px-3 rounded-xl bg-violet-600 enabled:hover:bg-violet-500 disabled:opacity-40 text-white flex items-center gap-1.5 text-[12px] font-semibold"
               >
-                <Send size={13} /> Send
+                <Send size={13} /> {t.terminal.send}
               </button>
             )}
           </div>
@@ -381,7 +383,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       <div className="w-[380px] flex-shrink-0 border-l border-zinc-900/70 bg-zinc-950/40 flex flex-col">
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-zinc-900/70">
           <div className="flex items-center gap-2 text-[12px] font-semibold text-zinc-300">
-            <FileEdit size={13} className="text-zinc-400" /> Changes
+            <FileEdit size={13} className="text-zinc-400" /> {t.terminal.changes}
           </div>
           <div className="flex items-center gap-2">
             {gitBranch && (
@@ -392,7 +394,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
             <button
               onClick={refreshDiff}
               className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
-              title="Refresh diff"
+              title={t.terminal.refreshDiff}
             >
               <RotateCcw size={12} />
             </button>

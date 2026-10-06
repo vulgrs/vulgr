@@ -1,0 +1,50 @@
+import { ns } from '../ns.js';
+
+export const profile = ns(
+  {
+    signInTitle: 'Sign in with GitHub',
+    enterCode: 'Enter this code on the page that opened in your browser:',
+    copyCode: 'Copy code',
+    waiting: 'Waiting for approval…',
+    openPage: 'Open page',
+    openGitHubProfile: 'Open GitHub profile',
+    signOut: 'Sign out',
+    accountMenu: (login: string) => `${login} — account menu`,
+    signIn: 'Sign in',
+    signingIn: 'Signing in…',
+    withGitHub: 'with your GitHub account',
+    settings: 'Settings (Ctrl+,)',
+    toLight: 'Switch to light theme',
+    toDark: 'Switch to dark theme',
+    errors: {
+      'missing-client-id': 'GITHUB_CLIENT_ID is not set. Add your GitHub OAuth App Client ID to the .env file.',
+      expired: 'The code expired. Try signing in again.',
+      denied: 'The sign-in request was denied.',
+      'no-profile': 'Could not load the GitHub profile.',
+      failed: 'Sign-in failed.',
+    } as Record<string, string>,
+  },
+  {
+    signInTitle: 'GitHub ile giriş',
+    enterCode: 'Tarayıcıda açılan sayfaya bu kodu girin:',
+    copyCode: 'Kodu kopyala',
+    waiting: 'Onay bekleniyor…',
+    openPage: 'Sayfayı aç',
+    openGitHubProfile: 'GitHub profilini aç',
+    signOut: 'Çıkış yap',
+    accountMenu: (login: string) => `${login} — hesap menüsü`,
+    signIn: 'Giriş yap',
+    signingIn: 'Giriş yapılıyor…',
+    withGitHub: 'GitHub hesabınla',
+    settings: 'Ayarlar (Ctrl+,)',
+    toLight: 'Açık temaya geç',
+    toDark: 'Koyu temaya geç',
+    errors: {
+      'missing-client-id': 'GITHUB_CLIENT_ID ayarlanmamış. .env dosyasına GitHub OAuth App Client ID değerini ekleyin.',
+      expired: 'Kodun süresi doldu. Tekrar giriş yapmayı deneyin.',
+      denied: 'Giriş isteği reddedildi.',
+      'no-profile': 'GitHub profili alınamadı.',
+      failed: 'Giriş başarısız.',
+    },
+  }
+);

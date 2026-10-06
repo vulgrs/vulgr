@@ -30,6 +30,7 @@ import { Spinner } from '@/components/ui/spinner.js';
 import { Switch } from '@/components/ui/switch.js';
 import { Textarea } from '@/components/ui/textarea.js';
 import { OptionSelect, type OptionItem } from './OptionSelect.js';
+import { useI18n } from '../i18n/index.js';
 
 export interface AgentMessage {
   id: string;
@@ -78,39 +79,26 @@ const AGENTS: OptionItem[] = [
   { value: 'gemini', label: 'Gemini CLI' },
 ];
 
-const ROUND_ITEMS: OptionItem[] = [
-  { value: '1', label: '1 tur' },
-  { value: '2', label: '2 tur' },
-  { value: '3', label: '3 tur' },
-  { value: '5', label: '5 tur' },
-];
+const ROUND_VALUES = [1, 2, 3, 5];
 
 const AGENT_META: Record<string, { icon: LucideIcon; label: string }> = {
   claude: { icon: SparklesIcon, label: 'Claude' },
   agy: { icon: ShieldIcon, label: 'AGY' },
   gemini: { icon: BotIcon, label: 'Gemini' },
   codex: { icon: BotIcon, label: 'Codex' },
-  orchestrator: { icon: TerminalIcon, label: 'Vulgaris' },
-  broadcast: { icon: TerminalIcon, label: 'Herkes' },
-};
-
-const TYPE_LABELS: Record<string, string> = {
-  USER_TASK: 'Görev verildi',
-  CODE_READY: 'Kod yazıldı',
-  VERIFICATION_FAILED: 'Test başarısız',
-  VERIFICATION_PASSED: 'Testler geçti',
-  PATCH_APPLIED: 'Düzeltme uygulandı',
-  SECURITY_CONCERN: 'Denetçi sorun buldu',
-  CONSENSUS_APPROVED: 'Onaylandı',
+  orchestrator: { icon: TerminalIcon, label: 'Vulgr' },
+  broadcast: { icon: TerminalIcon, label: '' },
 };
 
 const AgentBadge: React.FC<{ agent: string }> = ({ agent }) => {
+  const { t } = useI18n();
   const meta = AGENT_META[agent] ?? { icon: TerminalIcon, label: agent };
+  const name = agent === 'broadcast' ? t.mesh.everyone : meta.label;
   const Icon = meta.icon;
   return (
     <Badge variant="outline">
       <Icon data-icon="inline-start" />
-      {meta.label}
+      {name}
     </Badge>
   );
 };
@@ -135,6 +123,9 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   onOpenChanges,
   onOpenSandboxes,
 }) => {
+  const { t, lang } = useI18n();
+  const m = t.mesh;
+  const roundItems: OptionItem[] = ROUND_VALUES.map((n) => ({ value: String(n), label: m.rounds(n) }));
   const [goal, setGoal] = useState('');
   const [builder, setBuilder] = useState(() => loadSetting('builder', 'claude'));
   const [verifier, setVerifier] = useState(() => loadSetting('verifier', 'agy'));
@@ -209,10 +200,11 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
         maxRounds: Number(maxRounds) || 3,
         useSandbox,
         cwd,
+        lang,
       });
       setResult(res);
-      if (res.success) toast.success(res.audit === 'rejected' ? 'Testler geçti, denetçi uyarı verdi' : 'Görev tamamlandı');
-      else toast.error('Görev tamamlanamadı');
+      if (res.success) toast.success(res.audit === 'rejected' ? m.toastWarned : m.toastDone);
+      else toast.error(m.toastFailed);
     } catch (err: any) {
       const message = err?.message || String(err);
       setResult({ success: false, rounds: 0, error: message });
@@ -243,15 +235,14 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <Badge>
               <ZapIcon data-icon="inline-start" />
-              Otomatik Görev
+              {m.badge}
             </Badge>
-            <Badge variant="outline">Arka planda, terminalsiz</Badge>
+            <Badge variant="outline">{m.background}</Badge>
           </div>
-          <DialogTitle>Üç ajan, tek hedef</DialogTitle>
+          <DialogTitle>{m.title}</DialogTitle>
           <DialogDescription>
-            Bir hedef yazın. <b>Yazan</b> ajan kodu yazar, test komutunuz çalıştırılır. Test başarısız olursa{' '}
-            <b>kontrol eden</b> ajan hatayı inceler ve yazan ajan düzeltir. Testler geçince <b>denetçi</b> ajan son
-            değişiklikleri gözden geçirir. Siz sadece sonucu takip edersiniz.
+            {m.descBefore} <b>{m.descWriter}</b> {m.descMiddle1} <b>{m.descChecker}</b> {m.descMiddle2}{' '}
+            <b>{m.descAuditor}</b> {m.descAfter}
           </DialogDescription>
         </DialogHeader>
 
@@ -259,13 +250,13 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
           <div className="flex flex-col gap-4 border-b px-4 py-4">
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="mesh-goal">Hedef</FieldLabel>
+                <FieldLabel htmlFor="mesh-goal">{m.goal}</FieldLabel>
                 <Textarea
                   id="mesh-goal"
                   value={goal}
                   disabled={isRunning}
                   rows={2}
-                  placeholder="örn. Kullanıcı kaydı için e-posta doğrulaması ekle ve testlerini yaz"
+                  placeholder={m.goalPlaceholder}
                   onChange={(e) => setGoal(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleStartMesh();
@@ -274,14 +265,14 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
               </Field>
 
               <div className="grid gap-3 sm:grid-cols-3">
-                {roleField('mesh-builder', '1. Yazan', 'Kodu yazar ve düzeltir', builder, setBuilder)}
-                {roleField('mesh-verifier', '2. Kontrol eden', 'Test hatalarını inceler, ne düzeltileceğini söyler', verifier, setVerifier)}
-                {roleField('mesh-auditor', '3. Denetçi', 'Testler geçince son kodu gözden geçirir', auditor, setAuditor)}
+                {roleField('mesh-builder', m.builder, m.builderHint, builder, setBuilder)}
+                {roleField('mesh-verifier', m.verifier, m.verifierHint, verifier, setVerifier)}
+                {roleField('mesh-auditor', m.auditor, m.auditorHint, auditor, setAuditor)}
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <Field className="sm:col-span-2">
-                  <FieldLabel htmlFor="mesh-verify">Test komutu</FieldLabel>
+                  <FieldLabel htmlFor="mesh-verify">{m.verifyCmd}</FieldLabel>
                   <Input
                     id="mesh-verify"
                     value={verifyCmd}
@@ -290,21 +281,20 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                     className="font-mono"
                     onChange={(e) => setVerifyCmd(e.target.value)}
                   />
-                  <FieldDescription>Başarılı sayılması için 0 koduyla çıkmalı (örn. npm test, npm run build)</FieldDescription>
+                  <FieldDescription>{m.verifyCmdHint}</FieldDescription>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="mesh-rounds">En fazla deneme</FieldLabel>
-                  <OptionSelect id="mesh-rounds" value={maxRounds} items={ROUND_ITEMS} disabled={isRunning} onValueChange={setMaxRounds} />
+                  <FieldLabel htmlFor="mesh-rounds">{m.maxRounds}</FieldLabel>
+                  <OptionSelect id="mesh-rounds" value={maxRounds} items={roundItems} disabled={isRunning} onValueChange={setMaxRounds} />
                 </Field>
               </div>
 
               <Field orientation="horizontal">
                 <Switch id="mesh-sandbox" checked={useSandbox} disabled={isRunning} onCheckedChange={setUseSandbox} />
                 <div className="flex flex-col gap-0.5">
-                  <FieldLabel htmlFor="mesh-sandbox">Ayrı bir kopyada çalış (sandbox)</FieldLabel>
+                  <FieldLabel htmlFor="mesh-sandbox">{m.sandbox}</FieldLabel>
                   <FieldDescription>
-                    Açıksa değişiklikler ana klasörünüze değil, ayrı bir git kopyasına yazılır; sonra Sandbox panelinden
-                    birleştirirsiniz. Not: o kopyada node_modules olmadığı için test komutu kurulum gerektirebilir.
+                    {m.sandboxHint}
                   </FieldDescription>
                 </div>
               </Field>
@@ -312,25 +302,24 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
 
             {missing.length > 0 && (
               <p className="text-xs text-muted-foreground">
-                Bu bilgisayarda kurulu olmadığı için listede yok: {missing.join(', ')}.
+                {m.missing(missing.join(', '))}
               </p>
             )}
             {noneInstalled && (
               <Alert variant="destructive">
                 <XCircleIcon />
-                <AlertTitle>Hiç ajan bulunamadı</AlertTitle>
+                <AlertTitle>{m.noAgentTitle}</AlertTitle>
                 <AlertDescription>
-                  Claude Code, AGY, Codex veya Gemini CLI'dan en az birini kurun (örn. Claude Code için terminalde
-                  "npm install -g @anthropic-ai/claude-code").
+                  {m.noAgentHint}
                 </AlertDescription>
               </Alert>
             )}
 
             <div className="flex items-center justify-end gap-2">
-              <span className="mr-auto text-xs text-muted-foreground">Ctrl+Enter ile de başlatabilirsiniz</span>
+              <span className="mr-auto text-xs text-muted-foreground">{m.ctrlEnter}</span>
               <Button disabled={!goal.trim() || isRunning || noneInstalled} onClick={handleStartMesh}>
                 {isRunning ? <Spinner data-icon="inline-start" /> : <SendIcon data-icon="inline-start" />}
-                {isRunning ? 'Çalışıyor...' : 'Görevi başlat'}
+                {isRunning ? m.running : m.start}
               </Button>
             </div>
           </div>
@@ -338,7 +327,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
           <div className="flex flex-col gap-3 p-4">
             {messages.length === 0 && !isRunning && !result && (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                Görev başlayınca ajanların birbirine ne ilettiği burada adım adım görünür.
+                {m.feedEmpty}
               </p>
             )}
 
@@ -353,7 +342,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                       <ArrowRightIcon className="size-3 text-muted-foreground" />
                       <AgentBadge agent={msg.to} />
                       <Badge variant={isError ? 'destructive' : isSuccess ? 'default' : 'secondary'}>
-                        {TYPE_LABELS[msg.type] ?? msg.type}
+                        {m.types[msg.type] ?? msg.type}
                       </Badge>
                     </div>
                     <span className="font-mono text-xs text-muted-foreground">
@@ -368,7 +357,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                   )}
                   {msg.payload.details && msg.type !== 'USER_TASK' && (
                     <details className="text-xs">
-                      <summary className="cursor-pointer text-muted-foreground">Ajanın yanıtını göster</summary>
+                      <summary className="cursor-pointer text-muted-foreground">{m.showReply}</summary>
                       <pre className="mt-1.5 max-h-48 overflow-y-auto rounded-lg bg-muted p-2.5 font-mono whitespace-pre-wrap">
                         {msg.payload.details}
                       </pre>
@@ -384,7 +373,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                 <span>{status.text}</span>
                 {status.round > 0 && (
                   <span className="ml-auto font-mono text-xs text-muted-foreground">
-                    tur {status.round}/{status.maxRounds}
+                    {m.round(status.round, status.maxRounds)}
                   </span>
                 )}
               </div>
@@ -393,8 +382,8 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
             {result && !result.success && (
               <Alert variant="destructive">
                 <XCircleIcon />
-                <AlertTitle>Görev tamamlanamadı</AlertTitle>
-                <AlertDescription>{result.error || 'Bilinmeyen bir hata oluştu.'}</AlertDescription>
+                <AlertTitle>{m.failedTitle}</AlertTitle>
+                <AlertDescription>{result.error || m.unknownError}</AlertDescription>
               </Alert>
             )}
             {result?.success && (
@@ -402,14 +391,14 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                 {result.audit === 'rejected' ? <AlertTriangleIcon /> : <CheckCircle2Icon />}
                 <AlertTitle>
                   {result.audit === 'rejected'
-                    ? 'Testler geçti, ama denetçi bir sorun buldu'
-                    : `Tamamlandı: testler ${result.rounds}. turda geçti`}
+                    ? m.rejectedTitle
+                    : m.doneTitle(result.rounds)}
                 </AlertTitle>
                 <AlertDescription>
                   {result.sandbox
-                    ? 'Değişiklikler ayrı bir sandbox kopyasında. Sandbox panelinden inceleyip ana koda birleştirebilirsiniz.'
-                    : 'Değişiklikler proje klasörünüzde. "Değişiklikler" panelinden inceleyip commit edebilirsiniz.'}
-                  {result.audit === 'rejected' && ' Denetçinin notları yukarıdaki son mesajda.'}
+                    ? m.inSandbox
+                    : m.inProject}
+                  {result.audit === 'rejected' && m.auditorNotes}
                 </AlertDescription>
               </Alert>
             )}
@@ -422,17 +411,17 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
             {result.sandbox ? (
               onOpenSandboxes && (
                 <Button variant="outline" onClick={() => { onClose(); onOpenSandboxes(); }}>
-                  Sandbox'ı aç
+                  {m.openSandbox}
                 </Button>
               )
             ) : (
               onOpenChanges && (
                 <Button variant="outline" onClick={() => { onClose(); onOpenChanges(); }}>
-                  Değişiklikleri incele
+                  {m.reviewChanges}
                 </Button>
               )
             )}
-            <Button onClick={onClose}>Kapat</Button>
+            <Button onClick={onClose}>{m.close}</Button>
           </DialogFooter>
         )}
       </DialogContent>

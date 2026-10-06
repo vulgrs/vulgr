@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -44,10 +44,10 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --color-base-app: #08080a;
-  --color-base-surface: #0c0c0f;
-  --color-base-elevated: #131316;
-  --color-base-overlay: #0a0a0c;
+  --color-base-app: var(--base-app);
+  --color-base-surface: var(--base-surface);
+  --color-base-elevated: var(--base-elevated);
+  --color-base-overlay: var(--base-overlay);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -62,6 +62,10 @@
 }
 
 :root {
+  --base-app: #08080a;
+  --base-surface: #0c0c0f;
+  --base-elevated: #131316;
+  --base-overlay: #0a0a0c;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -128,6 +132,62 @@
   --sidebar-accent-foreground: #f4f4f5;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: rgba(77, 141, 255, 0.55);
+}
+
+/*
+ * Light theme. Components are written for the dark palette, so instead of
+ * restyling each one this mirrors the zinc scale (950 <-> 50, 900 <-> 100, ...):
+ * dark surfaces become light ones and light text becomes dark, keeping the same
+ * contrast steps. Shadcn tokens fall back to the :root (light) values above.
+ */
+.light {
+  --base-app: #ffffff;
+  --base-surface: #fafafa;
+  --base-elevated: #f4f4f5;
+  --base-overlay: #ffffff;
+  --color-zinc-50: oklch(14.1% 0.005 285.823);
+  --color-zinc-100: oklch(21% 0.006 285.885);
+  --color-zinc-200: oklch(27.4% 0.006 286.033);
+  --color-zinc-300: oklch(37% 0.013 285.805);
+  --color-zinc-400: oklch(44.2% 0.017 285.786);
+  --color-zinc-500: oklch(55.2% 0.016 285.938);
+  --color-zinc-600: oklch(70.5% 0.015 286.067);
+  --color-zinc-700: oklch(87.1% 0.006 286.286);
+  --color-zinc-800: oklch(92% 0.004 286.32);
+  --color-zinc-900: oklch(96.7% 0.001 286.375);
+  --color-zinc-950: oklch(98.5% 0 0);
+  /* Inset panels (bg-black/40 …) and dark chips read as light gray. */
+  --color-black: #e4e4e7;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --ring: rgba(37, 99, 235, 0.45);
+}
+
+/* The logo mark is white; show it dark on light surfaces. */
+.light .logo-mark {
+  filter: invert(1);
+}
+
+.light .modal-overlay {
+  background: rgba(24, 24, 27, 0.25);
+}
+
+.light .dx-block-header {
+  border-top-color: #e4e4e7;
+  color: #a1a1aa;
+}
+
+.light .dx-block-header.has-cmd {
+  background: #f4f4f5;
+}
+
+.light .dx-block-header .dx-cmd {
+  color: #18181b;
+}
+
+.light .dx-block-header .dx-actions button:hover {
+  color: #18181b;
+  background: rgba(0, 0, 0, 0.06);
 }
 
 @layer base {

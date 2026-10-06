@@ -9,6 +9,13 @@ export interface PtyCreateOptions {
   rows?: number;
 }
 
+export interface GitHubUser {
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  htmlUrl: string;
+}
+
 export interface WarpApi {
   platform: 'darwin' | 'win32' | 'linux';
 
@@ -51,6 +58,8 @@ export interface WarpApi {
     verifyCmd?: string;
     maxRounds?: number;
     cwd?: string;
+    useSandbox?: boolean;
+    lang?: 'en' | 'tr';
   }) => Promise<any>;
   onMeshEvent: (callback: (message: any) => void) => () => void;
   onMeshStatus: (callback: (status: any) => void) => () => void;
@@ -108,6 +117,15 @@ export interface WarpApi {
   readProjectFile: (filePath: string) => Promise<{ content?: string; size?: number; error?: string }>;
   getProjectConversations: () => Promise<any[]>;
   saveProjectConversation: (conv: any) => Promise<boolean>;
+
+  // GitHub sign-in
+  getAuthUser: () => Promise<GitHubUser | null>;
+  startGitHubLogin: () => Promise<{ userCode: string; verificationUri: string; expiresIn: number } | { error: string }>;
+  cancelGitHubLogin: () => Promise<void>;
+  logout: () => Promise<void>;
+  openGitHubProfile: (url: string) => Promise<void>;
+  onAuthChanged: (callback: (user: GitHubUser | null) => void) => () => void;
+  onAuthError: (callback: (message: string) => void) => () => void;
 
   // Frameless Window Controls
   windowMinimize: () => void;
@@ -227,6 +245,23 @@ const api: WarpApi = {
   readProjectFile: (filePath) => ipcRenderer.invoke('workspace:read-file', filePath),
   getProjectConversations: () => ipcRenderer.invoke('workspace:get-conversations'),
   saveProjectConversation: (conv) => ipcRenderer.invoke('workspace:save-conversation', conv),
+
+  // GitHub sign-in
+  getAuthUser: () => ipcRenderer.invoke('auth:get-user'),
+  startGitHubLogin: () => ipcRenderer.invoke('auth:login'),
+  cancelGitHubLogin: () => ipcRenderer.invoke('auth:cancel'),
+  logout: () => ipcRenderer.invoke('auth:logout'),
+  openGitHubProfile: (url) => ipcRenderer.invoke('auth:open-profile', url),
+  onAuthChanged: (callback) => {
+    const handler = (_: any, user: GitHubUser | null) => callback(user);
+    ipcRenderer.on('auth:changed', handler);
+    return () => ipcRenderer.removeListener('auth:changed', handler);
+  },
+  onAuthError: (callback) => {
+    const handler = (_: any, message: string) => callback(message);
+    ipcRenderer.on('auth:error', handler);
+    return () => ipcRenderer.removeListener('auth:error', handler);
+  },
 
   // Frameless Window Controls
   windowMinimize: () => ipcRenderer.send('window:minimize'),

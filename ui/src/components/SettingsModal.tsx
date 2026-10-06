@@ -20,6 +20,8 @@ import { Switch } from '@/components/ui/switch.js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.js';
 import { OptionSelect, type OptionItem } from './OptionSelect.js';
 import type { WarpConfig, ShellType, CursorStyleType } from '../types/warp.js';
+import { useI18n, LANGUAGES, type Lang, type Messages } from '../i18n/index.js';
+import { useTheme, type ThemePreference } from '../theme.js';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -27,22 +29,22 @@ interface SettingsModalProps {
   onConfigChanged?: (config: WarpConfig) => void;
 }
 
-const CLAUDE_MODELS: OptionItem[] = [
-  { value: 'default', label: 'Default (Claude Code decides)' },
-  { value: 'opus', label: 'Opus (most capable)' },
-  { value: 'sonnet', label: 'Sonnet (balanced)' },
-  { value: 'haiku', label: 'Haiku (fastest)' },
+const claudeModels = (t: Messages): OptionItem[] => [
+  { value: 'default', label: t.settings.claudeModels.default },
+  { value: 'opus', label: t.settings.claudeModels.opus },
+  { value: 'sonnet', label: t.settings.claudeModels.sonnet },
+  { value: 'haiku', label: t.settings.claudeModels.haiku },
 ];
 
-const AGY_MODELS: OptionItem[] = [
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Deep Code Analysis)' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Sub-Second Verify)' },
+const agyModels = (t: Messages): OptionItem[] => [
+  { value: 'gemini-2.5-pro', label: t.settings.agyModels.pro },
+  { value: 'gemini-2.5-flash', label: t.settings.agyModels.flash },
 ];
 
-const CODEX_MODELS: OptionItem[] = [
-  { value: 'gpt-4o', label: 'GPT-4o (Standard Multimodal)' },
-  { value: 'o3-mini', label: 'o3-mini (High-Speed Reasoning)' },
-  { value: 'o1', label: 'o1 (Deep Mathematics & Logic)' },
+const codexModels = (t: Messages): OptionItem[] => [
+  { value: 'gpt-4o', label: t.settings.codexModels.gpt4o },
+  { value: 'o3-mini', label: t.settings.codexModels.o3mini },
+  { value: 'o1', label: t.settings.codexModels.o1 },
 ];
 
 const SHELLS: OptionItem[] = [
@@ -52,18 +54,27 @@ const SHELLS: OptionItem[] = [
   { value: 'bash', label: 'Git Bash / POSIX (bash.exe)' },
 ];
 
-const CURSORS: OptionItem[] = [
-  { value: 'bar', label: 'Bar ( | )' },
-  { value: 'block', label: 'Block ( █ )' },
-  { value: 'underline', label: 'Underline ( _ )' },
+const cursors = (t: Messages): OptionItem[] => [
+  { value: 'bar', label: t.settings.cursors.bar },
+  { value: 'block', label: t.settings.cursors.block },
+  { value: 'underline', label: t.settings.cursors.underline },
 ];
+
+const LANGUAGE_ITEMS: OptionItem[] = LANGUAGES.map((l) => ({ value: l.value, label: l.label }));
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   onConfigChanged,
 }) => {
-  const [activeTab, setActiveTab] = useState('permissions');
+  const { t, lang, setLang } = useI18n();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme();
+  const themeItems: OptionItem[] = [
+    { value: 'dark', label: t.settings.themeDark },
+    { value: 'light', label: t.settings.themeLight },
+    { value: 'system', label: t.settings.themeSystem },
+  ];
+  const [activeTab, setActiveTab] = useState('general');
   const [config, setConfig] = useState<WarpConfig | null>(null);
 
   useEffect(() => {
@@ -89,10 +100,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const updated = await window.warpApi.updateConfig(config);
       setConfig(updated);
       onConfigChanged?.(updated);
-      toast.success('Settings saved');
+      toast.success(t.settings.saved);
     } catch (err) {
       console.error('Failed to update config:', err);
-      toast.error('Failed to save settings');
+      toast.error(t.settings.saveFailed);
     }
   };
 
@@ -103,10 +114,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const reset = await window.warpApi.resetConfig();
       setConfig(reset);
       onConfigChanged?.(reset);
-      toast.success('Settings reset to defaults');
+      toast.success(t.settings.resetDone);
     } catch (err) {
       console.error('Failed to reset config:', err);
-      toast.error('Failed to reset settings');
+      toast.error(t.settings.resetFailed);
     }
   };
 
@@ -117,13 +128,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <Badge>
               <SettingsIcon data-icon="inline-start" />
-              Settings
+              {t.settings.badge}
             </Badge>
-            <Badge variant="outline">Global Config</Badge>
+            <Badge variant="outline">{t.settings.globalConfig}</Badge>
           </div>
-          <DialogTitle>Vulgaris settings and CLI permissions</DialogTitle>
+          <DialogTitle>{t.settings.title}</DialogTitle>
           <DialogDescription>
-            Configure CLI flags, AI model choices, terminal shells, and safety sandboxes
+            {t.settings.description}
           </DialogDescription>
         </DialogHeader>
 
@@ -134,10 +145,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             className="flex min-h-0 flex-1 flex-col gap-0 px-4 pt-3"
           >
             <TabsList>
-              <TabsTrigger value="permissions">CLI Flags & Models</TabsTrigger>
-              <TabsTrigger value="terminal">Terminal & Shell</TabsTrigger>
-              <TabsTrigger value="safety">Safety & Sandbox</TabsTrigger>
+              <TabsTrigger value="general">{t.settings.tabGeneral}</TabsTrigger>
+              <TabsTrigger value="permissions">{t.settings.tabPermissions}</TabsTrigger>
+              <TabsTrigger value="terminal">{t.settings.tabTerminal}</TabsTrigger>
+              <TabsTrigger value="safety">{t.settings.tabSafety}</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="general" className="min-h-0 flex-1">
+              <ScrollArea className="h-full">
+                <div className="flex flex-col gap-4 py-4 pr-3">
+                  <Card size="sm">
+                    <CardHeader>
+                      <CardTitle>{t.settings.themeTitle}</CardTitle>
+                      <CardDescription>{t.settings.themeDescription}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Field>
+                        <FieldLabel htmlFor="ui-theme">{t.settings.themeTitle}</FieldLabel>
+                        <OptionSelect
+                          id="ui-theme"
+                          value={themePreference}
+                          items={themeItems}
+                          onValueChange={(value) => setThemePreference(value as ThemePreference)}
+                        />
+                      </Field>
+                    </CardContent>
+                  </Card>
+                  <Card size="sm">
+                    <CardHeader>
+                      <CardTitle>{t.settings.languageTitle}</CardTitle>
+                      <CardDescription>{t.settings.languageDescription}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Field>
+                        <FieldLabel htmlFor="ui-language">{t.common.language}</FieldLabel>
+                        <OptionSelect
+                          id="ui-language"
+                          value={lang}
+                          items={LANGUAGE_ITEMS}
+                          onValueChange={(value) => setLang(value as Lang)}
+                        />
+                      </Field>
+                    </CardContent>
+                  </Card>
+                </div>
+              </ScrollArea>
+            </TabsContent>
 
             <TabsContent value="permissions" className="min-h-0 flex-1">
               <ScrollArea className="h-full">
@@ -145,15 +198,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Card size="sm">
                     <CardHeader>
                       <CardTitle>Claude Code</CardTitle>
-                      <CardDescription>Model, retries, and permission bypass for autonomous loops</CardDescription>
+                      <CardDescription>{t.settings.claudeDescription}</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <FieldGroup>
                         <Field orientation="horizontal">
                           <div className="flex flex-col gap-1">
-                            <FieldTitle>Dangerously Skip Permissions</FieldTitle>
+                            <FieldTitle>{t.settings.skipPermissions}</FieldTitle>
                             <FieldDescription>
-                              Bypasses confirmation prompts so Claude can iterate in mesh loops. Flag: --dangerously-skip-permissions
+                              {t.settings.skipPermissionsHint}
                             </FieldDescription>
                           </div>
                           <Switch
@@ -168,18 +221,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <Field>
-                            <FieldLabel htmlFor="claude-model">Claude Model</FieldLabel>
+                            <FieldLabel htmlFor="claude-model">{t.settings.claudeModel}</FieldLabel>
                             <OptionSelect
                               id="claude-model"
                               value={config.claude.model}
-                              items={CLAUDE_MODELS}
+                              items={claudeModels(t)}
                               onValueChange={(value) =>
                                 setConfig({ ...config, claude: { ...config.claude, model: value } })
                               }
                             />
                           </Field>
                           <Field>
-                            <FieldLabel htmlFor="claude-retries">Max Autonomous Repair Retries</FieldLabel>
+                            <FieldLabel htmlFor="claude-retries">{t.settings.maxRetries}</FieldLabel>
                             <Input
                               id="claude-retries"
                               type="number"
@@ -203,23 +256,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Card size="sm">
                     <CardHeader>
                       <CardTitle>Google AGY Engine</CardTitle>
-                      <CardDescription>Verifier model and self-correction budget</CardDescription>
+                      <CardDescription>{t.settings.agyDescription}</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Field>
-                          <FieldLabel htmlFor="agy-model">AGY Gemini Model</FieldLabel>
+                          <FieldLabel htmlFor="agy-model">{t.settings.agyModel}</FieldLabel>
                           <OptionSelect
                             id="agy-model"
                             value={config.agy.model}
-                            items={AGY_MODELS}
+                            items={agyModels(t)}
                             onValueChange={(value) =>
                               setConfig({ ...config, agy: { ...config.agy, model: value } })
                             }
                           />
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="agy-budget">Self-Correction Budget (Rounds)</FieldLabel>
+                          <FieldLabel htmlFor="agy-budget">{t.settings.agyBudget}</FieldLabel>
                           <Input
                             id="agy-budget"
                             type="number"
@@ -242,23 +295,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Card size="sm">
                     <CardHeader>
                       <CardTitle>OpenAI Codex CLI</CardTitle>
-                      <CardDescription>Local subprocess, no API key required</CardDescription>
+                      <CardDescription>{t.settings.codexDescription}</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Field>
-                          <FieldLabel htmlFor="codex-model">Codex Model</FieldLabel>
+                          <FieldLabel htmlFor="codex-model">{t.settings.codexModel}</FieldLabel>
                           <OptionSelect
                             id="codex-model"
                             value={config.codex.model}
-                            items={CODEX_MODELS}
+                            items={codexModels(t)}
                             onValueChange={(value) =>
                               setConfig({ ...config, codex: { ...config.codex, model: value } })
                             }
                           />
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="codex-binary">Local CLI Binary Command</FieldLabel>
+                          <FieldLabel htmlFor="codex-binary">{t.settings.codexBinary}</FieldLabel>
                           <Input
                             id="codex-binary"
                             value={config.codex.binaryPath || 'codex'}
@@ -271,7 +324,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                               })
                             }
                           />
-                          <FieldDescription>Runs via local subprocess in the terminal</FieldDescription>
+                          <FieldDescription>{t.settings.codexBinaryHint}</FieldDescription>
                         </Field>
                       </div>
                     </CardContent>
@@ -285,13 +338,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="py-4 pr-3">
                   <Card size="sm">
                     <CardHeader>
-                      <CardTitle>Shell environment and font</CardTitle>
+                      <CardTitle>{t.settings.shellTitle}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <FieldGroup>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <Field>
-                            <FieldLabel htmlFor="default-shell">Default Shell</FieldLabel>
+                            <FieldLabel htmlFor="default-shell">{t.settings.defaultShell}</FieldLabel>
                             <OptionSelect
                               id="default-shell"
                               value={config.defaultShell}
@@ -302,11 +355,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             />
                           </Field>
                           <Field>
-                            <FieldLabel htmlFor="cursor-style">Cursor Style</FieldLabel>
+                            <FieldLabel htmlFor="cursor-style">{t.settings.cursorStyle}</FieldLabel>
                             <OptionSelect
                               id="cursor-style"
                               value={config.cursorStyle}
-                              items={CURSORS}
+                              items={cursors(t)}
                               onValueChange={(value) =>
                                 setConfig({ ...config, cursorStyle: value as CursorStyleType })
                               }
@@ -315,7 +368,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                         <Field>
                           <div className="flex items-center justify-between">
-                            <FieldLabel htmlFor="font-size">Font Size</FieldLabel>
+                            <FieldLabel htmlFor="font-size">{t.settings.fontSize}</FieldLabel>
                             <span className="font-mono text-sm text-muted-foreground">{config.fontSize}px</span>
                           </div>
                           <Slider
@@ -341,16 +394,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="py-4 pr-3">
                   <Card size="sm">
                     <CardHeader>
-                      <CardTitle>Autonomous agent sandbox</CardTitle>
-                      <CardDescription>Ephemeral git worktrees protect the active branch</CardDescription>
+                      <CardTitle>{t.settings.sandboxTitle}</CardTitle>
+                      <CardDescription>{t.settings.sandboxDescription}</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <FieldGroup>
                         <Field orientation="horizontal">
                           <div className="flex flex-col gap-1">
-                            <FieldTitle>Auto-Sandbox Autonomous Runs</FieldTitle>
+                            <FieldTitle>{t.settings.autoSandbox}</FieldTitle>
                             <FieldDescription>
-                              Agent Mesh and Autonomous Squads run inside .warp-worktrees/ so uncommitted files stay untouched.
+                              {t.settings.autoSandboxHint}
                             </FieldDescription>
                           </div>
                           <Switch
@@ -359,7 +412,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           />
                         </Field>
                         <Field>
-                          <FieldLabel htmlFor="verify-cmd">Default Build Verification Command</FieldLabel>
+                          <FieldLabel htmlFor="verify-cmd">{t.settings.verifyCmd}</FieldLabel>
                           <Input
                             id="verify-cmd"
                             value={config.defaultVerifyCmd}
@@ -377,17 +430,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </Tabs>
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Loading configuration…
+            {t.settings.loading}
           </div>
         )}
 
         <DialogFooter className="mx-0 mb-0 rounded-none">
           <Button variant="ghost" onClick={handleReset} disabled={!config}>
             <RotateCcwIcon data-icon="inline-start" />
-            Reset to Defaults
+            {t.settings.reset}
           </Button>
           <Button onClick={handleSave} disabled={!config}>
-            Save Configuration
+            {t.settings.save}
           </Button>
         </DialogFooter>
       </DialogContent>

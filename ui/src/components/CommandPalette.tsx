@@ -10,6 +10,7 @@ import {
   CommandShortcut,
 } from '@/components/ui/command.js';
 import type { CommandPaletteAction } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ interface CommandPaletteProps {
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, actions }) => {
+  const { t } = useI18n();
   const groups = useMemo(() => {
     const map = new Map<string, CommandPaletteAction[]>();
     for (const action of actions) {
@@ -34,14 +36,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title="Command Palette"
-      description="Type a command or search actions"
+      title={t.workspace.paletteTitle}
+      description={t.workspace.paletteDescription}
       className="sm:max-w-xl"
     >
       <Command key={isOpen ? 'open' : 'closed'}>
-        <CommandInput placeholder="Type a command or search actions..." />
+        <CommandInput placeholder={t.workspace.palettePlaceholder} />
         <CommandList>
-          <CommandEmpty>No matching commands found</CommandEmpty>
+          <CommandEmpty>{t.workspace.paletteEmpty}</CommandEmpty>
           {groups.map(([group, items]) => (
             <CommandGroup key={group} heading={group}>
               {items.map((action) => (

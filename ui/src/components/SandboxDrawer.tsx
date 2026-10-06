@@ -23,6 +23,7 @@ import { Spinner } from '@/components/ui/spinner.js';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group.js';
 import { DiffViewer } from './DiffViewer.js';
 import type { SandboxSession, SandboxMergeResult } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface SandboxDrawerProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
   onOpenTerminalInSandbox,
   onRefreshDiff,
 }) => {
+  const { t } = useI18n();
   const [sandboxes, setSandboxes] = useState<SandboxSession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [diff, setDiff] = useState<string>('');
@@ -115,7 +117,7 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
     } catch (err: any) {
       setMergeResult({
         success: false,
-        error: err.message || 'Merge failed',
+        error: err.message || t.modals.sandbox.mergeFailed,
       });
     } finally {
       setMerging(false);
@@ -147,12 +149,12 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <Badge>
               <GitBranchIcon data-icon="inline-start" />
-              Sandbox
+              {t.modals.sandbox.badge}
             </Badge>
-            <Badge variant="secondary">{sandboxes.length} active</Badge>
+            <Badge variant="secondary">{t.modals.sandbox.active(sandboxes.length)}</Badge>
           </div>
-          <SheetTitle>Agent Worktree Sandbox Review</SheetTitle>
-          <SheetDescription>Review isolated agent edits before merging into your working copy</SheetDescription>
+          <SheetTitle>{t.modals.sandbox.title}</SheetTitle>
+          <SheetDescription>{t.modals.sandbox.description}</SheetDescription>
         </SheetHeader>
 
         {sandboxes.length > 0 ? (
@@ -183,9 +185,9 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
               <EmptyMedia variant="icon">
                 <GitBranchIcon />
               </EmptyMedia>
-              <EmptyTitle>No active sandboxes</EmptyTitle>
+              <EmptyTitle>{t.modals.sandbox.emptyTitle}</EmptyTitle>
               <EmptyDescription>
-                Autonomous agents run in sandboxes automatically.
+                {t.modals.sandbox.emptyHint}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -195,13 +197,13 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
           <div className="px-4 pt-4">
             <Alert variant={mergeResult.success ? 'default' : 'destructive'}>
               {mergeResult.success ? <CheckIcon /> : <AlertTriangleIcon />}
-              <AlertTitle>{mergeResult.success ? 'Merged cleanly' : 'Merge failed'}</AlertTitle>
+              <AlertTitle>{mergeResult.success ? t.modals.sandbox.mergedCleanly : t.modals.sandbox.mergeFailed}</AlertTitle>
               <AlertDescription>
                 {mergeResult.success
-                  ? `Working branch updated (${mergeResult.mergedCommit?.substring(0, 7)})`
+                  ? t.modals.sandbox.branchUpdated(mergeResult.mergedCommit?.substring(0, 7) ?? '')
                   : mergeResult.conflict
-                    ? `Merge conflict in: ${mergeResult.conflictFiles?.join(', ')}`
-                    : mergeResult.error || 'Merge failed'}
+                    ? t.modals.sandbox.conflict(mergeResult.conflictFiles?.join(', ') ?? '')
+                    : mergeResult.error || t.modals.sandbox.mergeFailed}
               </AlertDescription>
             </Alert>
           </div>
@@ -211,10 +213,10 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
           <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
             <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 font-mono text-xs">
               <span className="truncate text-muted-foreground">
-                Path <span className="text-foreground">{selectedSandbox.worktreePath}</span>
+                {t.modals.sandbox.path} <span className="text-foreground">{selectedSandbox.worktreePath}</span>
               </span>
               <Badge variant="outline">
-                {filesChanged.length} file{filesChanged.length === 1 ? '' : 's'}
+                {t.modals.sandbox.files(filesChanged.length)}
               </Badge>
             </div>
 
@@ -224,8 +226,8 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
               ) : (
                 <Empty className="border-0">
                   <EmptyHeader>
-                    <EmptyTitle>No uncommitted changes</EmptyTitle>
-                    <EmptyDescription>This sandbox has nothing to review yet.</EmptyDescription>
+                    <EmptyTitle>{t.modals.sandbox.noChanges}</EmptyTitle>
+                    <EmptyDescription>{t.modals.sandbox.noChangesHint}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               )}
@@ -238,16 +240,16 @@ export const SandboxDrawer: React.FC<SandboxDrawerProps> = ({
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => onOpenTerminalInSandbox(selectedSandbox.worktreePath)}>
                 <TerminalIcon data-icon="inline-start" />
-                Open Terminal Here
+                {t.modals.sandbox.openTerminal}
               </Button>
               <Button variant="destructive" disabled={discarding} onClick={handleDiscard}>
                 {discarding ? <Spinner data-icon="inline-start" /> : <Trash2Icon data-icon="inline-start" />}
-                {discarding ? 'Discarding...' : 'Discard'}
+                {discarding ? t.modals.sandbox.discarding : t.modals.sandbox.discard}
               </Button>
             </div>
             <Button disabled={merging} onClick={handleMerge}>
               {merging ? <Spinner data-icon="inline-start" /> : <GitMergeIcon data-icon="inline-start" />}
-              {merging ? 'Merging...' : 'Merge into Active Branch'}
+              {merging ? t.modals.sandbox.merging : t.modals.sandbox.merge}
             </Button>
           </SheetFooter>
         )}

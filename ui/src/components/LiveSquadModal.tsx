@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input.js';
 import { Textarea } from '@/components/ui/textarea.js';
 import { OptionSelect, type OptionItem } from './OptionSelect.js';
 import type { SessionType } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface LiveSquadModalProps {
   isOpen: boolean;
@@ -35,11 +36,7 @@ const AGENT_ITEMS: OptionItem[] = [
   { value: 'codex', label: 'Codex CLI' },
 ];
 
-const ROUND_ITEMS: OptionItem[] = [
-  { value: '2', label: '2 tur' },
-  { value: '3', label: '3 tur' },
-  { value: '5', label: '5 tur' },
-];
+const ROUND_VALUES = [2, 3, 5];
 
 const load = (key: string, fallback: string) => {
   try {
@@ -55,6 +52,9 @@ const save = (key: string, value: string) => {
 };
 
 export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose, onLaunchSquad }) => {
+  const { t } = useI18n();
+  const d = t.modals.duo;
+  const roundItems: OptionItem[] = ROUND_VALUES.map((n) => ({ value: String(n), label: d.rounds(n) }));
   const [goal, setGoal] = useState('');
   const [builder, setBuilder] = useState(() => load('builder', 'claude'));
   const [verifier, setVerifier] = useState(() => load('verifier', 'agy'));
@@ -73,7 +73,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
   }, [isOpen]);
 
   const installed = AGENT_ITEMS.filter((a) => !available || available[a.value]);
-  const verifierItems: OptionItem[] = [...installed, { value: 'shell', label: 'Ajan yok, sadece test komutu' }];
+  const verifierItems: OptionItem[] = [...installed, { value: 'shell', label: d.verifierShellOnly }];
   const missing = available ? AGENT_ITEMS.filter((a) => !available[a.value]).map((a) => a.label) : [];
   const noBuilder = available !== null && installed.length === 0;
 
@@ -106,27 +106,26 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
           <div className="flex flex-wrap items-center gap-2">
             <Badge>
               <UsersIcon data-icon="inline-start" />
-              İkili Ajan
+              {d.badge}
             </Badge>
-            <Badge variant="outline">Yan yana iki panel, canlı</Badge>
+            <Badge variant="outline">{d.live}</Badge>
           </div>
-          <DialogTitle>Biri yazsın, diğeri kontrol etsin</DialogTitle>
+          <DialogTitle>{d.title}</DialogTitle>
           <DialogDescription>
-            Solda bir ajan kodu yazar, sağda test komutunuz çalışır. Hata çıkarsa kontrol eden ajan nedenini bulur ve
-            iş geri gönderilir; testler geçince kodu gözden geçirir. Her adımı panellerde canlı izlersiniz.
+            {d.description}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="squad-goal">Ne yapılsın?</FieldLabel>
+              <FieldLabel htmlFor="squad-goal">{d.goal}</FieldLabel>
               <Textarea
                 id="squad-goal"
                 autoFocus
                 rows={2}
                 value={goal}
-                placeholder="örn. Sepete indirim kodu desteği ekle ve testlerini yaz"
+                placeholder={d.goalPlaceholder}
                 onChange={(e) => setGoal(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
@@ -136,20 +135,20 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Field>
-                <FieldLabel htmlFor="squad-builder">Yazan (sol panel)</FieldLabel>
+                <FieldLabel htmlFor="squad-builder">{d.builder}</FieldLabel>
                 <OptionSelect id="squad-builder" value={builder} items={installed} disabled={noBuilder} onValueChange={setBuilder} />
-                <FieldDescription>Kodu yazar ve gelen geri bildirime göre düzeltir</FieldDescription>
+                <FieldDescription>{d.builderHint}</FieldDescription>
               </Field>
               <Field>
-                <FieldLabel htmlFor="squad-verifier">Kontrol eden (sağ panel)</FieldLabel>
+                <FieldLabel htmlFor="squad-verifier">{d.verifier}</FieldLabel>
                 <OptionSelect id="squad-verifier" value={verifier} items={verifierItems} onValueChange={setVerifier} />
-                <FieldDescription>Testleri çalıştırır, hataları inceler, kodu gözden geçirir</FieldDescription>
+                <FieldDescription>{d.verifierHint}</FieldDescription>
               </Field>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
               <Field className="sm:col-span-2">
-                <FieldLabel htmlFor="squad-verify">Test komutu</FieldLabel>
+                <FieldLabel htmlFor="squad-verify">{d.verifyCmd}</FieldLabel>
                 <Input
                   id="squad-verify"
                   value={verifyCmd}
@@ -157,50 +156,50 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
                   className="font-mono"
                   onChange={(e) => setVerifyCmd(e.target.value)}
                 />
-                <FieldDescription>Başarıda 0 ile çıkan bir komut (npm test, npm run build...)</FieldDescription>
+                <FieldDescription>{d.verifyCmdHint}</FieldDescription>
               </Field>
               <Field>
-                <FieldLabel htmlFor="squad-rounds">En fazla tur</FieldLabel>
-                <OptionSelect id="squad-rounds" value={maxRounds} items={ROUND_ITEMS} onValueChange={setMaxRounds} />
+                <FieldLabel htmlFor="squad-rounds">{d.maxRounds}</FieldLabel>
+                <OptionSelect id="squad-rounds" value={maxRounds} items={roundItems} onValueChange={setMaxRounds} />
               </Field>
             </div>
           </FieldGroup>
 
           {missing.length > 0 && !noBuilder && (
-            <p className="text-xs text-muted-foreground">Bu bilgisayarda kurulu olmadığı için listede yok: {missing.join(', ')}.</p>
+            <p className="text-xs text-muted-foreground">{d.missing(missing.join(', '))}</p>
           )}
           {noBuilder && (
             <Alert variant="destructive">
               <XCircleIcon />
-              <AlertTitle>Kurulu ajan bulunamadı</AlertTitle>
-              <AlertDescription>Claude Code, AGY veya Codex CLI'dan en az birini kurun.</AlertDescription>
+              <AlertTitle>{d.noAgentTitle}</AlertTitle>
+              <AlertDescription>{d.noAgentHint}</AlertDescription>
             </Alert>
           )}
 
           <Alert>
             <InfoIcon />
-            <AlertTitle>Nasıl ilerler?</AlertTitle>
+            <AlertTitle>{d.howTitle}</AlertTitle>
             <AlertDescription>
               <ol className="list-decimal space-y-0.5 pl-4">
-                <li>{builderLabel} görevi alır ve dosyaları düzenler (sol panel).</li>
-                <li>"{verifyCmd || 'npm test'}" sağ panelde çalışır.</li>
+                <li>{d.step1(builderLabel)}</li>
+                <li>{d.step2(verifyCmd || 'npm test')}</li>
                 <li>
                   {verifierLabel
-                    ? `Başarısızsa ${verifierLabel} hatayı inceler, ${builderLabel} düzeltir. Başarılıysa ${verifierLabel} kodu gözden geçirir.`
-                    : `Başarısızsa hata çıktısı ${builderLabel}'a geri gönderilir.`}
+                    ? d.step3Agent(verifierLabel, builderLabel)
+                    : d.step3Shell(builderLabel)}
                 </li>
-                <li>Onay gelene ya da tur sınırına ulaşılana kadar tekrar eder. İstediğiniz an duraklatabilirsiniz.</li>
+                <li>{d.step4}</li>
               </ol>
             </AlertDescription>
           </Alert>
 
           <DialogFooter className="mx-0 mb-0 rounded-none border-0 bg-transparent p-0">
             <Button type="button" variant="outline" onClick={onClose}>
-              Vazgeç
+              {d.cancel}
             </Button>
             <Button type="submit" disabled={!goal.trim() || noBuilder}>
               <PlayIcon data-icon="inline-start" />
-              Başlat
+              {d.start}
             </Button>
           </DialogFooter>
         </form>

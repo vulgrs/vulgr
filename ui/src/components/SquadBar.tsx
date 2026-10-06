@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { squadAgentLabel } from '../hooks/useSquadOrchestrator.js';
 import type { SquadSession } from '../types/warp.js';
+import { useI18n } from '../i18n/index.js';
 
 interface SquadBarProps {
   squad: SquadSession;
@@ -35,6 +36,7 @@ const PHASE_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
 };
 
 export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStopSquad, onOpenChanges }) => {
+  const { t } = useI18n();
   if (!squad.active) return null;
 
   const finished = squad.phase === 'consensus' || squad.phase === 'failed';
@@ -42,7 +44,7 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
     ? { color: 'bg-zinc-900 border-zinc-700 text-zinc-300', icon: <Pause size={13} className="text-zinc-400" /> }
     : PHASE_STYLE[squad.phase] ?? PHASE_STYLE.building;
   const statusText = squad.paused
-    ? 'Duraklatıldı — şu anki adım bitince bekliyor. Panellere kendiniz yazabilirsiniz.'
+    ? t.workspace.squadPaused
     : squad.statusText || '';
 
   return (
@@ -53,7 +55,7 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
           <div className="flex size-5 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-primary">
             <Users size={11} />
           </div>
-          <span className="font-semibold text-xs text-zinc-100 font-sans">İkili Ajan</span>
+          <span className="font-semibold text-xs text-zinc-100 font-sans">{t.workspace.squadTitle}</span>
         </div>
 
         <div className="h-3.5 w-px bg-zinc-800 flex-shrink-0" />
@@ -61,23 +63,23 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
         <div className="flex items-center gap-1.5 text-[11px] flex-shrink-0">
           <span
             className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300"
-            title="Sol panel: kodu yazan ajan"
+            title={t.workspace.builderHint}
           >
-            ◧ {squadAgentLabel(squad.builderType)} yazar
+            ◧ {t.workspace.builderLabel(squadAgentLabel(squad.builderType))}
           </span>
           <span className="text-zinc-600">⇄</span>
           <span
             className="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300"
             title={
               squad.verifierType === 'shell'
-                ? 'Sağ panel: test komutu çalışır'
-                : 'Sağ panel: test komutu çalışır, ajan hataları inceler ve kodu gözden geçirir'
+                ? t.workspace.verifierShellHint
+                : t.workspace.verifierAgentHint
             }
           >
-            ◨ {squad.verifierType === 'shell' ? 'test' : `${squadAgentLabel(squad.verifierType)} kontrol eder`}
+            ◨ {squad.verifierType === 'shell' ? t.workspace.verifierShellLabel : t.workspace.verifierAgentLabel(squadAgentLabel(squad.verifierType))}
           </span>
           <span className="font-mono text-zinc-500 ml-1">
-            tur {squad.round}/{squad.maxRounds}
+            {t.workspace.round(squad.round, squad.maxRounds)}
           </span>
         </div>
 
@@ -106,10 +108,10 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
             <button
               onClick={onOpenChanges}
               className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-primary/40 bg-primary/10 text-xs font-medium text-primary"
-              title="Ajanların yaptığı değişiklikleri inceleyin ve commit edin"
+              title={t.workspace.reviewChangesHint}
             >
               <GitCompare size={11} />
-              <span>Değişiklikleri incele</span>
+              <span>{t.workspace.reviewChanges}</span>
             </button>
           )
         ) : (
@@ -120,17 +122,17 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
                 ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
                 : 'btn-ghost'
             }`}
-            title={squad.paused ? 'Kaldığı yerden devam et' : 'Şu anki adım bitince beklesin; araya girip kendiniz yazabilirsiniz'}
+            title={squad.paused ? t.workspace.resumeHint : t.workspace.pauseHint}
           >
             {squad.paused ? <Play size={11} /> : <Pause size={11} />}
-            <span>{squad.paused ? 'Devam et' : 'Duraklat'}</span>
+            <span>{squad.paused ? t.workspace.resume : t.workspace.pause}</span>
           </button>
         )}
 
         <button
           onClick={onStopSquad}
           className="p-1 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-          title={finished ? 'Bu çubuğu kapat' : 'İkili ajanı durdur (çalışan komutlar Ctrl+C ile kesilir)'}
+          title={finished ? t.workspace.closeBar : t.workspace.stopSquad}
         >
           <X size={14} />
         </button>
