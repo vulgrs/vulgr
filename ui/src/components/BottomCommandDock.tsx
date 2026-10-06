@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Terminal,
   Send,
   Sparkles,
   Shield,
@@ -85,7 +84,6 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
 }) => {
   const { t } = useI18n();
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<'shell' | 'claude'>('shell');
   const [suggestion, setSuggestion] = useState<CommandSuggestion | null>(null);
   const [ghostSuggestion, setGhostSuggestion] = useState<AutoSuggestItem | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
@@ -106,7 +104,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
     inputRef.current?.focus();
   }, [insertRequest]);
 
-  const isAiMode = mode === 'shell' && input.startsWith('#');
+  const isAiMode = input.startsWith('#');
 
 
   // Query AI command generator when query starts with '#'
@@ -177,9 +175,9 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
     const trimmed = input.trim();
     if (!trimmed) return;
 
-    // Claude Mode or ? question prefix: route to Claude Code
-    if (mode === 'claude' || trimmed.startsWith('?')) {
-      const prompt = mode === 'claude' ? trimmed : trimmed.slice(1).trim();
+    // ? question prefix: route to Claude Code
+    if (trimmed.startsWith('?')) {
+      const prompt = trimmed.slice(1).trim();
       const askHandler = onAskClaude || onAskAgent;
       if (prompt && askHandler) {
         askHandler(prompt);
@@ -360,7 +358,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
         </div>
       )}
 
-      {/* Input block: cwd chip & mode toggle on top, then the input with a send button. */}
+      {/* Input block: cwd chip on top, then the input with a run button. */}
       <form onSubmit={handleSubmit} className="relative px-4 pt-3 pb-1.5">
         <div className="flex items-center gap-2">
           <div
@@ -370,51 +368,14 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
             <Folder size={11} />
             <span className="max-w-[280px] truncate">{shortCwd}</span>
           </div>
-
-          {/* Mode Switcher: Terminal Shell vs Claude Code */}
-          <div className="inline-flex items-center p-0.5 rounded-md bg-zinc-900/70 border border-zinc-800 text-[10px] font-mono">
-            <button
-              type="button"
-              onClick={() => setMode('shell')}
-              className={`px-2 py-0.5 rounded transition-all flex items-center gap-1 ${
-                mode === 'shell'
-                  ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-              title={t.dock.shellModeHint}
-            >
-              <Terminal size={10} />
-              <span>Shell</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('claude')}
-              className={`px-2 py-0.5 rounded transition-all flex items-center gap-1 ${
-                mode === 'claude'
-                  ? 'bg-violet-950/80 text-violet-200 border border-violet-700/60 font-semibold shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-              title={t.dock.claudeModeHint}
-            >
-              <Sparkles size={10} className={mode === 'claude' ? 'text-violet-300' : 'text-zinc-500'} />
-              <span>Claude Code</span>
-            </button>
-          </div>
         </div>
 
         <div className="mt-2.5 flex items-center gap-2">
           <div className="relative flex-1 flex items-center min-w-0">
-            {/* Mode prefix icon */}
-            <span className="mr-2 text-xs select-none">
-              {mode === 'claude' ? (
-                <Sparkles size={13} className="text-violet-400" />
-              ) : (
-                <span className="text-zinc-500 font-bold">$</span>
-              )}
-            </span>
+            <span className="mr-2 text-xs select-none text-zinc-500 font-bold">$</span>
 
             {/* Ghost Text Overlay */}
-            {ghostSuggestion && !isAiMode && mode === 'shell' && (
+            {ghostSuggestion && !isAiMode && (
               <div className="absolute inset-0 pl-5 px-0.5 flex items-center pointer-events-none font-mono text-[13px] overflow-hidden select-none whitespace-pre">
                 <span className="opacity-0">{input}</span>
                 <span className="text-zinc-600 italic">{ghostSuggestion.suffix}</span>
@@ -434,13 +395,7 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
               }}
               onKeyDown={handleKeyDown}
               disabled={!activeSession}
-              placeholder={
-                !activeSession
-                  ? t.dock.selectTerminalFirst
-                  : mode === 'claude'
-                  ? t.dock.claudePlaceholder
-                  : t.dock.shellPlaceholder
-              }
+              placeholder={!activeSession ? t.dock.selectTerminalFirst : t.dock.shellPlaceholder}
               className="w-full bg-transparent text-zinc-100 text-[13px] font-mono placeholder:text-zinc-600 focus:outline-none outline-none relative z-10"
             />
           </div>
@@ -448,15 +403,11 @@ export const BottomCommandDock: React.FC<BottomCommandDockProps> = ({
           <button
             type="submit"
             disabled={!input.trim() || !activeSession}
-            className={`flex-shrink-0 flex items-center px-2 py-1 rounded border text-xs font-mono transition-colors disabled:cursor-not-allowed ${
-              mode === 'claude'
-                ? 'border-violet-800 text-violet-300 enabled:hover:bg-violet-950/60 disabled:border-zinc-800 disabled:text-zinc-600'
-                : 'border-zinc-800 text-zinc-600 enabled:text-zinc-200 enabled:hover:bg-zinc-900'
-            }`}
-            title={mode === 'claude' ? t.dock.sendToClaude : t.dock.runEnter}
+            className="flex-shrink-0 flex items-center px-2 py-1 rounded border border-zinc-800 text-xs font-mono text-zinc-600 enabled:text-zinc-200 enabled:hover:bg-zinc-900 transition-colors disabled:cursor-not-allowed"
+            title={t.dock.runEnter}
           >
-            {mode === 'claude' ? <Sparkles size={12} className="mr-1 text-violet-400" /> : <ArrowRight size={12} />}
-            <span>{mode === 'claude' ? t.dock.ask : t.dock.run}</span>
+            <ArrowRight size={12} />
+            <span>{t.dock.run}</span>
           </button>
         </div>
       </form>
