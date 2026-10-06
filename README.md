@@ -1,73 +1,75 @@
-# Warp Multi-Agent Terminal Workspace
+<p align="center">
+  <img src="ui/public/logo.png" alt="Vulgr" width="96" height="96" />
+</p>
 
-> **Interactive Warp-Style Terminal Workspace for AI Coding Agents (`claude`, `agy`, `codex`)**
-> Real xterm.js + node-pty Engine • Multi-Pane Split Layout • Auto Compiler Error Interceptor • Cross-Model Adversarial Audit
+<h1 align="center">Vulgr</h1>
 
----
+<p align="center">
+  An open-source terminal for working with AI coding agents.<br />
+  Run Claude Code, Codex and AGY side by side, keep your sessions organized, and let agents check each other's work.
+</p>
 
-## 🌟 Overview
+<p align="center">
+  <a href="https://vulgr.tech">vulgr.tech</a> ·
+  <a href="https://github.com/vulgrs/vulgr/issues">Issues</a> ·
+  <a href="LICENSE">MIT License</a>
+</p>
 
-**Warp Multi-Agent Terminal Workspace** transforms your development environment into an AI-native, multi-pane terminal workspace inspired by [Warp](https://www.warp.dev/).
+<p align="center">
+  <img src="docs/screenshot.png" alt="Vulgr with a split tab, groups and per-pane command boxes" />
+</p>
 
-Instead of running opaque scripts in the background, you **interactively launch and operate `claude` (Claude Code), `agy` (Antigravity CLI), and `codex` yourself** inside real terminal sessions with full ANSI color, TUI cursor navigation, and interactive prompts.
+## Features
 
-The workspace acts as an intelligent orchestration layer:
-1. **Interactive Multi-Agent Panes:** Split terminals horizontally or vertically. Run Claude Code in one pane, AGY in another, and your test watcher in a third.
-2. **Compiler Error Sniffer (Self-Correction):** When an error occurs in your terminal (TypeScript `TS2322`, syntax error, test failure), a floating banner detects the error and offers one-click action: *"Send to Claude / AGY / Codex to Fix"*.
-3. **Cross-Model Adversarial Audit:** When one agent writes code, click `Git Diff` to inspect the uncommitted changes and send them to another agent (e.g., AGY auditing Claude's code) for paranoid security and edge-case inspection.
+- **Real terminals** — xterm.js + node-pty, so agent TUIs, colors and prompts work as they do in your normal terminal.
+- **Split panes** — open terminals side by side or stacked; every pane has its own command box.
+- **Sessions and groups** — tabs name themselves after the work done in them (or stay *Untitled*), can be renamed, dragged into groups, and are restored on the next launch. Split tabs list their panes in the sidebar.
+- **Command box** — run commands as blocks with duration and output, describe a command in plain words with `#`, or ask Claude with `?` / `Ctrl+Shift+Enter`.
+- **Agents working together**
+  - **Duo Loop** — one agent writes the code, another runs your tests and asks for fixes until they pass.
+  - **Agent Swarm** — give one goal; writer, checker and auditor agents run it in the background, optionally in an isolated git worktree.
+  - **Claude Chat** — talk to Claude Code and watch its file changes live.
+- **Changes, report, memory** — review the diff and commit & push, export the session as Markdown/HTML/JSON, and keep project rules the agents always receive.
+- **GitHub sign-in**, **dark / light theme**, **English / Turkish** interface.
 
----
+## Requirements
 
-## 🖥️ Workspace Layout
+- macOS or Windows (Linux should work but is not tested yet)
+- [Node.js](https://nodejs.org) 20 or newer
+- Build tools for the native terminal module (`node-pty`): Xcode Command Line Tools on macOS, the "Desktop development with C++" workload on Windows
+- The agent CLIs you want to use, installed and signed in: [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Codex CLI, AGY / Gemini CLI
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  ⚡ WARP WORKSPACE  [Terminal 1] [+]  [+ Shell] [+ Claude] [+ AGY] [+ Codex] [Diff]│
-├──────────────────────────────────────────────────────────────────────────────────┤
-│  Split Interactive Terminals (Powered by xterm.js + node-pty)                    │
-│                                                                                  │
-│  ┌─────────────────────────────────────┬──────────────────────────────────────┐  │
-│  │ 🖥️ Claude Code (Interactive TUI)    │ 🖥️ AGY Engine (Interactive Session)  │  │
-│  │                                     │                                      │  │
-│  │  > claude                           │  > agy                               │  │
-│  │  ╭─ Claude Code ──────────────────╮ │  ╭─ Google Antigravity CLI ────────╮ │  │
-│  │  │ What would you like to build?  │ │  │ Listening for commands...        │ │  │
-│  │  ╰────────────────────────────────╯ │  ╰──────────────────────────────────╯ │  │
-│  └─────────────────────────────────────┴──────────────────────────────────────┘  │
-│                                                                                  │
-│  ┌────────────────────────────────────────────────────────────────────────────┐  │
-│  │ 🖥️ Verifier & Build Watcher (npm test / npm run dev / tsc -w)              │  │
-│  │  ⚠ Compiler Error: TS2322 in auth.ts                                       │  │
-│  │  [⚡ Send to Claude to Fix]  [⚡ Send to AGY to Fix]  [⚡ Send to Codex]    │  │
-│  └────────────────────────────────────────────────────────────────────────────┘  │
-├──────────────────────────────────────────────────────────────────────────────────┤
-│  Active Pane: Claude Code   [claude] [agy] [codex] [npm test]   $ [Input]       │
-└──────────────────────────────────────────────────────────────────────────────────┘
-```
+## Getting started
 
----
-
-## 🚀 Quick Start
-
-### 1. Launch the Desktop Terminal Workspace
 ```bash
-npm run start:app
+git clone https://github.com/vulgrs/vulgr.git
+cd vulgr
+npm install
+npm run build      # compile the Electron main process and the UI
+npm run dev:app    # start the UI dev server and the app
 ```
 
-### 2. Available Controls
-- **`+ Shell`**: Opens a standard PowerShell / Bash terminal pane.
-- **`+ Claude`**: Spawns an interactive `claude` (Claude Code) session.
-- **`+ AGY`**: Spawns an interactive `agy` (Antigravity CLI) session.
-- **`+ Codex`**: Spawns an interactive `codex` CLI session.
-- **Split Horizontal / Vertical**: Split your active terminal into multiple panes.
-- **`Git Diff`**: Open the diff inspector drawer to review changes and trigger cross-model audits.
+`npm run start:app` runs the last build without the dev server.
 
----
+## Development
 
-## 🧪 Testing
-```bash
-npm test
-```
+| Command | What it does |
+| --- | --- |
+| `npm run dev:app` | Vite dev server + Electron, with hot reload for the UI |
+| `npm run build` | Type-check and build everything into `dist/` |
+| `npm run type-check` | Type-check the main process and the UI |
+| `npm test` | Run the engine tests (after `npm run build`) |
 
-## 📄 License
-MIT
+Project layout:
+
+- `electron/` — main process: windows, terminals (`ptyManager.ts`), GitHub sign-in, IPC
+- `src/` — engine shared by the app: agent adapters, Agent Swarm (`engine/agentMesh.ts`), git and worktree helpers, tests
+- `ui/` — React interface; translations live in `ui/src/i18n/messages/`
+
+## Contributing
+
+Issues and pull requests are welcome. For larger changes, please open an issue first so we can agree on the approach. When adding interface text, add it to both the English and Turkish tables in `ui/src/i18n/messages/` — the type-check fails if one is missing.
+
+## License
+
+[MIT](LICENSE) © Vulgr contributors

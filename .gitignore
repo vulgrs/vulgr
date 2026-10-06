@@ -3,6 +3,7 @@ dist/
 .env
 .env.local
 .ai-bridge/runs/
+.ai-bridge/bus/
 .test-mesh-workspace/
 *.log
 .DS_Store
