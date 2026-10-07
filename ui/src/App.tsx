@@ -1449,6 +1449,7 @@ export const App: React.FC = () => {
           setRightPanelOpen(true);
         }}
         onOpenSandboxes={() => setSandboxDrawerOpen(true)}
+        onInstallAgents={() => setAgentSetupOpen(true)}
       />
 
       {/* Live Autonomous Squad Modal */}
@@ -1456,6 +1457,7 @@ export const App: React.FC = () => {
         isOpen={squadModalOpen}
         onClose={() => setSquadModalOpen(false)}
         onLaunchSquad={handleLaunchLiveSquad}
+        onInstallAgents={() => setAgentSetupOpen(true)}
       />
 
       {/* Universal Shared Skills & Persistent Memory Modal */}

@@ -1,20 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { UsersIcon, PlayIcon, InfoIcon, XCircleIcon } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.js';
-import { Badge } from '@/components/ui/badge.js';
+import { ArrowLeftRight, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button.js';
+import { Dialog, DialogContent } from '@/components/ui/dialog.js';
+import duoLoopIcon from '../assets/sidebar/duo-loop.svg';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog.js';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field.js';
-import { Input } from '@/components/ui/input.js';
-import { Textarea } from '@/components/ui/textarea.js';
-import { OptionSelect, type OptionItem } from './OptionSelect.js';
+  FLOW_DIALOG,
+  FlowArrow,
+  FlowFooter,
+  FlowHeader,
+  FlowInput,
+  GoalInput,
+  Kbd,
+  MissingAgents,
+  RoleCard,
+  SectionLabel,
+  Segmented,
+  SettingRow,
+  SettingsDisclosure,
+  isMac,
+  type AgentOption,
+} from './FlowParts.js';
 import type { SessionType } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
 
@@ -28,17 +33,19 @@ interface LiveSquadModalProps {
     verifyCmd: string;
     maxRounds: number;
   }) => void;
+  /** Opens the agent installer, offered when some agents aren't installed. */
+  onInstallAgents?: () => void;
 }
 
-const AGENT_ITEMS: OptionItem[] = [
+const AGENT_ITEMS: AgentOption[] = [
   { value: 'claude', label: 'Claude Code' },
-  { value: 'agy', label: 'Antigravity (AGY)' },
+  { value: 'agy', label: 'Antigravity' },
   { value: 'codex', label: 'Codex CLI' },
   { value: 'opencode', label: 'OpenCode' },
   { value: 'cursor', label: 'Cursor Agent' },
 ];
 
-const ROUND_VALUES = [2, 3, 5];
+const ROUND_VALUES = ['2', '3', '5'];
 
 const load = (key: string, fallback: string) => {
   try {
@@ -53,10 +60,10 @@ const save = (key: string, value: string) => {
   } catch {}
 };
 
-export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose, onLaunchSquad }) => {
+export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose, onLaunchSquad, onInstallAgents }) => {
   const { t } = useI18n();
+  const f = t.flow;
   const d = t.modals.duo;
-  const roundItems: OptionItem[] = ROUND_VALUES.map((n) => ({ value: String(n), label: d.rounds(n) }));
   const [goal, setGoal] = useState('');
   const [builder, setBuilder] = useState(() => load('builder', 'claude'));
   const [verifier, setVerifier] = useState(() => load('verifier', 'agy'));
@@ -77,139 +84,124 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
   }, [isOpen]);
 
   const installed = AGENT_ITEMS.filter((a) => !available || available[a.value]);
-  const verifierItems: OptionItem[] = [...installed, { value: 'shell', label: d.verifierShellOnly }];
+  const verifierItems: AgentOption[] = [...installed, { value: 'shell', label: f.terminalOnly }];
   const missing = available ? AGENT_ITEMS.filter((a) => !available[a.value]).map((a) => a.label) : [];
   const noBuilder = available !== null && installed.length === 0;
+  const cmd = verifyCmd.trim();
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleSubmit = () => {
     if (!goal.trim() || noBuilder) return;
     save('builder', builder);
     save('verifier', verifier);
-    save('testCommand', verifyCmd.trim());
+    save('testCommand', cmd);
     save('maxRounds', maxRounds);
 
     onLaunchSquad({
       goal: goal.trim(),
       builder: builder as SessionType,
       verifier: verifier as SessionType,
-      verifyCmd: verifyCmd.trim(),
+      verifyCmd: cmd,
       maxRounds: Number(maxRounds) || 3,
     });
     setGoal('');
     onClose();
   };
 
-  const builderLabel = AGENT_ITEMS.find((a) => a.value === builder)?.label ?? builder;
-  const verifierLabel = AGENT_ITEMS.find((a) => a.value === verifier)?.label;
+  const checkerDuty = verifier === 'shell' ? f.dutyShell : cmd ? f.dutyCheckerCmd : f.dutyCheckerAuto;
+  const summary = [cmd ? f.testCmd(cmd) : f.autoTests, f.rounds(Number(maxRounds))].join(' · ');
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <DialogHeader className="gap-2 border-b px-4 py-4 pr-12">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge>
-              <UsersIcon data-icon="inline-start" />
-              {d.badge}
-            </Badge>
-            <Badge variant="outline">{d.live}</Badge>
+      <DialogContent className={`${FLOW_DIALOG} sm:max-w-[560px]`}>
+        <FlowHeader icon={duoLoopIcon} title="Duo Loop" subtitle={f.duoSubtitle} />
+
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
+          <div>
+            <SectionLabel htmlFor="squad-goal">{f.goal}</SectionLabel>
+            <GoalInput
+              id="squad-goal"
+              value={goal}
+              placeholder={d.goalPlaceholder}
+              onChange={setGoal}
+              onSubmit={handleSubmit}
+            />
           </div>
-          <DialogTitle>{d.title}</DialogTitle>
-          <DialogDescription>
-            {d.description}
-          </DialogDescription>
-        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="squad-goal">{d.goal}</FieldLabel>
-              <Textarea
-                id="squad-goal"
-                autoFocus
-                rows={2}
-                value={goal}
-                placeholder={d.goalPlaceholder}
-                onChange={(e) => setGoal(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
-                }}
-              />
-            </Field>
+          <div>
+            <SectionLabel>{f.flow}</SectionLabel>
+            {noBuilder ? (
+              <p className="rounded-[11px] border border-dashed border-zinc-800 px-3.5 py-4 text-center text-[12px] text-zinc-500">
+                {f.noAgents}
+              </p>
+            ) : (
+              <div className="flex items-stretch gap-2">
+                <RoleCard
+                  step={`${f.leftPane} · ${f.writer}`}
+                  duty={f.dutyWriter}
+                  value={builder}
+                  options={installed}
+                  onChange={setBuilder}
+                />
+                <FlowArrow icon={<ArrowLeftRight size={13} />} />
+                <RoleCard
+                  step={`${f.rightPane} · ${f.checker}`}
+                  duty={checkerDuty}
+                  value={verifier}
+                  options={verifierItems}
+                  onChange={setVerifier}
+                />
+              </div>
+            )}
+          </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field>
-                <FieldLabel htmlFor="squad-builder">{d.builder}</FieldLabel>
-                <OptionSelect id="squad-builder" value={builder} items={installed} disabled={noBuilder} onValueChange={setBuilder} />
-                <FieldDescription>{d.builderHint}</FieldDescription>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="squad-verifier">{d.verifier}</FieldLabel>
-                <OptionSelect id="squad-verifier" value={verifier} items={verifierItems} onValueChange={setVerifier} />
-                <FieldDescription>{d.verifierHint}</FieldDescription>
-              </Field>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field className="sm:col-span-2">
-                <FieldLabel htmlFor="squad-verify">{d.verifyCmd}</FieldLabel>
-                <Input
+          <SettingsDisclosure label={f.settings} summary={summary}>
+            <SettingRow
+              stacked
+              htmlFor="squad-verify"
+              label={f.testLabel}
+              hint={f.testHint}
+              control={
+                <FlowInput
                   id="squad-verify"
                   value={verifyCmd}
-                  placeholder={d.verifyCmdPlaceholder}
-                  className="font-mono"
+                  placeholder={f.testPlaceholder}
                   onChange={(e) => setVerifyCmd(e.target.value)}
                 />
-                <FieldDescription>{d.verifyCmdHint}</FieldDescription>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="squad-rounds">{d.maxRounds}</FieldLabel>
-                <OptionSelect id="squad-rounds" value={maxRounds} items={roundItems} onValueChange={setMaxRounds} />
-              </Field>
-            </div>
-          </FieldGroup>
+              }
+            />
+            <SettingRow
+              label={f.roundsLabel}
+              hint={f.roundsHint}
+              control={
+                <Segmented
+                  value={maxRounds}
+                  items={ROUND_VALUES.map((v) => ({ value: v, label: v }))}
+                  onChange={setMaxRounds}
+                />
+              }
+            />
+          </SettingsDisclosure>
+        </div>
 
-          {missing.length > 0 && !noBuilder && (
-            <p className="text-xs text-muted-foreground">{d.missing(missing.join(', '))}</p>
-          )}
-          {noBuilder && (
-            <Alert variant="destructive">
-              <XCircleIcon />
-              <AlertTitle>{d.noAgentTitle}</AlertTitle>
-              <AlertDescription>{d.noAgentHint}</AlertDescription>
-            </Alert>
-          )}
-
-          <Alert>
-            <InfoIcon />
-            <AlertTitle>{d.howTitle}</AlertTitle>
-            <AlertDescription>
-              <ol className="list-decimal space-y-0.5 pl-4">
-                {!verifyCmd.trim() && verifierLabel && <li>{d.step0(verifierLabel)}</li>}
-                <li>{d.step1(builderLabel)}</li>
-                <li>
-                  {verifyCmd.trim() ? d.step2(verifyCmd.trim()) : verifierLabel ? d.step2Auto : d.step2Project}
-                </li>
-                <li>
-                  {verifierLabel
-                    ? d.step3Agent(verifierLabel, builderLabel)
-                    : d.step3Shell(builderLabel)}
-                </li>
-                <li>{d.step4}</li>
-              </ol>
-            </AlertDescription>
-          </Alert>
-
-          <DialogFooter className="mx-0 mb-0 rounded-none border-0 bg-transparent p-0">
-            <Button type="button" variant="outline" onClick={onClose}>
-              {d.cancel}
-            </Button>
-            <Button type="submit" disabled={!goal.trim() || noBuilder}>
-              <PlayIcon data-icon="inline-start" />
-              {d.start}
-            </Button>
-          </DialogFooter>
-        </form>
+        <FlowFooter
+          left={
+            missing.length > 0 ? (
+              <MissingAgents names={missing} text={f.notInstalled} action={f.install} onInstall={onInstallAgents && (() => { onClose(); onInstallAgents(); })} />
+            ) : (
+              <>
+                <Kbd>{isMac ? '⌘' : 'Ctrl'} ↵</Kbd>
+              </>
+            )
+          }
+        >
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {f.cancel}
+          </Button>
+          <Button size="sm" disabled={!goal.trim() || noBuilder} onClick={handleSubmit}>
+            <Play data-icon="inline-start" />
+            {f.start}
+          </Button>
+        </FlowFooter>
       </DialogContent>
     </Dialog>
   );
