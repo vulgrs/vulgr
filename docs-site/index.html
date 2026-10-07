@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vulgr — open-source terminal for AI coding agents</title>
+  <meta name="description" content="Vulgr is a free, open-source terminal for working with AI coding agents. Run Claude Code, Codex and AGY side by side, keep sessions organized and let agents check each other's work. For macOS, Windows and Linux." />
+  <meta name="theme-color" content="#0a0a0a" />
+  <link rel="canonical" href="https://vulgr.tech/" />
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/logo.png" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Vulgr" />
+  <meta property="og:url" content="https://vulgr.tech/" />
+  <meta property="og:title" content="Vulgr — open-source terminal for AI coding agents" />
+  <meta property="og:description" content="Run Claude Code, Codex and AGY side by side, keep your sessions organized, and let agents check each other's work." />
+  <meta property="og:image" content="https://vulgr.tech/assets/screenshot.png" />
+  <meta property="og:image:alt" content="Vulgr with a split tab, groups and per-pane command boxes" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:locale:alternate" content="tr_TR" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Vulgr — open-source terminal for AI coding agents" />
+  <meta name="twitter:description" content="Run Claude Code, Codex and AGY side by side, keep your sessions organized, and let agents check each other's work." />
+  <meta name="twitter:image" content="https://vulgr.tech/assets/screenshot.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="Vulgr">
+      <img src="assets/logo.png" alt="" width="28" height="28" />
+      <span>Vulgr</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features" data-i18n="navFeatures">Features</a>
+      <a href="#download" data-i18n="navDownload">Download</a>
+      <a href="https://github.com/vulgrs/vulgr">GitHub</a>
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang="tr" aria-pressed="false">TR</button>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <p class="eyebrow" data-i18n="eyebrow">Free &amp; open source · MIT</p>
+      <h1 data-i18n="heroTitle">An open-source terminal for working with AI coding agents.</h1>
+      <p class="lead" data-i18n="heroLead">Run Claude Code, Codex and AGY side by side, keep your sessions organized, and let agents check each other's work.</p>
+      <div class="cta">
+        <a class="btn primary" id="primary-download" href="https://github.com/vulgrs/vulgr/releases/latest">
+          <span data-i18n="downloadFor">Download for</span> <span id="primary-os">your OS</span>
+        </a>
+        <a class="btn ghost" href="https://github.com/vulgrs/vulgr" data-i18n="viewSource">View source</a>
+      </div>
+      <p class="meta"><span id="release-version"></span> <a href="#download" data-i18n="otherPlatforms">Other platforms</a></p>
+    </section>
+
+    <figure class="shot">
+      <img src="assets/screenshot.png" alt="Vulgr with a split tab, groups and per-pane command boxes" width="2892" height="1574" />
+    </figure>
+
+    <section id="features" class="section">
+      <h2 data-i18n="featuresTitle">Features</h2>
+      <div class="grid">
+        <article class="card">
+          <h3 data-i18n="f1Title">Real terminals</h3>
+          <p data-i18n="f1Body">xterm.js + node-pty, so agent TUIs, colors and prompts work as they do in your normal terminal.</p>
+        </article>
+        <article class="card">
+          <h3 data-i18n="f2Title">Split panes</h3>
+          <p data-i18n="f2Body">Open terminals side by side or stacked; every pane has its own command box.</p>
+        </article>
+        <article class="card">
+          <h3 data-i18n="f3Title">Sessions and groups</h3>
+          <p data-i18n="f3Body">Tabs name themselves after the work done in them, can be renamed, dragged into groups, and are restored on the next launch.</p>
+        </article>
+        <article class="card">
+          <h3 data-i18n="f4Title">Command box</h3>
+          <p data-i18n-html="f4Body">Run commands as blocks with duration and output, describe a command in plain words with <code>#</code>, or ask Claude with <code>?</code>.</p>
+        </article>
+        <article class="card">
+          <h3 data-i18n="f5Title">Agents working together</h3>
+          <p data-i18n="f5Body">Duo Loop: one agent writes, another tests until it passes. Agent Swarm: writer, checker and auditor agents run one goal, optionally in an isolated git worktree. Claude Chat: watch file changes live.</p>
+        </article>
+        <article class="card">
+          <h3 data-i18n="f6Title">Changes, report, memory</h3>
+          <p data-i18n="f6Body">Review the diff and commit &amp; push, export the session as Markdown/HTML/JSON, and keep project rules the agents always receive.</p>
+        </article>
+        <article class="card">
+          <h3 data-i18n="f7Title">Automatic updates</h3>
+          <p data-i18n="f7Body">Windows and Linux builds update themselves in the background; on macOS, Vulgr tells you when a new version is out.</p>
+        </article>
+        <article class="card">
+          <h3 data-i18n="f8Title">Made to fit in</h3>
+          <p data-i18n="f8Body">GitHub sign-in, dark and light themes, English and Turkish interface.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="download" class="section">
+      <h2 data-i18n="downloadTitle">Download</h2>
+      <p class="muted" data-i18n="downloadLead">Pick the build for your computer. Every file is on the GitHub Releases page.</p>
+      <div class="downloads">
+        <a class="dl" data-os="mac-arm64" href="https://github.com/vulgrs/vulgr/releases/latest">
+          <strong>macOS</strong><span data-i18n="macArm">Apple Silicon (M1 or later)</span><code>.dmg</code>
+        </a>
+        <a class="dl" data-os="mac-x64" href="https://github.com/vulgrs/vulgr/releases/latest">
+          <strong>macOS</strong><span data-i18n="macIntel">Intel</span><code>.dmg</code>
+        </a>
+        <a class="dl" data-os="win" href="https://github.com/vulgrs/vulgr/releases/latest">
+          <strong>Windows</strong><span>10 / 11, x64</span><code>.exe</code>
+        </a>
+        <a class="dl" data-os="linux" href="https://github.com/vulgrs/vulgr/releases/latest">
+          <strong>Linux</strong><span>x64</span><code>.AppImage</code>
+        </a>
+      </div>
+
+      <div class="notice">
+        <h3 data-i18n="unsignedTitle">These beta builds are not code-signed yet</h3>
+        <p data-i18n="unsignedLead">Your system will warn you the first time you open Vulgr. This is expected; here is how to open it:</p>
+        <ul>
+          <li data-i18n-html="unsignedMac"><strong>macOS:</strong> right-click Vulgr in Applications and choose <em>Open</em>, then <em>Open</em> again. If macOS still refuses, go to <em>System Settings → Privacy &amp; Security</em> and click <em>Open Anyway</em>.</li>
+          <li data-i18n-html="unsignedWin"><strong>Windows:</strong> when SmartScreen appears, click <em>More info → Run anyway</em>.</li>
+          <li data-i18n-html="unsignedLinux"><strong>Linux:</strong> make the file executable with <code>chmod +x Vulgr-*.AppImage</code>, then run it.</li>
+        </ul>
+      </div>
+
+      <div class="npm">
+        <p data-i18n="npmLead">Or install it with npm and start it with <code>vulgr</code>:</p>
+        <pre><code>npm install -g vulgr@beta
+vulgr</code></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>MIT © Vulgr contributors</span>
+    <a href="https://github.com/vulgrs/vulgr">GitHub</a>
+    <a href="https://github.com/vulgrs/vulgr/issues" data-i18n="issues">Issues</a>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

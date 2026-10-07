@@ -13,3 +13,4 @@ dist/
 .warp-config.json
 release/
 *.tgz
+/docs-site/assets/

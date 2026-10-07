@@ -78,6 +78,20 @@ Project layout:
 - `src/` — engine shared by the app: agent adapters, Agent Swarm (`engine/agentMesh.ts`), git and worktree helpers, tests
 - `ui/` — React interface; translations live in `ui/src/i18n/messages/`
 
+## Website
+
+[vulgr.tech](https://vulgr.tech) is built from `docs-site/` (plain HTML/CSS) and published to GitHub Pages by `.github/workflows/pages.yml`. To point the domain at it, add these DNS records at your registrar, then set the custom domain under **Settings → Pages**:
+
+| Type | Name | Value |
+| --- | --- | --- |
+| A | `@` | `185.199.108.153` |
+| A | `@` | `185.199.109.153` |
+| A | `@` | `185.199.110.153` |
+| A | `@` | `185.199.111.153` |
+| CNAME | `www` | `vulgrs.github.io` |
+
+Optionally add AAAA records for IPv6: `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`.
+
 ## Contributing
 
 Issues and pull requests are welcome. For larger changes, please open an issue first so we can agree on the approach. When adding interface text, add it to both the English and Turkish tables in `ui/src/i18n/messages/` — the type-check fails if one is missing.
