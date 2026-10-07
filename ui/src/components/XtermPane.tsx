@@ -174,6 +174,36 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       term.loadAddon(webgl);
     } catch {}
 
+    // xterm 6.0.0's own DECRQM handler ("is mode N set?", CSI ? N $ p) throws
+    // a ReferenceError in the published build, which stalls the parser and
+    // leaves the pane blank. Agent TUIs (agy) send it at startup, so answer it
+    // here instead: SET/RESET for the modes we can read, "not recognized" otherwise.
+    term.parser.registerCsiHandler({ prefix: '?', intermediates: '$', final: 'p' }, (params) => {
+      const mode = Number(params[0]);
+      const m = term.modes;
+      const flags: Record<number, boolean> = {
+        1: m.applicationCursorKeysMode,
+        6: m.originMode,
+        7: m.wraparoundMode,
+        25: true,
+        45: m.reverseWraparoundMode,
+        66: m.applicationKeypadMode,
+        1004: m.sendFocusMode,
+        1049: term.buffer.active.type === 'alternate',
+        2004: m.bracketedPasteMode,
+        2026: m.synchronizedOutputMode,
+      };
+      const state = mode in flags ? (flags[mode] ? 1 : 2) : 0;
+      window.warpApi?.writeTerminal(session.id, `\x1b[?${mode};${state}$y`);
+      return true;
+    });
+    term.parser.registerCsiHandler({ intermediates: '$', final: 'p' }, (params) => {
+      const mode = Number(params[0]);
+      const state = mode === 4 ? (term.modes.insertMode ? 1 : 2) : 0;
+      window.warpApi?.writeTerminal(session.id, `\x1b[${mode};${state}$y`);
+      return true;
+    });
+
     xtermInstance.current = term;
     fitAddon.current = fit;
 
@@ -203,17 +233,20 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         rows: term.rows,
       });
 
+      // Error text seen while the current command runs; shown only if that
+      // command then exits non-zero, so an agent merely talking about an
+      // AssertionError, or a passing test summary, doesn't raise the banner.
+      let sniffed: string | null = null;
+
       // Stream data from backend to terminal
       const unsubscribeData = window.warpApi.onTerminalData(({ id, data }: { id: string; data: string }) => {
         if (id === session.id) {
           term.write(data);
 
           // Error sniffer for self-correction trigger
-          if (ERROR_PATTERN.test(data)) {
-            const clean = data.replace(ESCAPE_CODE_PATTERN, '');
-            if (clean.trim().length > 20) {
-              setDetectedError(clean.trim());
-            }
+          if (!sniffed && ERROR_PATTERN.test(data)) {
+            const clean = data.replace(ESCAPE_CODE_PATTERN, '').trim();
+            if (clean.length > 20) sniffed = clean;
           }
         }
       });
@@ -431,6 +464,8 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         paintLabel(b);
         refreshHeader(b);
         onCommandFinishedRef.current?.(session.id, { command: b.command, exitCode, output: blockText(b) });
+        setDetectedError(exitCode !== 0 && sniffed ? sniffed : null);
+        sniffed = null;
       };
 
       // `clear` wipes the screen and scrollback. Stale headers would be left

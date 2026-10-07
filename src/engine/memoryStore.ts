@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, basename } from 'node:path';
+import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 
 export interface WorkspaceFact {
   key: string;
@@ -38,6 +40,50 @@ export interface MemoryData {
   lastUpdated: string;
 }
 
+/**
+ * Rules and facts that earlier versions seeded into every project regardless of
+ * what it was. They misled agents (PowerShell on macOS, "Electron" for a plain
+ * Node script), so they are dropped when an old memory file is loaded.
+ */
+const LEGACY_DEFAULT_RULES = new Set([
+  'Use PowerShell syntax compatible commands (use semicolon instead of &&)',
+  'Verify TypeScript types with npx tsc before final review',
+]);
+const LEGACY_DEFAULT_FRAMEWORK = 'Electron + React + TypeScript';
+
+/** Facts read from the project itself: its package manager and main frameworks. */
+export function detectProjectFacts(workspaceDir: string): Record<string, string> {
+  const facts: Record<string, string> = {};
+  const has = (f: string) => existsSync(join(workspaceDir, f));
+  let pkg: any = null;
+  try {
+    pkg = JSON.parse(readFileSync(join(workspaceDir, 'package.json'), 'utf-8'));
+  } catch {
+    // Not a Node project (or unreadable package.json).
+  }
+
+  if (has('pnpm-lock.yaml')) facts.package_manager = 'pnpm';
+  else if (has('yarn.lock')) facts.package_manager = 'yarn';
+  else if (has('bun.lockb') || has('bun.lock')) facts.package_manager = 'bun';
+  else if (pkg) facts.package_manager = 'npm';
+  else if (has('Cargo.toml')) facts.package_manager = 'cargo';
+  else if (has('go.mod')) facts.package_manager = 'go';
+  else if (has('pyproject.toml') || has('requirements.txt')) facts.package_manager = 'pip';
+
+  if (pkg) {
+    const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}), ...(pkg.optionalDependencies || {}) };
+    const known: Array<[string, string]> = [
+      ['next', 'Next.js'], ['electron', 'Electron'], ['react', 'React'], ['vue', 'Vue'],
+      ['svelte', 'Svelte'], ['@angular/core', 'Angular'], ['express', 'Express'], ['fastify', 'Fastify'],
+    ];
+    const frameworks = known.filter(([dep]) => dep in deps).map(([, name]) => name);
+    if ('typescript' in deps || has('tsconfig.json')) frameworks.push('TypeScript');
+    if (frameworks.length > 0) facts.framework = frameworks.join(' + ');
+    if (pkg.scripts?.test) facts.test_command = `${facts.package_manager ?? 'npm'} test`;
+  }
+  return facts;
+}
+
 export class MemoryStore {
   private readonly filePath: string;
   private data: MemoryData;
@@ -57,7 +103,10 @@ export class MemoryStore {
       } else if (existsSync(warpPath)) {
         this.filePath = warpPath;
       } else {
-        this.filePath = join(workspaceDir, '.vulgaris-memory.json');
+        // Kept out of the project, so it never shows up in git status, the
+        // Changes panel or an agent's review of the work.
+        const id = createHash('sha1').update(resolve(workspaceDir)).digest('hex').slice(0, 12);
+        this.filePath = join(homedir(), '.vulgr', 'memory', `${basename(resolve(workspaceDir)) || 'root'}-${id}.json`);
       }
     }
     this.data = this.loadInitial(workspaceDir);
@@ -68,10 +117,14 @@ export class MemoryStore {
       try {
         const raw = readFileSync(this.filePath, 'utf-8');
         const parsed = JSON.parse(raw);
+        const facts: Record<string, WorkspaceFact> = parsed.facts || {};
+        if (facts.framework?.source === 'learned' && facts.framework.value === LEGACY_DEFAULT_FRAMEWORK) {
+          delete facts.framework;
+        }
         return {
           workspaceDir: parsed.workspaceDir || workspaceDir,
-          facts: parsed.facts || {},
-          rules: Array.isArray(parsed.rules) ? parsed.rules : [],
+          facts,
+          rules: Array.isArray(parsed.rules) ? parsed.rules.filter((r: string) => !LEGACY_DEFAULT_RULES.has(r)) : [],
           recentCommands: Array.isArray(parsed.recentCommands) ? parsed.recentCommands : [],
           conversations: Array.isArray(parsed.conversations) ? parsed.conversations : [],
           skillsUsage: parsed.skillsUsage || {},
@@ -84,14 +137,13 @@ export class MemoryStore {
 
     return {
       workspaceDir,
-      facts: {
-        package_manager: { key: 'package_manager', value: 'npm', source: 'learned', updatedAt: new Date().toISOString() },
-        framework: { key: 'framework', value: 'Electron + React + TypeScript', source: 'learned', updatedAt: new Date().toISOString() },
-      },
-      rules: [
-        'Use PowerShell syntax compatible commands (use semicolon instead of &&)',
-        'Verify TypeScript types with npx tsc before final review',
-      ],
+      facts: Object.fromEntries(
+        Object.entries(detectProjectFacts(workspaceDir)).map(([key, value]) => [
+          key,
+          { key, value, source: 'learned' as const, updatedAt: new Date().toISOString() },
+        ])
+      ),
+      rules: [],
       recentCommands: [],
       conversations: [],
       skillsUsage: {},
@@ -231,14 +283,14 @@ export class MemoryStore {
       : '- none';
 
     const rulesStr = this.data.rules.length > 0
-      ? this.data.rules.slice(0, 4).map((r) => `- ${r}`).join('\n')
+      ? this.data.rules.map((r) => `- ${r}`).join('\n')
       : '- none';
 
     const lastConv = this.data.conversations && this.data.conversations.length > 0
       ? `\nLast Goal: ${this.data.conversations[0].prompt.slice(0, 80)} (${this.data.conversations[0].agent})`
       : '';
 
-    return `[Project Memory & Rules]\nFacts:\n${factsStr}\nRules:\n${rulesStr}${lastConv}`.trim();
+    return `[Project Memory & Rules]\nFacts:\n${factsStr}\nRules (always follow these):\n${rulesStr}${lastConv}`.trim();
   }
 
   clear(): void {

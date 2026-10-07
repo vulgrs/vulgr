@@ -3,6 +3,9 @@ import type { SquadSession, SessionType, SquadPhase } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
 
 /** Result of one command run in a squad pane (from the shell's exit marker). */
+/** Paths in a unified diff, from its `+++ b/<path>` lines. */
+const changedPaths = (diff: string) => [...diff.matchAll(/^\+\+\+ b\/(.+)$/gm)].map((m) => m[1]);
+
 export interface PaneRunResult {
   exitCode: number;
   output: string;
@@ -31,6 +34,8 @@ const AGENT_LABELS: Partial<Record<SessionType, string>> = {
   claude: 'Claude',
   agy: 'AGY',
   codex: 'Codex',
+  opencode: 'OpenCode',
+  cursor: 'Cursor',
   shell: 'Terminal',
 };
 export const squadAgentLabel = (type: SessionType) => AGENT_LABELS[type] ?? type;
@@ -107,6 +112,12 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
         run(sessionId, await depsRef.current.buildAgentRun(agent, prompt, { allowEdits }));
       const fail = (error: string) => update({ phase: 'failed', statusText: error, error });
 
+      // Project rules and facts from the Memory panel, as Agent Swarm sends them.
+      let memorySnippet = '';
+      // With no test command the verifier first writes tests from the goal;
+      // verifyCmd then becomes the command it named.
+      let verifyCmd = config.verifyCmd.trim();
+      let testFiles: string[] = [];
       const builderPrompt = (feedback?: string) =>
         [
           `Goal: ${config.goal}`,
@@ -114,29 +125,54 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
           feedback
             ? `Your previous attempt is not done yet. Feedback from the reviewer / test run:\n${feedback}\n\nFix these problems.`
             : 'Implement this goal by editing the code in this repository.',
+          testFiles.length
+            ? `${label(config.verifier)} already wrote tests for this goal: ${testFiles.join(', ')}. Make them pass; do not delete or weaken them.`
+            : '',
           'Do not ask questions; make reasonable assumptions. Do not run long-lived servers.',
-          `Your work will be checked with: ${config.verifyCmd}`,
+          `Your work will be checked with: ${verifyCmd}`,
           'Finish with a short summary of what you changed.',
+          memorySnippet,
         ].join('\n');
 
       void (async () => {
+        memorySnippet = (await window.warpApi?.getMemorySnippet?.().catch(() => '')) || '';
         let feedback: string | undefined;
         let reviewSkipped = false;
         try {
+          if (!verifyCmd) {
+            let agentOutput = '';
+            if (verifierIsAgent) {
+              await step('planning', msg().planningTests(label(config.verifier)));
+              const before = changedPaths(await depsRef.current.getDiff());
+              const planPrompt = await window.warpApi.getTestPlanPrompt(config.goal, [memorySnippet]);
+              const planned = await runAgent(verifierSessionId, config.verifier, planPrompt, true);
+              if (planned.exitCode === 0) agentOutput = planned.output;
+              testFiles = changedPaths(await depsRef.current.getDiff()).filter((f) => !before.includes(f));
+            }
+            verifyCmd = (await window.warpApi?.resolveTestCommand?.(agentOutput).catch(() => null)) || '';
+            if (!verifyCmd) {
+              fail(msg().noTestCommand);
+              return;
+            }
+            update({ verifyCmd, testFiles });
+            await step('building', msg().building(label(config.builder)));
+          }
           for (let round = 1; ; round++) {
             // 1. Builder writes / repairs the code.
             if (round > 1) {
               await step('repairing', msg().repairing(label(config.builder), round, config.maxRounds), round);
             }
+            const diffBeforeBuild = await depsRef.current.getDiff();
             const built = await runAgent(builderSessionId, config.builder, builderPrompt(feedback), true);
-            if (built.exitCode !== 0) {
+            // A builder that stopped with an error but changed files is judged by the tests.
+            if (built.exitCode !== 0 && (await depsRef.current.getDiff()) === diffBeforeBuild) {
               fail(msg().builderFailed(label(config.builder)));
               return;
             }
 
             // 2. Verify command in the right pane.
-            await step('verifying', msg().verifying(config.verifyCmd, round, config.maxRounds));
-            const verified = await run(verifierSessionId, config.verifyCmd);
+            await step('verifying', msg().verifying(verifyCmd, round, config.maxRounds));
+            const verified = await run(verifierSessionId, verifyCmd);
 
             if (verified.exitCode === 0) {
               if (!verifierIsAgent) break;
@@ -149,7 +185,10 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
                 config.verifier,
                 [
                   `Another agent implemented this goal: ${config.goal}`,
-                  `The check "${config.verifyCmd}" passes. Review the change below for bugs and missed requirements.`,
+                  `The check "${verifyCmd}" passes. Review the change below for bugs and missed requirements.`,
+                  testFiles.length
+                    ? `You wrote the tests (${testFiles.join(', ')}) before the code; flag it if they were deleted or weakened.`
+                    : '',
                   'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly.',
                   '',
                   'git diff:',
@@ -171,7 +210,7 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
               feedback = `Code review from ${label(config.verifier)}:\n${tail(review.output, 6000)}`;
             } else {
               // 3b. Tests fail: diagnose (verifier agent) and hand back to the builder.
-              feedback = `"${config.verifyCmd}" failed:\n${tail(verified.output, 6000)}`;
+              feedback = `"${verifyCmd}" failed:\n${tail(verified.output, 6000)}`;
               if (verifierIsAgent && round < config.maxRounds) {
                 await step('handing_off', msg().handingOff(label(config.verifier)));
                 const diagnosis = await runAgent(
@@ -179,7 +218,7 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
                   config.verifier,
                   [
                     `Another agent is implementing: ${config.goal}`,
-                    `The check "${config.verifyCmd}" failed with this output:`,
+                    `The check "${verifyCmd}" failed with this output:`,
                     tail(verified.output, 8000),
                     '',
                     'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Explain the root cause briefly and list the concrete fixes needed.',

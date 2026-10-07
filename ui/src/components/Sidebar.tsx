@@ -50,6 +50,7 @@ interface SidebarProps {
   onOpenPalette: () => void;
   onOpenSquads: () => void;
   onOpenMesh?: () => void;
+  onOpenOrchestra?: () => void;
   onOpenSkills: () => void;
   onOpenSettings: () => void;
   pastRuns?: any[];
@@ -264,6 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewSession,
   onOpenSquads,
   onOpenMesh,
+  onOpenOrchestra,
   onOpenSettings,
   pastConversations = [],
   onSelectConversation,
@@ -425,10 +427,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
+  /** Back to the terminal list and the active tab, or a first terminal when there is none. */
+  const openWorkspace = () => {
+    setPanel('terminals');
+    if (tabs.length === 0) onNewTerminal?.();
+    else onSelectTab(tabs.some((tab) => tab.id === activeTabId) ? activeTabId : tabs[0].id);
+  };
+
   const modes = [
     { label: 'Duo Loop', icon: duoLoopIcon, w: 7, h: 5.47, onClick: onOpenSquads, title: t.sidebar.duoLoopHint },
     { label: 'Agent Swarm', icon: agentSwarmIcon, w: 7, h: 8, onClick: onOpenMesh, title: t.sidebar.agentSwarmHint },
-    { label: 'Orchestrator', icon: orchestratorIcon, w: 7, h: 8, onClick: undefined, title: t.sidebar.orchestratorHint },
+    { label: 'Orchestrator', icon: orchestratorIcon, w: 7, h: 8, onClick: onOpenOrchestra ?? openWorkspace, title: t.sidebar.orchestratorHint },
   ];
 
   return (
@@ -468,7 +477,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {newMenuOpen && (
               <div className="absolute right-0 top-full mt-1.5 w-52 rounded-[12px] bg-base-elevated border border-zinc-800 shadow-lg p-1.5 z-50 text-[10px] animate-slide-in-up">
                 <div className="px-2 py-1 text-[8px] text-zinc-500 uppercase tracking-wider">{t.sidebar.launchAgent}</div>
-                {(['claude', 'agy', 'shell', 'codex'] as SessionType[]).map((type) => (
+                {(['shell', 'claude', 'codex', 'agy', 'opencode', 'cursor'] as SessionType[]).map((type) => (
                   <button
                     key={type}
                     onClick={() => {
@@ -707,8 +716,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {panel === 'memory' && (
           <div className="px-[10px] space-y-4 text-[9px]">
             <p className="text-zinc-500 leading-relaxed">
-              {t.sidebar.memoryIntro} <code className="text-zinc-300">.vulgaris-memory.json</code>{' '}
-              {t.sidebar.memoryIntroRest}
+              {t.sidebar.memoryIntro}
             </p>
 
             {/* Rules */}

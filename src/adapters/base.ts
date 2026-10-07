@@ -46,7 +46,9 @@ export abstract class BaseCliAdapter implements ICliAdapter {
     const home = os.homedir();
     const extra = [
       path.join(home, '.local', 'bin'),
+      path.join(home, '.opencode', 'bin'),
       path.join(home, 'AppData', 'Local', 'agy', 'bin'),
+      path.join(home, 'AppData', 'Local', 'cursor-agent'),
       path.join(home, 'AppData', 'Roaming', 'npm'),
       path.join(home, '.cargo', 'bin'),
     ];
@@ -171,6 +173,14 @@ export abstract class BaseCliAdapter implements ICliAdapter {
         child.stdin?.end();
       }
 
+      // Stopped from outside (e.g. the user pressed Stop on a multi-agent run).
+      const onAbort = () => {
+        stderr += '\n[Stopped.]';
+        void terminateChildProcessSafely(child, 500);
+      };
+      if (options.signal?.aborted) onAbort();
+      else options.signal?.addEventListener('abort', onAbort, { once: true });
+
       // Strict timeout watcher
       const timeoutTimer = setTimeout(() => {
         timedOut = true;
@@ -183,6 +193,7 @@ export abstract class BaseCliAdapter implements ICliAdapter {
         if (isSettled) return;
         isSettled = true;
         clearTimeout(timeoutTimer);
+        options.signal?.removeEventListener('abort', onAbort);
 
         resolve({
           exitCode: 1,
@@ -199,6 +210,7 @@ export abstract class BaseCliAdapter implements ICliAdapter {
         if (isSettled) return;
         isSettled = true;
         clearTimeout(timeoutTimer);
+        options.signal?.removeEventListener('abort', onAbort);
 
         resolve({
           exitCode: code,

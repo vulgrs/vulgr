@@ -29,6 +29,8 @@ interface SettingsModalProps {
   onConfigChanged?: (config: WarpConfig) => void;
   /** Re-open the first-launch welcome flow. */
   onShowWelcome?: () => void;
+  /** Open the agent install dialog. */
+  onOpenAgents?: () => void;
 }
 
 const claudeModels = (t: Messages): OptionItem[] => [
@@ -69,6 +71,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onConfigChanged,
   onShowWelcome,
+  onOpenAgents,
 }) => {
   const { t, lang, setLang } = useI18n();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
@@ -191,6 +194,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </Field>
                     </CardContent>
                   </Card>
+                  {onOpenAgents && (
+                    <Card size="sm">
+                      <CardHeader>
+                        <CardTitle>{t.agentSetup.settingsTitle}</CardTitle>
+                        <CardDescription>{t.agentSetup.settingsDescription}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button variant="outline" onClick={onOpenAgents}>
+                          {t.agentSetup.open}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
                   {onShowWelcome && (
                     <Card size="sm">
                       <CardHeader>

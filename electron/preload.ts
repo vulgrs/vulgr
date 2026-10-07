@@ -65,7 +65,26 @@ export interface WarpApi {
   }) => Promise<any>;
   onMeshEvent: (callback: (message: any) => void) => () => void;
   onMeshStatus: (callback: (status: any) => void) => () => void;
+
+  // Orchestra: a planner splits a goal, workers run the parts in parallel
+  runOrchestra: (options: {
+    goal: string;
+    planner: string;
+    workers: string[];
+    reviewer: string;
+    verifyCmd?: string;
+    maxParallel?: number;
+    maxRounds?: number;
+    cwd?: string;
+    lang?: 'en' | 'tr';
+  }) => Promise<any>;
+  stopOrchestra: () => Promise<boolean>;
+  onOrchestraEvent: (callback: (event: any) => void) => () => void;
   getAvailableAgents: () => Promise<Record<string, boolean>>;
+  getAgentStatus: () => Promise<any[]>;
+  installAgent: (id: string) => Promise<{ ok: boolean; code: number | null; error?: string }>;
+  cancelAgentInstall: (id: string) => Promise<void>;
+  onAgentInstallOutput: (callback: (event: { id: string; chunk: string }) => void) => () => void;
   writeSquadPrompt: (text: string) => Promise<string>;
 
   // AI Command Search
@@ -86,6 +105,9 @@ export interface WarpApi {
   removeMemoryRule: (rule: string) => Promise<boolean>;
   recordMemoryCommand: (cmd: { command: string; exitCode: number; durationMs?: number; summary?: string }) => Promise<boolean>;
   getMemorySnippet: () => Promise<string>;
+  getTestPlanPrompt: (goal: string, extra?: string[]) => Promise<string>;
+  /** The command an agent named on its TEST_COMMAND line, else the project's own test command. */
+  resolveTestCommand: (agentOutput?: string) => Promise<string | null>;
 
   // Context Optimizer
   optimizeContext: (raw: string, options?: any) => Promise<string>;
@@ -193,7 +215,22 @@ const api: WarpApi = {
     ipcRenderer.on('mesh:status', handler);
     return () => ipcRenderer.removeListener('mesh:status', handler);
   },
+  runOrchestra: (options) => ipcRenderer.invoke('orchestra:run', options),
+  stopOrchestra: () => ipcRenderer.invoke('orchestra:stop'),
+  onOrchestraEvent: (callback) => {
+    const handler = (_: any, event: any) => callback(event);
+    ipcRenderer.on('orchestra:event', handler);
+    return () => ipcRenderer.removeListener('orchestra:event', handler);
+  },
   getAvailableAgents: () => ipcRenderer.invoke('agents:available'),
+  getAgentStatus: () => ipcRenderer.invoke('agents:status'),
+  installAgent: (id) => ipcRenderer.invoke('agents:install', id),
+  cancelAgentInstall: (id) => ipcRenderer.invoke('agents:cancel-install', id),
+  onAgentInstallOutput: (callback) => {
+    const handler = (_: any, event: any) => callback(event);
+    ipcRenderer.on('agents:install-output', handler);
+    return () => ipcRenderer.removeListener('agents:install-output', handler);
+  },
   writeSquadPrompt: (text) => ipcRenderer.invoke('squad:write-prompt', text),
 
   generateCommand: (query) => ipcRenderer.invoke('ai:generateCommand', query),
@@ -214,6 +251,8 @@ const api: WarpApi = {
   removeMemoryRule: (rule) => ipcRenderer.invoke('memory:removeRule', rule),
   recordMemoryCommand: (cmd) => ipcRenderer.invoke('memory:recordCommand', cmd),
   getMemorySnippet: () => ipcRenderer.invoke('memory:promptSnippet'),
+  getTestPlanPrompt: (goal, extra) => ipcRenderer.invoke('tests:planPrompt', goal, extra),
+  resolveTestCommand: (agentOutput) => ipcRenderer.invoke('tests:resolveCommand', agentOutput),
 
   // Context Optimizer
   optimizeContext: (raw, options) => ipcRenderer.invoke('context:optimize', { raw, options }),

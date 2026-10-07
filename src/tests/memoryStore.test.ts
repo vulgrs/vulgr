@@ -20,14 +20,13 @@ describe('MemoryStore Suite', () => {
     }
   });
 
-  it('initializes with default learned facts and rules', () => {
+  it('learns facts from the project and starts without rules', () => {
     const memory = new MemoryStore(process.cwd(), testFileName);
     const facts = memory.getAllFacts();
     assert.ok(facts.package_manager);
     assert.strictEqual(facts.package_manager.value, 'npm');
-
-    const rules = memory.getRules();
-    assert.ok(rules.length > 0);
+    assert.match(facts.framework.value, /Electron/);
+    assert.deepStrictEqual(memory.getRules(), []);
   });
 
   it('stores, updates, and deletes facts', () => {

@@ -29,6 +29,10 @@ export const onboarding = ns(
       language: 'Language',
       theme: 'Theme',
     },
+    install: {
+      title: 'Install your agents',
+      body: 'Vulgr works with the coding agents you already use. Install any that are missing with one click — it runs the official installer — then sign in once.',
+    },
     terminals: {
       title: 'Terminals and groups',
       body: 'Open terminals with + and collect them in groups with the folder button. Drag a terminal onto a group to move it there.',
@@ -58,10 +62,11 @@ export const onboarding = ns(
     },
     agents: {
       title: 'Let agents do the work',
-      body: 'Three ways to hand work to AI, from the top of the sidebar and the top bar.',
+      body: 'Four ways to hand work to AI, from the top of the sidebar and the top bar.',
       points: [
         'Duo Loop: one agent writes, another tests and asks for fixes.',
         'Agent Swarm: give a goal; writer, checker and auditor run it in the background.',
+        'Orchestrator: give a big goal; it is split into tasks that several agents do at the same time.',
         'Claude Chat: talk to Claude Code and watch its changes live.',
       ],
     },
@@ -106,6 +111,10 @@ export const onboarding = ns(
       language: 'Dil',
       theme: 'Tema',
     },
+    install: {
+      title: 'Ajanlarını kur',
+      body: 'Vulgr zaten kullandığın kodlama ajanlarıyla çalışır. Eksik olanları tek tıkla kur — resmi kurulum komutunu çalıştırır — sonra bir kez giriş yap.',
+    },
     terminals: {
       title: 'Terminaller ve gruplar',
       body: '+ ile terminal aç, klasör düğmesiyle grup oluştur. Bir terminali gruba taşımak için grubun üstüne sürükle.',
@@ -135,10 +144,11 @@ export const onboarding = ns(
     },
     agents: {
       title: 'İşi ajanlara bırak',
-      body: 'Kenar çubuğunun üstünden ve üst çubuktan yapay zekâya iş vermenin üç yolu.',
+      body: 'Kenar çubuğunun üstünden ve üst çubuktan yapay zekâya iş vermenin dört yolu.',
       points: [
         'Duo Loop: bir ajan yazar, diğeri test edip düzeltme ister.',
         'Agent Swarm: bir hedef ver; yazan, kontrol eden ve denetleyen arka planda yürütür.',
+        'Orchestrator: büyük bir hedef ver; görevlere bölünür, birkaç ajan aynı anda yapar.',
         'Claude Chat: Claude Code ile konuş, değişikliklerini canlı izle.',
       ],
     },
