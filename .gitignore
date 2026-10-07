@@ -12,3 +12,4 @@ dist/
 .vulgaris-memory.json
 .warp-config.json
 release/
+*.tgz

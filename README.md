@@ -23,6 +23,13 @@
 
 Grab the latest build from [Releases](https://github.com/vulgrs/vulgr/releases): `Vulgr-<version>-arm64.dmg` (Apple Silicon), `Vulgr-<version>-x64.dmg` (Intel Mac) or `Vulgr-Setup-<version>.exe` (Windows). Beta builds are not code-signed yet — on macOS, right-click the app and choose **Open** the first time; on Windows, choose **More info → Run anyway**.
 
+Or install it with npm and start it with `vulgr`:
+
+```bash
+npm install -g vulgr@beta
+vulgr
+```
+
 ## Features
 
 - **Real terminals** — xterm.js + node-pty, so agent TUIs, colors and prompts work as they do in your normal terminal.
