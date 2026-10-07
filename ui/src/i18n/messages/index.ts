@@ -15,3 +15,4 @@ export { skills } from './skills.js';
 export { hud } from './hud.js';
 export { onboarding } from './onboarding.js';
 export { agentSetup } from './agentSetup.js';
+export { update } from './update.js';

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { UpdateNotice } from './updater.js';
 
 export interface PtyCreateOptions {
   id: string;
@@ -132,6 +133,12 @@ export interface WarpApi {
   openGitHubProfile: (url: string) => Promise<void>;
   onAuthChanged: (callback: (user: GitHubUser | null) => void) => () => void;
   onAuthError: (callback: (message: string) => void) => () => void;
+
+  // App updates
+  getUpdateNotice: () => Promise<UpdateNotice | null>;
+  onUpdateNotice: (callback: (notice: UpdateNotice) => void) => () => void;
+  openUpdateRelease: () => Promise<void>;
+  installUpdate: () => Promise<void>;
 
   // Frameless Window Controls
   windowMinimize: () => void;
@@ -277,6 +284,16 @@ const api: WarpApi = {
     ipcRenderer.on('auth:error', handler);
     return () => ipcRenderer.removeListener('auth:error', handler);
   },
+
+  // App updates
+  getUpdateNotice: () => ipcRenderer.invoke('update:get-notice'),
+  onUpdateNotice: (callback) => {
+    const handler = (_: any, notice: UpdateNotice) => callback(notice);
+    ipcRenderer.on('update:notice', handler);
+    return () => ipcRenderer.removeListener('update:notice', handler);
+  },
+  openUpdateRelease: () => ipcRenderer.invoke('update:open-release'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
 
   // Frameless Window Controls
   windowMinimize: () => ipcRenderer.send('window:minimize'),

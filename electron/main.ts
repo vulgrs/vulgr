@@ -26,6 +26,7 @@ import { AutoSuggestEngine } from '../src/engine/autoSuggest.js';
 import { ConfigManager } from '../src/engine/configManager.js';
 import { SessionExporter } from '../src/engine/sessionExporter.js';
 import { listAgentStatus, installAgent, cancelAgentInstall } from './agentInstaller.js';
+import { setupAutoUpdates } from './updater.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -695,6 +696,7 @@ app.whenReady().then(async () => {
 
   setupIpcHandlers();
   await createWindow();
+  setupAutoUpdates(() => mainWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
