@@ -3,15 +3,7 @@ import { Check, Copy, Download, ExternalLink, Loader2, LogIn, RotateCw, Square, 
 import { toast } from 'sonner';
 import { useI18n } from '../i18n/index.js';
 import { useAgentSetup, type AgentStatus } from '../hooks/useAgentSetup.js';
-
-/** Monogram tiles in each vendor's colour, so the list scans at a glance. */
-const MARKS: Record<string, { letter: string; className: string }> = {
-  claude: { letter: 'C', className: 'bg-[#d97757] text-white' },
-  codex: { letter: 'O', className: 'bg-zinc-100 text-zinc-900' },
-  opencode: { letter: 'oc', className: 'bg-zinc-800 text-zinc-100 border border-zinc-700' },
-  agy: { letter: 'A', className: 'bg-gradient-to-br from-[#4285f4] via-[#9b72cb] to-[#d96570] text-white' },
-  cursor: { letter: '▲', className: 'bg-zinc-950 text-zinc-100 border border-zinc-700' },
-};
+import { AgentLogo } from './AgentLogo.js';
 
 const MONO = "font-['Geist_Mono',ui-monospace,monospace]";
 
@@ -31,7 +23,6 @@ const AgentRow: React.FC<{
   const current = phase[agent.id] || 'idle';
   const output = log[agent.id] || '';
   const busy = current === 'installing';
-  const mark = MARKS[agent.id] ?? { letter: agent.name[0], className: 'bg-zinc-800 text-zinc-100' };
 
   useEffect(() => {
     if (busy || current === 'failed') setShowLog(true);
@@ -57,11 +48,7 @@ const AgentRow: React.FC<{
   return (
     <div className="rounded-[11px] border border-zinc-800 bg-base-elevated/60">
       <div className="flex items-center gap-3 px-3.5 py-3">
-        <span
-          className={`w-9 h-9 flex-shrink-0 rounded-[9px] flex items-center justify-center text-[13px] font-semibold ${mark.className}`}
-        >
-          {mark.letter}
-        </span>
+        <AgentLogo id={agent.id} name={agent.name} size={36} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[13px] text-zinc-100">{agent.name}</span>

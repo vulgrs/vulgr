@@ -11,6 +11,7 @@ import duoLoopIcon from '../assets/sidebar/duo-loop.svg';
 import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
 import { AgentSetupPanel } from './AgentSetupPanel.js';
+import { AgentLogo } from './AgentLogo.js';
 import { useAgentSetup } from '../hooks/useAgentSetup.js';
 
 const STEPS = ['signin', 'prefs', 'install', 'terminals', 'split', 'command', 'agents', 'project', 'done'] as const;
@@ -81,11 +82,11 @@ const CodeBoxes: React.FC<{ code: string }> = ({ code }) => (
 
 /** The five agents as tiles, lit up once installed. */
 const AGENT_TILES = [
-  { id: 'claude', label: 'Claude Code', letter: 'C', className: 'bg-[#d97757] text-white' },
-  { id: 'codex', label: 'Codex', letter: 'O', className: 'bg-zinc-100 text-zinc-900' },
-  { id: 'opencode', label: 'OpenCode', letter: 'oc', className: 'bg-zinc-800 text-zinc-100 border border-zinc-700' },
-  { id: 'agy', label: 'Antigravity', letter: 'A', className: 'bg-gradient-to-br from-[#4285f4] via-[#9b72cb] to-[#d96570] text-white' },
-  { id: 'cursor', label: 'Cursor', letter: '▲', className: 'bg-zinc-950 text-zinc-100 border border-zinc-700' },
+  { id: 'claude', label: 'Claude Code' },
+  { id: 'codex', label: 'Codex' },
+  { id: 'opencode', label: 'OpenCode' },
+  { id: 'agy', label: 'Antigravity' },
+  { id: 'cursor', label: 'Cursor' },
 ];
 
 const AgentTiles: React.FC = () => {
@@ -97,13 +98,7 @@ const AgentTiles: React.FC = () => {
         return (
           <div key={tile.id} className="flex flex-col items-center gap-2">
             <span className="relative">
-              <span
-                className={`w-14 h-14 rounded-[14px] flex items-center justify-center text-[20px] font-semibold transition-opacity ${tile.className} ${
-                  installed ? '' : 'opacity-35'
-                }`}
-              >
-                {tile.letter}
-              </span>
+              <AgentLogo id={tile.id} name={tile.label} size={56} dim={!installed} />
               {installed && (
                 <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-base-app flex items-center justify-center text-white">
                   <Check size={11} />
