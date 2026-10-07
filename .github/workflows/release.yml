@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: --mac
+          - os: windows-latest
+            target: --win
+          - os: ubuntu-latest
+            target: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the tag matches package.json
+        shell: bash
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # node-gyp needs Python for node-pty; Windows and macOS runners already ship
+      # the C++ toolchain (Visual Studio Build Tools / Xcode Command Line Tools).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # TODO(signing): Windows code signing via SignPath goes here — sign the
+      # NSIS installer before it is uploaded (e.g. signpath/github-action-submit-signing-request).
+      - name: Package
+        run: npx electron-builder ${{ matrix.target }} --publish never
+        env:
+          # No signing certificates yet: skip macOS keychain lookup.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            release/*.dmg
+            release/*.exe
+            release/*.AppImage
+            release/*.blockmap
+            release/latest*.yml
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - run: ls -la release
+
+      # Uploads the installers plus latest*.yml, which electron-updater reads.
+      # Tags with a pre-release suffix (v0.2.0-beta) become pre-releases.
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Vulgr ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release/*
