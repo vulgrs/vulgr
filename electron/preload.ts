@@ -66,6 +66,10 @@ export interface WarpApi {
   onMeshEvent: (callback: (message: any) => void) => () => void;
   onMeshStatus: (callback: (status: any) => void) => () => void;
   getAvailableAgents: () => Promise<Record<string, boolean>>;
+  getAgentStatus: () => Promise<any[]>;
+  installAgent: (id: string) => Promise<{ ok: boolean; code: number | null; error?: string }>;
+  cancelAgentInstall: (id: string) => Promise<void>;
+  onAgentInstallOutput: (callback: (event: { id: string; chunk: string }) => void) => () => void;
   writeSquadPrompt: (text: string) => Promise<string>;
 
   // AI Command Search
@@ -194,6 +198,14 @@ const api: WarpApi = {
     return () => ipcRenderer.removeListener('mesh:status', handler);
   },
   getAvailableAgents: () => ipcRenderer.invoke('agents:available'),
+  getAgentStatus: () => ipcRenderer.invoke('agents:status'),
+  installAgent: (id) => ipcRenderer.invoke('agents:install', id),
+  cancelAgentInstall: (id) => ipcRenderer.invoke('agents:cancel-install', id),
+  onAgentInstallOutput: (callback) => {
+    const handler = (_: any, event: any) => callback(event);
+    ipcRenderer.on('agents:install-output', handler);
+    return () => ipcRenderer.removeListener('agents:install-output', handler);
+  },
   writeSquadPrompt: (text) => ipcRenderer.invoke('squad:write-prompt', text),
 
   generateCommand: (query) => ipcRenderer.invoke('ai:generateCommand', query),

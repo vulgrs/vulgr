@@ -29,6 +29,10 @@ export const onboarding = ns(
       language: 'Language',
       theme: 'Theme',
     },
+    install: {
+      title: 'Install your agents',
+      body: 'Vulgr works with the coding agents you already use. Install any that are missing with one click — it runs the official installer — then sign in once.',
+    },
     terminals: {
       title: 'Terminals and groups',
       body: 'Open terminals with + and collect them in groups with the folder button. Drag a terminal onto a group to move it there.',
@@ -105,6 +109,10 @@ export const onboarding = ns(
       body: 'Bir dil ve görünüm seç. İkisini de sonra Ayarlar’dan değiştirebilirsin.',
       language: 'Dil',
       theme: 'Tema',
+    },
+    install: {
+      title: 'Ajanlarını kur',
+      body: 'Vulgr zaten kullandığın kodlama ajanlarıyla çalışır. Eksik olanları tek tıkla kur — resmi kurulum komutunu çalıştırır — sonra bir kez giriş yap.',
     },
     terminals: {
       title: 'Terminaller ve gruplar',

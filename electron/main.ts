@@ -25,6 +25,7 @@ import { WorktreeManager } from '../src/git/worktreeManager.js';
 import { AutoSuggestEngine } from '../src/engine/autoSuggest.js';
 import { ConfigManager } from '../src/engine/configManager.js';
 import { SessionExporter } from '../src/engine/sessionExporter.js';
+import { listAgentStatus, installAgent, cancelAgentInstall } from './agentInstaller.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -473,6 +474,13 @@ function setupIpcHandlers() {
     );
     return Object.fromEntries(entries);
   });
+
+  // Agent setup: which CLIs are installed, and installing them from inside the app.
+  ipcMain.handle('agents:status', () => listAgentStatus());
+  ipcMain.handle('agents:install', (_, id: string) =>
+    installAgent(id, (chunk) => mainWindow?.webContents.send('agents:install-output', { id, chunk }))
+  );
+  ipcMain.handle('agents:cancel-install', (_, id: string) => cancelAgentInstall(id));
 
   // Squad: prompts are written to a temp file and piped into the agent CLI, so
   // multi-line text with quotes never has to survive shell quoting.

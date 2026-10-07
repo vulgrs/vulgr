@@ -46,7 +46,9 @@ export abstract class BaseCliAdapter implements ICliAdapter {
     const home = os.homedir();
     const extra = [
       path.join(home, '.local', 'bin'),
+      path.join(home, '.opencode', 'bin'),
       path.join(home, 'AppData', 'Local', 'agy', 'bin'),
+      path.join(home, 'AppData', 'Local', 'cursor-agent'),
       path.join(home, 'AppData', 'Roaming', 'npm'),
       path.join(home, '.cargo', 'bin'),
     ];

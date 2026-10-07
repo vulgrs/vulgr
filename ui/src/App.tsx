@@ -19,6 +19,7 @@ import { SettingsModal } from './components/SettingsModal.js';
 import { ExportReportModal } from './components/ExportReportModal.js';
 import { TokenOptimizerHUD } from './components/TokenOptimizerHUD.js';
 import { GuideModal, type GuideAction } from './components/GuideModal.js';
+import { AgentSetupModal } from './components/AgentSetupModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
 import { useI18n } from './i18n/index.js';
@@ -128,6 +129,7 @@ export const App: React.FC = () => {
   const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [agentSetupOpen, setAgentSetupOpen] = useState(false);
   // First launch shows the welcome flow; the guide opens from Help / F1.
   const [onboardingOpen, setOnboardingOpen] = useState(shouldShowOnboarding);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -1118,6 +1120,13 @@ export const App: React.FC = () => {
         run: () => setSettingsModalOpen(true),
       },
       {
+        id: 'install-agents',
+        label: t.agentSetup.open,
+        group: t.app.groups.ai,
+        keywords: 'install setup claude codex opencode antigravity agy cursor agent cli download',
+        run: () => setAgentSetupOpen(true),
+      },
+      {
         id: 'export-report',
         label: t.app.actions.exportReport,
         group: t.app.groups.export,
@@ -1428,11 +1437,27 @@ export const App: React.FC = () => {
           setSettingsModalOpen(false);
           setOnboardingOpen(true);
         }}
+        onOpenAgents={() => {
+          setSettingsModalOpen(false);
+          setAgentSetupOpen(true);
+        }}
+      />
+
+      {/* Install / sign in to the agent CLIs */}
+      <AgentSetupModal
+        isOpen={agentSetupOpen}
+        onClose={() => setAgentSetupOpen(false)}
+        onRunInTerminal={(command, title) => createShellTab(title, command)}
       />
 
       {/* First-run / F1 feature guide */}
       <GuideModal isOpen={guideOpen} onClose={closeGuide} onAction={handleGuideAction} />
-      {onboardingOpen && <Onboarding onDone={() => setOnboardingOpen(false)} />}
+      {onboardingOpen && (
+        <Onboarding
+          onDone={() => setOnboardingOpen(false)}
+          onRunInTerminal={(command, title) => createShellTab(title, command)}
+        />
+      )}
 
       {/* Vulgr Session Timeline & Technical Report Modal */}
       <ExportReportModal

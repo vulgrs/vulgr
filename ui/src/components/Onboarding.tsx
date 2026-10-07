@@ -10,8 +10,10 @@ import folderIcon from '../assets/sidebar/folder.svg';
 import duoLoopIcon from '../assets/sidebar/duo-loop.svg';
 import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
+import { AgentSetupPanel } from './AgentSetupPanel.js';
+import { useAgentSetup } from '../hooks/useAgentSetup.js';
 
-const STEPS = ['signin', 'prefs', 'terminals', 'split', 'command', 'agents', 'project', 'done'] as const;
+const STEPS = ['signin', 'prefs', 'install', 'terminals', 'split', 'command', 'agents', 'project', 'done'] as const;
 type Step = (typeof STEPS)[number];
 
 const MONO = "font-['Geist_Mono',ui-monospace,monospace]";
@@ -76,6 +78,45 @@ const CodeBoxes: React.FC<{ code: string }> = ({ code }) => (
     ))}
   </div>
 );
+
+/** The five agents as tiles, lit up once installed. */
+const AGENT_TILES = [
+  { id: 'claude', label: 'Claude Code', letter: 'C', className: 'bg-[#d97757] text-white' },
+  { id: 'codex', label: 'Codex', letter: 'O', className: 'bg-zinc-100 text-zinc-900' },
+  { id: 'opencode', label: 'OpenCode', letter: 'oc', className: 'bg-zinc-800 text-zinc-100 border border-zinc-700' },
+  { id: 'agy', label: 'Antigravity', letter: 'A', className: 'bg-gradient-to-br from-[#4285f4] via-[#9b72cb] to-[#d96570] text-white' },
+  { id: 'cursor', label: 'Cursor', letter: '▲', className: 'bg-zinc-950 text-zinc-100 border border-zinc-700' },
+];
+
+const AgentTiles: React.FC = () => {
+  const { agents } = useAgentSetup({ check: false });
+  return (
+    <div className="flex items-end gap-5">
+      {AGENT_TILES.map((tile) => {
+        const installed = agents.find((a) => a.id === tile.id)?.installed;
+        return (
+          <div key={tile.id} className="flex flex-col items-center gap-2">
+            <span className="relative">
+              <span
+                className={`w-14 h-14 rounded-[14px] flex items-center justify-center text-[20px] font-semibold transition-opacity ${tile.className} ${
+                  installed ? '' : 'opacity-35'
+                }`}
+              >
+                {tile.letter}
+              </span>
+              {installed && (
+                <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-base-app flex items-center justify-center text-white">
+                  <Check size={11} />
+                </span>
+              )}
+            </span>
+            <span className={`text-[10px] ${installed ? 'text-zinc-200' : 'text-zinc-500'}`}>{tile.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const Visual: React.FC<{
   step: Step;
@@ -142,6 +183,8 @@ const Visual: React.FC<{
           ))}
         </div>
       );
+    case 'install':
+      return <AgentTiles />;
     case 'terminals':
       return (
         <div className="w-72 space-y-2">
@@ -242,7 +285,11 @@ export const shouldShowOnboarding = (): boolean => {
 };
 
 /** First launch: GitHub sign-in up front, preferences, then a tour of every part of the app. */
-export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+export const Onboarding: React.FC<{
+  onDone: () => void;
+  /** Leaves onboarding and opens a terminal tab running the command (agent sign-in). */
+  onRunInTerminal?: (command: string, title: string) => void;
+}> = ({ onDone, onRunInTerminal }) => {
   const { t, lang, setLang } = useI18n();
   const { theme, preference, setPreference } = useTheme();
   const { state, login, cancel, openProfile } = useGitHubAuth();
@@ -304,7 +351,9 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
         : pending
           ? { title: s.codeTitle, body: s.codeBody, points: undefined }
           : { title: s.title, body: s.body, points: undefined }
-      : step === 'prefs' || step === 'done'
+      : step === 'install'
+        ? { title: t.onboarding.install.title, body: t.onboarding.install.body, points: undefined as string[] | undefined }
+        : step === 'prefs' || step === 'done'
         ? { ...t.onboarding[step], points: undefined as string[] | undefined }
         : t.onboarding[step];
 
@@ -421,6 +470,21 @@ export const Onboarding: React.FC<{ onDone: () => void }> = ({ onDone }) => {
                   {t.common.cancel}
                 </button>
               </div>
+            </div>
+          )}
+
+          {step === 'install' && (
+            <div className="mt-4" onKeyDown={(e) => e.stopPropagation()}>
+              <AgentSetupPanel
+                compact
+                onRunInTerminal={
+                  onRunInTerminal &&
+                  ((command, title) => {
+                    finish();
+                    onRunInTerminal(command, title);
+                  })
+                }
+              />
             </div>
           )}
 
