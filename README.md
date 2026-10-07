@@ -37,8 +37,9 @@ vulgr
 - **Sessions and groups** — tabs name themselves after the work done in them (or stay *Untitled*), can be renamed, dragged into groups, and are restored on the next launch. Split tabs list their panes in the sidebar.
 - **Command box** — run commands as blocks with duration and output, describe a command in plain words with `#`, or ask Claude with `?` / `Ctrl+Shift+Enter`.
 - **Agents working together**
-  - **Duo Loop** — one agent writes the code, another runs your tests and asks for fixes until they pass.
-  - **Agent Swarm** — give one goal; writer, checker and auditor agents run it in the background, optionally in an isolated git worktree.
+  - **Duo Loop** — two panes side by side: the checker writes tests from your goal, the writer codes until they pass.
+  - **Agent Swarm** — give one goal; test-writer, coder and reviewer agents run it in the background, optionally in an isolated git worktree.
+  - **Orchestrator** — give a big goal; a planner splits it into tasks, several agents do them at the same time (each in its own worktree, with tests), the parts are merged and tested together, a reviewer checks the whole change and the result lands in your working tree. From a terminal: `orchestrate orchestra "<goal>" -w claude,agy`.
   - **Claude Chat** — talk to Claude Code and watch its file changes live.
 - **Changes, report, memory** — review the diff and commit & push, export the session as Markdown/HTML/JSON, and keep project rules the agents always receive.
 - **GitHub sign-in**, **dark / light theme**, **English / Turkish** interface.
@@ -75,7 +76,7 @@ npm run dev:app    # start the UI dev server and the app
 Project layout:
 
 - `electron/` — main process: windows, terminals (`ptyManager.ts`), GitHub sign-in, IPC
-- `src/` — engine shared by the app: agent adapters, Agent Swarm (`engine/agentMesh.ts`), git and worktree helpers, tests
+- `src/` — engine shared by the app: agent adapters, Agent Swarm (`engine/agentMesh.ts`), Orchestrator (`engine/orchestra.ts`), git and worktree helpers, tests
 - `ui/` — React interface; translations live in `ui/src/i18n/messages/`
 
 ## Contributing

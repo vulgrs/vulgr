@@ -1,6 +1,6 @@
 import { execSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, mkdirSync, rmSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, copyFileSync, symlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { GitUtils, excludeFromGit, type GitDiffResult } from './gitUtils.js';
@@ -77,6 +77,17 @@ export class WorktreeManager {
       if (existsSync(envFile)) {
         try {
           copyFileSync(envFile, join(worktreePath, '.env'));
+        } catch {}
+      }
+
+      // 3. Share the installed dependencies, so tests run in the copy without
+      // a fresh install. The link stays out of git like the folder itself.
+      const modules = join(this.mainCwd, 'node_modules');
+      const linked = join(worktreePath, 'node_modules');
+      if (existsSync(modules) && !existsSync(linked)) {
+        try {
+          symlinkSync(modules, linked, process.platform === 'win32' ? 'junction' : 'dir');
+          excludeFromGit(this.mainCwd, 'node_modules');
         } catch {}
       }
 

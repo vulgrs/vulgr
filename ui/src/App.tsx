@@ -12,6 +12,7 @@ import { Sidebar } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { AgentMeshModal } from './components/AgentMeshModal.js';
+import { OrchestraModal } from './components/OrchestraModal.js';
 import { SquadBar } from './components/SquadBar.js';
 import { LiveSquadModal } from './components/LiveSquadModal.js';
 import { SkillsModal } from './components/SkillsModal.js';
@@ -125,6 +126,7 @@ export const App: React.FC = () => {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => loadPersisted('warp.sidebarOpen', true));
   const [meshModalOpen, setMeshModalOpen] = useState(false);
+  const [orchestraOpen, setOrchestraOpen] = useState(false);
   const [squadModalOpen, setSquadModalOpen] = useState(false);
   const [skillsModalOpen, setSkillsModalOpen] = useState(false);
   const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
@@ -1319,6 +1321,7 @@ export const App: React.FC = () => {
             onOpenPalette={() => setPaletteOpen(true)}
             onOpenSquads={() => setSquadModalOpen(true)}
             onOpenMesh={() => setMeshModalOpen(true)}
+            onOpenOrchestra={() => setOrchestraOpen(true)}
             onOpenSkills={() => setSkillsModalOpen(true)}
             onOpenSettings={() => setSettingsModalOpen(true)}
             pastRuns={[]}
@@ -1443,6 +1446,19 @@ export const App: React.FC = () => {
       <AgentMeshModal
         isOpen={meshModalOpen}
         onClose={() => setMeshModalOpen(false)}
+        cwd={cwd}
+        onOpenChanges={() => {
+          refreshGitDiff();
+          setRightPanelOpen(true);
+        }}
+        onOpenSandboxes={() => setSandboxDrawerOpen(true)}
+        onInstallAgents={() => setAgentSetupOpen(true)}
+      />
+
+      {/* Orchestra: a planner splits the goal, workers run the parts in parallel */}
+      <OrchestraModal
+        isOpen={orchestraOpen}
+        onClose={() => setOrchestraOpen(false)}
         cwd={cwd}
         onOpenChanges={() => {
           refreshGitDiff();

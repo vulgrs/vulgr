@@ -62,10 +62,11 @@ export const onboarding = ns(
     },
     agents: {
       title: 'Let agents do the work',
-      body: 'Three ways to hand work to AI, from the top of the sidebar and the top bar.',
+      body: 'Four ways to hand work to AI, from the top of the sidebar and the top bar.',
       points: [
         'Duo Loop: one agent writes, another tests and asks for fixes.',
         'Agent Swarm: give a goal; writer, checker and auditor run it in the background.',
+        'Orchestrator: give a big goal; it is split into tasks that several agents do at the same time.',
         'Claude Chat: talk to Claude Code and watch its changes live.',
       ],
     },
@@ -143,10 +144,11 @@ export const onboarding = ns(
     },
     agents: {
       title: 'İşi ajanlara bırak',
-      body: 'Kenar çubuğunun üstünden ve üst çubuktan yapay zekâya iş vermenin üç yolu.',
+      body: 'Kenar çubuğunun üstünden ve üst çubuktan yapay zekâya iş vermenin dört yolu.',
       points: [
         'Duo Loop: bir ajan yazar, diğeri test edip düzeltme ister.',
         'Agent Swarm: bir hedef ver; yazan, kontrol eden ve denetleyen arka planda yürütür.',
+        'Orchestrator: büyük bir hedef ver; görevlere bölünür, birkaç ajan aynı anda yapar.',
         'Claude Chat: Claude Code ile konuş, değişikliklerini canlı izle.',
       ],
     },

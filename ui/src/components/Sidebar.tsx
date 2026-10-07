@@ -50,6 +50,7 @@ interface SidebarProps {
   onOpenPalette: () => void;
   onOpenSquads: () => void;
   onOpenMesh?: () => void;
+  onOpenOrchestra?: () => void;
   onOpenSkills: () => void;
   onOpenSettings: () => void;
   pastRuns?: any[];
@@ -264,6 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewSession,
   onOpenSquads,
   onOpenMesh,
+  onOpenOrchestra,
   onOpenSettings,
   pastConversations = [],
   onSelectConversation,
@@ -435,7 +437,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const modes = [
     { label: 'Duo Loop', icon: duoLoopIcon, w: 7, h: 5.47, onClick: onOpenSquads, title: t.sidebar.duoLoopHint },
     { label: 'Agent Swarm', icon: agentSwarmIcon, w: 7, h: 8, onClick: onOpenMesh, title: t.sidebar.agentSwarmHint },
-    { label: 'Orchestrator', icon: orchestratorIcon, w: 7, h: 8, onClick: openWorkspace, title: t.sidebar.orchestratorHint },
+    { label: 'Orchestrator', icon: orchestratorIcon, w: 7, h: 8, onClick: onOpenOrchestra ?? openWorkspace, title: t.sidebar.orchestratorHint },
   ];
 
   return (

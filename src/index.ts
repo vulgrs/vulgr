@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import pc from 'picocolors';
 import { OrchestrationEngine } from './engine/orchestrator.js';
 import { AgentMesh } from './engine/agentMesh.js';
+import { Orchestra } from './engine/orchestra.js';
 import { runDoctorCheck } from './cli/doctor.js';
 import { ContextBus } from './bus/contextBus.js';
 import { logger } from './utils/logger.js';
@@ -52,6 +53,49 @@ program
       logger.error('Autonomous mesh failed:', err.message || err);
       process.exit(1);
     }
+  });
+
+// Subcommand: orchestra (planner splits the goal, workers run the parts in parallel)
+program
+  .command('orchestra')
+  .description('Split a big goal into tasks that several agents do at the same time, then combine and review them')
+  .argument('<goal>', 'High-level engineering goal')
+  .option('-p, --planner <cli>', 'Agent that plans the tasks and resolves conflicts', 'claude')
+  .option('-w, --workers <clis>', 'Comma-separated agents that do the tasks', 'claude')
+  .option('-r, --reviewer <cli>', 'Agent that reviews the combined change', 'claude')
+  .option('--verify-cmd <cmd>', "Command that must pass (default: the project's test command)")
+  .option('--parallel <n>', 'Agents working at the same time', '3')
+  .option('--max-rounds <n>', 'Attempts per task while its tests fail', '2')
+  .action(async (goal: string, options) => {
+    const orchestra = new Orchestra({
+      planner: options.planner,
+      workers: String(options.workers).split(',').map((w: string) => w.trim()).filter(Boolean),
+      reviewer: options.reviewer,
+      verifyCmd: options.verifyCmd,
+      maxParallel: parseInt(options.parallel, 10) || 3,
+      maxRounds: parseInt(options.maxRounds, 10) || 2,
+      cwd: process.cwd(),
+      onEvent: (e) => {
+        if (e.type === 'status' && e.phase !== 'done' && e.phase !== 'failed') logger.info(e.text);
+        else if (e.type === 'plan') e.tasks.forEach((t) => logger.info(`  [${t.id}] ${t.title} → ${t.agent}${t.dependsOn.length ? ` (${t.dependsOn.join(', ')})` : ''}`));
+        else if (e.type === 'task' && ['done', 'failed', 'skipped'].includes(e.state)) {
+          const line = `[${e.id}] ${e.state}${e.note ? `: ${e.note}` : ''}`;
+          if (e.state === 'done') logger.success(line);
+          else logger.warn(line);
+        } else if (e.type === 'log') logger.info(e.text);
+      },
+    });
+    // Ctrl+C stops the agents and removes their copies instead of exiting at once.
+    process.removeAllListeners('SIGINT');
+    process.once('SIGINT', () => orchestra.stop());
+    const result = await orchestra.run(goal);
+    if (result.reviewNotes) {
+      logger.divider();
+      console.log(result.reviewNotes);
+    }
+    if (result.success) logger.success(`Done${result.applied ? '; changes applied to the working tree' : ''}.`);
+    else logger.error(result.error || 'Stopped.');
+    process.exit(result.success ? 0 : 1);
   });
 
 // Subcommand: run

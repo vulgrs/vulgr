@@ -16,6 +16,7 @@ import { GitUtils } from '../src/git/gitUtils.js';
 import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
 import { AgentMesh } from '../src/engine/agentMesh.js';
+import { Orchestra } from '../src/engine/orchestra.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
@@ -471,6 +472,34 @@ function setupIpcHandlers() {
     } catch (err: any) {
       return { success: false, rounds: 0, messages: [], diff: '', durationMs: 0, error: err?.message || String(err) };
     }
+  });
+
+  // Orchestra: one run at a time; Stop aborts every agent it started.
+  let orchestra: Orchestra | null = null;
+  ipcMain.handle('orchestra:run', async (_, { goal, planner, workers, reviewer, verifyCmd, maxParallel, maxRounds, cwd, lang }) => {
+    if (orchestra) return { success: false, applied: false, tasks: [], durationMs: 0, error: 'Another orchestra run is in progress.' };
+    orchestra = new Orchestra({
+      planner,
+      workers,
+      reviewer,
+      verifyCmd,
+      maxParallel,
+      maxRounds,
+      cwd: cwd || currentCwd,
+      lang: lang === 'en' ? 'en' : 'tr',
+      onEvent: (event) => mainWindow?.webContents.send('orchestra:event', event),
+    });
+    try {
+      return await orchestra.run(goal);
+    } catch (err: any) {
+      return { success: false, applied: false, tasks: [], durationMs: 0, error: err?.message || String(err) };
+    } finally {
+      orchestra = null;
+    }
+  });
+  ipcMain.handle('orchestra:stop', () => {
+    orchestra?.stop();
+    return true;
   });
 
   // Which agent CLIs are installed, so the UI only offers ones that can run.

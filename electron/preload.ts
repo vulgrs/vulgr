@@ -65,6 +65,21 @@ export interface WarpApi {
   }) => Promise<any>;
   onMeshEvent: (callback: (message: any) => void) => () => void;
   onMeshStatus: (callback: (status: any) => void) => () => void;
+
+  // Orchestra: a planner splits a goal, workers run the parts in parallel
+  runOrchestra: (options: {
+    goal: string;
+    planner: string;
+    workers: string[];
+    reviewer: string;
+    verifyCmd?: string;
+    maxParallel?: number;
+    maxRounds?: number;
+    cwd?: string;
+    lang?: 'en' | 'tr';
+  }) => Promise<any>;
+  stopOrchestra: () => Promise<boolean>;
+  onOrchestraEvent: (callback: (event: any) => void) => () => void;
   getAvailableAgents: () => Promise<Record<string, boolean>>;
   getAgentStatus: () => Promise<any[]>;
   installAgent: (id: string) => Promise<{ ok: boolean; code: number | null; error?: string }>;
@@ -199,6 +214,13 @@ const api: WarpApi = {
     const handler = (_: any, status: any) => callback(status);
     ipcRenderer.on('mesh:status', handler);
     return () => ipcRenderer.removeListener('mesh:status', handler);
+  },
+  runOrchestra: (options) => ipcRenderer.invoke('orchestra:run', options),
+  stopOrchestra: () => ipcRenderer.invoke('orchestra:stop'),
+  onOrchestraEvent: (callback) => {
+    const handler = (_: any, event: any) => callback(event);
+    ipcRenderer.on('orchestra:event', handler);
+    return () => ipcRenderer.removeListener('orchestra:event', handler);
   },
   getAvailableAgents: () => ipcRenderer.invoke('agents:available'),
   getAgentStatus: () => ipcRenderer.invoke('agents:status'),
