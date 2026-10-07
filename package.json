@@ -1,6 +1,6 @@
 {
   "name": "vulgr",
-  "version": "0.1.0-beta",
+  "version": "0.1.1-beta",
   "productName": "Vulgr",
   "description": "Open-source terminal for working with AI coding agents (Claude Code, Codex, AGY)",
   "type": "module",
