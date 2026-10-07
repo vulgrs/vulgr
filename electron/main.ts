@@ -25,6 +25,7 @@ import { WorktreeManager } from '../src/git/worktreeManager.js';
 import { AutoSuggestEngine } from '../src/engine/autoSuggest.js';
 import { ConfigManager } from '../src/engine/configManager.js';
 import { SessionExporter } from '../src/engine/sessionExporter.js';
+import { buildTestPlanPrompt, parseTestCommand, detectTestCommand } from '../src/engine/testPlan.js';
 import { listAgentStatus, installAgent, cancelAgentInstall } from './agentInstaller.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -543,6 +544,10 @@ function setupIpcHandlers() {
     return true;
   });
   ipcMain.handle('memory:promptSnippet', () => memoryStore.toPromptSnippet());
+
+  // Duo Loop without a test command: the checker writes tests from the goal.
+  ipcMain.handle('tests:planPrompt', (_, goal: string, extra: string[] = []) => buildTestPlanPrompt(goal, extra));
+  ipcMain.handle('tests:resolveCommand', (_, agentOutput = '') => parseTestCommand(agentOutput) ?? detectTestCommand(currentCwd));
 
   // Context & Token Optimizer Handlers
   ipcMain.handle('context:optimize', (_, { raw, options }) => ContextOptimizer.optimizeTerminalLog(raw, options));

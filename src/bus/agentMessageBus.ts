@@ -7,6 +7,7 @@ export type AgentRole = 'claude' | 'agy' | 'gemini' | 'codex' | 'opencode' | 'cu
 
 export type MessageType =
   | 'USER_TASK'             // Orchestrator -> Builder
+  | 'TESTS_WRITTEN'         // Verifier -> Builder (tests written from the goal)
   | 'CODE_READY'            // Builder -> Verifier
   | 'VERIFICATION_FAILED'   // Verifier -> Builder (compiler errors, test failures)
   | 'VERIFICATION_PASSED'   // Verifier -> Auditor

@@ -49,7 +49,7 @@ export interface AgentMessage {
 }
 
 interface MeshStatus {
-  stage: 'checking' | 'building' | 'verifying' | 'diagnosing' | 'repairing' | 'auditing' | 'done' | 'failed';
+  stage: 'checking' | 'planning' | 'building' | 'verifying' | 'diagnosing' | 'repairing' | 'auditing' | 'done' | 'failed';
   agent?: string;
   round: number;
   maxRounds: number;
@@ -134,7 +134,9 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   const [builder, setBuilder] = useState(() => loadSetting('builder', 'claude'));
   const [verifier, setVerifier] = useState(() => loadSetting('verifier', 'agy'));
   const [auditor, setAuditor] = useState(() => loadSetting('auditor', 'claude'));
-  const [verifyCmd, setVerifyCmd] = useState(() => loadSetting('verifyCmd', 'npm test'));
+  // Empty by default: the checker writes tests from the goal. Earlier versions
+  // saved 'npm test' under 'verifyCmd', so the optional override uses a new key.
+  const [verifyCmd, setVerifyCmd] = useState(() => loadSetting('testCommand', ''));
   const [maxRounds, setMaxRounds] = useState(() => loadSetting('maxRounds', '3'));
   const [useSandbox, setUseSandbox] = useState(false);
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
@@ -186,7 +188,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     saveSetting('builder', builder);
     saveSetting('verifier', verifier);
     saveSetting('auditor', auditor);
-    saveSetting('verifyCmd', verifyCmd);
+    saveSetting('testCommand', verifyCmd.trim());
     saveSetting('maxRounds', maxRounds);
 
     setIsRunning(true);
@@ -200,7 +202,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
         builder,
         verifier,
         auditor,
-        verifyCmd: verifyCmd.trim() || 'npm test',
+        verifyCmd: verifyCmd.trim(),
         maxRounds: Number(maxRounds) || 3,
         useSandbox,
         cwd,
@@ -245,7 +247,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
           </div>
           <DialogTitle>{m.title}</DialogTitle>
           <DialogDescription>
-            {m.descBefore} <b>{m.descWriter}</b> {m.descMiddle1} <b>{m.descChecker}</b> {m.descMiddle2}{' '}
+            {m.descBefore} <b>{m.descChecker}</b> {m.descMiddle1} <b>{m.descWriter}</b> {m.descMiddle2}{' '}
             <b>{m.descAuditor}</b> {m.descAfter}
           </DialogDescription>
         </DialogHeader>
@@ -281,7 +283,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                     id="mesh-verify"
                     value={verifyCmd}
                     disabled={isRunning}
-                    placeholder="npm test"
+                    placeholder={m.verifyCmdPlaceholder}
                     className="font-mono"
                     onChange={(e) => setVerifyCmd(e.target.value)}
                   />

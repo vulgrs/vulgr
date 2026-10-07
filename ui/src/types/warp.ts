@@ -66,6 +66,7 @@ export interface DoctorStatus {
 
 export type SquadPhase =
   | 'idle'
+  | 'planning'
   | 'building'
   | 'handing_off'
   | 'verifying'
@@ -84,6 +85,8 @@ export interface SquadSession {
   verifierType: SessionType;
   goal: string;
   verifyCmd: string;
+  /** Test files the verifier wrote from the goal (when no test command was given). */
+  testFiles?: string[];
   phase: SquadPhase;
   round: number;
   maxRounds: number;

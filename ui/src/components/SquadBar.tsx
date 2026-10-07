@@ -26,6 +26,7 @@ interface SquadBarProps {
 }
 
 const PHASE_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
+  planning: { color: 'bg-zinc-800 border-zinc-700 text-zinc-200', icon: <Shield size={13} className="text-zinc-400" /> },
   building: { color: 'bg-zinc-800 border-zinc-700 text-zinc-200', icon: <Sparkles size={13} className="text-zinc-400" /> },
   verifying: { color: 'bg-zinc-800 border-zinc-700 text-zinc-200', icon: <Shield size={13} className="text-zinc-400" /> },
   handing_off: { color: 'bg-amber-500/15 border-amber-500/40 text-amber-200', icon: <ArrowRight size={13} className="text-amber-400" /> },

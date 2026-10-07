@@ -90,6 +90,9 @@ export interface WarpApi {
   removeMemoryRule: (rule: string) => Promise<boolean>;
   recordMemoryCommand: (cmd: { command: string; exitCode: number; durationMs?: number; summary?: string }) => Promise<boolean>;
   getMemorySnippet: () => Promise<string>;
+  getTestPlanPrompt: (goal: string, extra?: string[]) => Promise<string>;
+  /** The command an agent named on its TEST_COMMAND line, else the project's own test command. */
+  resolveTestCommand: (agentOutput?: string) => Promise<string | null>;
 
   // Context Optimizer
   optimizeContext: (raw: string, options?: any) => Promise<string>;
@@ -226,6 +229,8 @@ const api: WarpApi = {
   removeMemoryRule: (rule) => ipcRenderer.invoke('memory:removeRule', rule),
   recordMemoryCommand: (cmd) => ipcRenderer.invoke('memory:recordCommand', cmd),
   getMemorySnippet: () => ipcRenderer.invoke('memory:promptSnippet'),
+  getTestPlanPrompt: (goal, extra) => ipcRenderer.invoke('tests:planPrompt', goal, extra),
+  resolveTestCommand: (agentOutput) => ipcRenderer.invoke('tests:resolveCommand', agentOutput),
 
   // Context Optimizer
   optimizeContext: (raw, options) => ipcRenderer.invoke('context:optimize', { raw, options }),

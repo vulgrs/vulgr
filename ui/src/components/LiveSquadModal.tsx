@@ -60,7 +60,9 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
   const [goal, setGoal] = useState('');
   const [builder, setBuilder] = useState(() => load('builder', 'claude'));
   const [verifier, setVerifier] = useState(() => load('verifier', 'agy'));
-  const [verifyCmd, setVerifyCmd] = useState(() => load('verifyCmd', 'npm test'));
+  // Empty by default: the checker writes tests from the goal. Earlier versions
+  // saved 'npm test' under 'verifyCmd', so the optional override uses a new key.
+  const [verifyCmd, setVerifyCmd] = useState(() => load('testCommand', ''));
   const [maxRounds, setMaxRounds] = useState(() => load('maxRounds', '3'));
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
 
@@ -84,14 +86,14 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
     if (!goal.trim() || noBuilder) return;
     save('builder', builder);
     save('verifier', verifier);
-    save('verifyCmd', verifyCmd);
+    save('testCommand', verifyCmd.trim());
     save('maxRounds', maxRounds);
 
     onLaunchSquad({
       goal: goal.trim(),
       builder: builder as SessionType,
       verifier: verifier as SessionType,
-      verifyCmd: verifyCmd.trim() || 'npm test',
+      verifyCmd: verifyCmd.trim(),
       maxRounds: Number(maxRounds) || 3,
     });
     setGoal('');
@@ -154,7 +156,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
                 <Input
                   id="squad-verify"
                   value={verifyCmd}
-                  placeholder="npm test"
+                  placeholder={d.verifyCmdPlaceholder}
                   className="font-mono"
                   onChange={(e) => setVerifyCmd(e.target.value)}
                 />
@@ -183,8 +185,11 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
             <AlertTitle>{d.howTitle}</AlertTitle>
             <AlertDescription>
               <ol className="list-decimal space-y-0.5 pl-4">
+                {!verifyCmd.trim() && verifierLabel && <li>{d.step0(verifierLabel)}</li>}
                 <li>{d.step1(builderLabel)}</li>
-                <li>{d.step2(verifyCmd || 'npm test')}</li>
+                <li>
+                  {verifyCmd.trim() ? d.step2(verifyCmd.trim()) : verifierLabel ? d.step2Auto : d.step2Project}
+                </li>
                 <li>
                   {verifierLabel
                     ? d.step3Agent(verifierLabel, builderLabel)

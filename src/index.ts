@@ -23,7 +23,7 @@ program
   .option('-b, --builder <cli>', 'Builder CLI (claude, agy, codex, opencode, cursor, gemini, mock)', 'claude')
   .option('-v, --verifier <cli>', 'Verifier CLI (same choices)', 'agy')
   .option('-a, --auditor <cli>', 'Auditor CLI (same choices)', 'claude')
-  .option('--verify-cmd <cmd>', 'Verification command to execute (e.g. "npm test" or "npm run type-check")')
+  .option('--verify-cmd <cmd>', 'Command that must pass (e.g. "npm test"). Omit it and the verifier writes tests from the goal first')
   .option('--max-rounds <number>', 'Maximum autonomous repair rounds', '3')
   .action(async (goal: string, options) => {
     try {
