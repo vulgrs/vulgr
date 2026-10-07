@@ -1,9 +1,9 @@
 import { execSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, copyFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { GitUtils, type GitDiffResult } from './gitUtils.js';
+import { GitUtils, excludeFromGit, type GitDiffResult } from './gitUtils.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -35,23 +35,9 @@ export class WorktreeManager {
     this.worktreesDir = join(this.mainCwd, '.warp-worktrees');
   }
 
-  /**
-   * Ensures .warp-worktrees is listed in the primary repository's .gitignore
-   */
+  /** Keeps .warp-worktrees out of `git status` without editing the user's .gitignore. */
   private ensureGitignored(): void {
-    const gitignorePath = join(this.mainCwd, '.gitignore');
-    try {
-      let content = '';
-      if (existsSync(gitignorePath)) {
-        content = readFileSync(gitignorePath, 'utf-8');
-      }
-      if (!content.includes('.warp-worktrees')) {
-        const addition = content.endsWith('\n') || content.length === 0 ? '.warp-worktrees/\n' : '\n.warp-worktrees/\n';
-        writeFileSync(gitignorePath, content + addition, 'utf-8');
-      }
-    } catch {
-      // Best effort
-    }
+    excludeFromGit(this.mainCwd, '.warp-worktrees/');
   }
 
   /**

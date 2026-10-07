@@ -12,6 +12,9 @@ import type { ICliAdapter, CliExecutionResult } from '../types/index.js';
 
 const execAsync = promisify(exec);
 
+/** Diff lines a reviewing agent gets: it is told not to read files, so it must see the code itself. */
+const REVIEW_DIFF_LINES = 1500;
+
 /** Where a run currently is, for a live progress line in the UI. */
 export interface AgentMeshStatus {
   stage: 'checking' | 'building' | 'verifying' | 'diagnosing' | 'repairing' | 'auditing' | 'done' | 'failed';
@@ -53,6 +56,8 @@ const AGENT_LABELS: Record<string, string> = {
   claude: 'Claude',
   agy: 'AGY',
   codex: 'Codex',
+  opencode: 'OpenCode',
+  cursor: 'Cursor Agent',
   gemini: 'Gemini',
   mock: 'Mock',
 };
@@ -98,7 +103,7 @@ const MESH_TEXT = {
     checking: 'Seçilen ajanların kurulu olduğu kontrol ediliyor...',
     missingAgents: (names: string) =>
       `Kurulu olmayan ajan: ${names}. Bu bilgisayarda kurulu bir ajan seçin ya da önce o aracı kurun.`,
-    taskGiven: (agent: string, goal: string) => `Görev ${agent}'a verildi: "${goal}"`,
+    taskGiven: (agent: string, goal: string) => `${agent} görevi aldı: "${goal}"`,
     building: (agent: string) => `${agent} kodu yazıyor...`,
     buildFailed: (agent: string, tail: string) => `${agent} görevi tamamlayamadı: ${tail}`,
     codeWritten: (agent: string, files: number) => `${agent} kodu yazdı (${files} dosya değişti).`,
@@ -144,6 +149,8 @@ export class AgentMesh {
   private readonly onMessage?: (message: AgentMessage) => void;
   private readonly onStatus?: (status: AgentMeshStatus) => void;
   private readonly text: (typeof MESH_TEXT)[MeshLang];
+  /** Appended to prompts whose reply is shown to the person, so it reads in their language. */
+  private readonly replyLang: string;
 
   constructor(options: AgentMeshOptions = {}) {
     this.cwd = options.cwd || process.cwd();
@@ -161,6 +168,7 @@ export class AgentMesh {
     this.onMessage = options.onMessage;
     this.onStatus = options.onStatus;
     this.text = MESH_TEXT[options.lang ?? 'tr'];
+    this.replyLang = (options.lang ?? 'tr') === 'tr' ? 'Write your reply in Turkish.' : '';
   }
 
   private status(stage: AgentMeshStatus['stage'], round: number, text: string, agent?: string) {
@@ -310,15 +318,21 @@ export class AgentMesh {
       filesChanged: diffInitial.filesChanged,
     });
 
-    // Stage 2: Verify, and on failure let the verifier diagnose and the builder repair.
+    // Stage 2+3: verify; on failure the verifier diagnoses and the builder
+    // repairs. Once tests pass the auditor reviews the diff, and a rejection
+    // also goes back to the builder while rounds are left.
     let verificationPassed = false;
     let currentRound = 1;
+    let audit: AgentMeshResult['audit'] = 'skipped';
+    let auditNotes = '';
+    let finalDiff = activeGit.getDiff();
 
     for (; currentRound <= this.maxRounds; currentRound++) {
       this.status('verifying', currentRound, this.text.verifying(this.verifyCmd, currentRound, this.maxRounds));
       const verifyResult = await this.runVerificationCmd(activeCwd);
       memory.recordCommand(this.verifyCmd, verifyResult.exitCode, undefined, verifyResult.success ? 'Verification passed' : 'Verification failed');
 
+      let repairPrompt: string;
       if (verifyResult.success) {
         verificationPassed = true;
         await this.bus.publish(runId, this.verifierName, this.auditorName, 'VERIFICATION_PASSED', {
@@ -326,43 +340,92 @@ export class AgentMesh {
           gitDiff: ContextOptimizer.optimizeDiff(activeGit.getDiff().diff),
         });
         logger.success(`[${this.verifierName} -> ${this.auditorName}]: VERIFICATION_PASSED!`);
-        break;
+
+        // The auditor reviews the final diff (read-only).
+        this.status('auditing', currentRound, this.text.auditing(label(this.auditorName)), this.auditorName);
+        finalDiff = activeGit.getDiff();
+        const auditPrompt = [
+          `You are ${label(this.auditorName)}, reviewing code written by ${label(this.builderName)} for the goal "${goal}". Tests already pass.`,
+          'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Look for bugs, security problems and missed requirements in this git diff:',
+          ContextOptimizer.optimizeDiff(finalDiff.diff, REVIEW_DIFF_LINES),
+          '',
+          'End your reply with exactly one line: "VERDICT: APPROVED" or "VERDICT: REJECTED: <reason>".',
+          this.replyLang ? `${this.replyLang} Keep the VERDICT line in English.` : '',
+        ].join('\n');
+
+        const auditExec = await auditorAdapter.execute(auditPrompt, { cwd: activeCwd, timeoutMs: this.timeoutMs });
+        // Only an explicit verdict counts: a reply without one (e.g. the agent was
+        // blocked from a tool and printed nothing useful) is not an approval.
+        const auditRan = auditExec.exitCode === 0 && !auditExec.timedOut;
+        audit = 'skipped';
+        if (auditRan && /VERDICT:\s*REJECTED/i.test(auditExec.stdout)) audit = 'rejected';
+        else if (auditRan && /VERDICT:\s*APPROVED/i.test(auditExec.stdout)) audit = 'approved';
+        auditNotes = auditExec.stdout.trim();
+        const skippedReason = auditRan ? this.text.auditNoVerdict : this.text.auditCouldNotRun(failureTail(auditExec, this.text));
+
+        if (audit !== 'rejected') {
+          await this.bus.publish(runId, this.auditorName, 'orchestrator', 'CONSENSUS_APPROVED', {
+            summary:
+              audit === 'skipped'
+                ? this.text.auditSkipped(label(this.auditorName), skippedReason)
+                : this.text.auditApproved(label(this.auditorName)),
+            details: auditNotes,
+            gitDiff: finalDiff.diff,
+          });
+          logger.success(`[${this.auditorName} -> orchestrator]: CONSENSUS_APPROVED! Full multi-agent consensus achieved.`);
+          break;
+        }
+
+        await this.bus.publish(runId, this.auditorName, this.builderName, 'SECURITY_CONCERN', {
+          summary: this.text.auditRejected(label(this.auditorName)),
+          details: auditNotes,
+        });
+        logger.warn(`[${this.auditorName} -> ${this.builderName}]: SECURITY_CONCERN flagged.`);
+        if (currentRound === this.maxRounds) break;
+
+        repairPrompt = [
+          `The goal is still: "${goal}". Tests pass, but ${label(this.auditorName)} reviewed your changes and rejected them:`,
+          auditNotes,
+          '',
+          'Address these points with the smallest correct change, keep the tests passing, and add tests for any bug you fix. Do not ask questions.',
+        ].join('\n');
+      } else {
+        // The verifier agent reads the failure and tells the builder what to fix.
+        this.status('diagnosing', currentRound, this.text.diagnosing(label(this.verifierName)), this.verifierName);
+        const diagnosePrompt = [
+          `You are reviewing work by another coding agent. The goal was: "${goal}".`,
+          `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
+          verifyResult.output,
+          '',
+          'Current changes (git diff):',
+          ContextOptimizer.optimizeDiff(activeGit.getDiff().diff, REVIEW_DIFF_LINES),
+          '',
+          'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Explain the root cause in 2-3 sentences, then list the concrete fixes the other agent should make.',
+          this.replyLang,
+        ].join('\n');
+        const diagnosis = await verifierAdapter.execute(diagnosePrompt, { cwd: activeCwd, timeoutMs: this.timeoutMs });
+        const diagnosisText = diagnosis.exitCode === 0 ? diagnosis.stdout.trim() : '';
+
+        await this.bus.publish(runId, this.verifierName, this.builderName, 'VERIFICATION_FAILED', {
+          summary: this.text.verifyFailed(this.verifyCmd, verifyResult.exitCode),
+          errorTrace: verifyResult.output,
+          details: diagnosisText || undefined,
+        });
+
+        if (currentRound === this.maxRounds) break;
+
+        repairPrompt = [
+          `The goal is still: "${goal}".`,
+          `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
+          verifyResult.output,
+          diagnosisText ? `\nReview from ${label(this.verifierName)}:\n${diagnosisText}` : '',
+          '',
+          'Fix the problem with the smallest correct change. Do not ask questions.',
+        ].join('\n');
       }
 
-      // The verifier agent reads the failure and tells the builder what to fix.
-      this.status('diagnosing', currentRound, this.text.diagnosing(label(this.verifierName)), this.verifierName);
-      const diagnosePrompt = [
-        `You are reviewing work by another coding agent. The goal was: "${goal}".`,
-        `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
-        verifyResult.output,
-        '',
-        'Current changes (git diff):',
-        ContextOptimizer.optimizeDiff(activeGit.getDiff().diff),
-        '',
-        'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Explain the root cause in 2-3 sentences, then list the concrete fixes the other agent should make.',
-      ].join('\n');
-      const diagnosis = await verifierAdapter.execute(diagnosePrompt, { cwd: activeCwd, timeoutMs: this.timeoutMs });
-      const diagnosisText = diagnosis.exitCode === 0 ? diagnosis.stdout.trim() : '';
-
-      await this.bus.publish(runId, this.verifierName, this.builderName, 'VERIFICATION_FAILED', {
-        summary: this.text.verifyFailed(this.verifyCmd, verifyResult.exitCode),
-        errorTrace: verifyResult.output,
-        details: diagnosisText || undefined,
-      });
-
-      if (currentRound === this.maxRounds) break;
-
       this.status('repairing', currentRound + 1, this.text.repairing(label(this.builderName), currentRound + 1, this.maxRounds), this.builderName);
-      logger.model(this.builderName, `Autonomously repairing errors reported by ${this.verifierName}...`);
-      const repairPrompt = [
-        `The goal is still: "${goal}".`,
-        `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
-        verifyResult.output,
-        diagnosisText ? `\nReview from ${label(this.verifierName)}:\n${diagnosisText}` : '',
-        '',
-        'Fix the problem with the smallest correct change. Do not ask questions.',
-      ].join('\n');
-
+      logger.model(this.builderName, 'Autonomously repairing the reported problems...');
       const repairExec = await builderAdapter.execute(repairPrompt, {
         cwd: activeCwd,
         timeoutMs: this.timeoutMs,
@@ -380,53 +443,12 @@ export class AgentMesh {
         gitDiff: diffAfterPatch.diff,
         filesChanged: diffAfterPatch.filesChanged,
       });
+      verificationPassed = false;
     }
+    currentRound = Math.min(currentRound, this.maxRounds);
 
     if (!verificationPassed) {
-      return fail(
-        this.text.outOfRounds(this.maxRounds),
-        Math.min(currentRound, this.maxRounds),
-        activeGit,
-        sandboxSession
-      );
-    }
-
-    // Stage 3: Auditor reviews the final diff (read-only).
-    this.status('auditing', currentRound, this.text.auditing(label(this.auditorName)), this.auditorName);
-    const finalDiff = activeGit.getDiff();
-    const auditPrompt = [
-      `You are ${label(this.auditorName)}, reviewing code written by ${label(this.builderName)} for the goal "${goal}". Tests already pass.`,
-      'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Look for bugs, security problems and missed requirements in this git diff:',
-      ContextOptimizer.optimizeDiff(finalDiff.diff),
-      '',
-      'End your reply with exactly one line: "VERDICT: APPROVED" or "VERDICT: REJECTED: <reason>".',
-    ].join('\n');
-
-    const auditExec = await auditorAdapter.execute(auditPrompt, { cwd: activeCwd, timeoutMs: this.timeoutMs });
-    // Only an explicit verdict counts: a reply without one (e.g. the agent was
-    // blocked from a tool and printed nothing useful) is not an approval.
-    const auditRan = auditExec.exitCode === 0 && !auditExec.timedOut;
-    let audit: AgentMeshResult['audit'] = 'skipped';
-    if (auditRan && /VERDICT:\s*REJECTED/i.test(auditExec.stdout)) audit = 'rejected';
-    else if (auditRan && /VERDICT:\s*APPROVED/i.test(auditExec.stdout)) audit = 'approved';
-    const skippedReason = auditRan ? this.text.auditNoVerdict : this.text.auditCouldNotRun(failureTail(auditExec, this.text));
-
-    if (audit === 'rejected') {
-      await this.bus.publish(runId, this.auditorName, this.builderName, 'SECURITY_CONCERN', {
-        summary: this.text.auditRejected(label(this.auditorName)),
-        details: auditExec.stdout.trim(),
-      });
-      logger.warn(`[${this.auditorName} -> ${this.builderName}]: SECURITY_CONCERN flagged.`);
-    } else {
-      await this.bus.publish(runId, this.auditorName, 'orchestrator', 'CONSENSUS_APPROVED', {
-        summary:
-          audit === 'skipped'
-            ? this.text.auditSkipped(label(this.auditorName), skippedReason)
-            : this.text.auditApproved(label(this.auditorName)),
-        details: auditExec.stdout.trim(),
-        gitDiff: finalDiff.diff,
-      });
-      logger.success(`[${this.auditorName} -> orchestrator]: CONSENSUS_APPROVED! Full multi-agent consensus achieved.`);
+      return fail(this.text.outOfRounds(this.maxRounds), currentRound, activeGit, sandboxSession);
     }
 
     this.status(
@@ -444,7 +466,7 @@ export class AgentMesh {
       durationMs: Date.now() - startTime,
       sandbox: sandboxSession,
       audit,
-      auditNotes: auditExec.stdout.trim().slice(-4000),
+      auditNotes: auditNotes.slice(-4000),
     };
   }
 }

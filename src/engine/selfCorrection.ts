@@ -147,6 +147,7 @@ export class SelfCorrectionEngine {
       // Stream output from the model
       const executionResult = await primaryAdapter.execute(repairPrompt, {
         cwd: this.cwd,
+        allowEdits: true,
         onStdout: (chunk) => logger.streamChunk(chunk),
       });
 

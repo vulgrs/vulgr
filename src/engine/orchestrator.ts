@@ -114,6 +114,7 @@ export class OrchestrationEngine {
     const primaryExec = await primaryAdapter.execute(prompt, {
       cwd: this.cwd,
       timeoutMs: options.timeoutMs,
+      allowEdits: true,
       onStdout: (chunk) => logger.streamChunk(chunk),
     });
 
@@ -124,6 +125,15 @@ export class OrchestrationEngine {
 
     if (primaryExec.exitCode !== 0) {
       const errMsg = `Primary CLI exited with error code ${primaryExec.exitCode}: ${primaryExec.stderr}`;
+      logger.error(errMsg);
+      this.contextBus.updateManifest({ status: 'FAILED', error: errMsg });
+      return this.contextBus.getManifest()!;
+    }
+
+    // An agent that only printed code (e.g. it was refused write access) changed
+    // nothing; verifying the untouched project would report a false success.
+    if (this.gitUtils.isGitRepo() && !this.gitUtils.getDiff().hasChanges) {
+      const errMsg = `[${primaryAdapter.name}] finished without changing any file. Its reply is saved in the run log; nothing was verified.`;
       logger.error(errMsg);
       this.contextBus.updateManifest({ status: 'FAILED', error: errMsg });
       return this.contextBus.getManifest()!;
@@ -179,10 +189,24 @@ export class OrchestrationEngine {
 
         await primaryAdapter.execute(remediationPrompt, {
           cwd: this.cwd,
+          allowEdits: true,
           onStdout: (chunk) => logger.streamChunk(chunk),
         });
 
         logger.success('Remediation patch applied by primary model.');
+
+        // The fix is new code: check it the same way as the first attempt.
+        if (options.verify) {
+          const recheck = new SelfCorrectionEngine(this.contextBus, {
+            verificationCommand: this.detectVerificationCommand(options.verifyCmd),
+            maxRetries: options.maxRetries ?? 2,
+            cwd: this.cwd,
+          });
+          const recheckResult = await recheck.executeCorrectionLoop(primaryAdapter);
+          if (!recheckResult.passed) {
+            logger.warn('The remediation left failing checks that self-correction could not fix.');
+          }
+        }
       }
     }
 

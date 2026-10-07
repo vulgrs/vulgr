@@ -20,9 +20,9 @@ program
   .command('mesh')
   .description('Run autonomous inter-CLI agent mesh (CLIs talk to each other without manual intervention)')
   .argument('<goal>', 'High-level engineering goal')
-  .option('-b, --builder <cli>', 'Builder CLI (claude, agy, gemini, codex, mock)', 'claude')
-  .option('-v, --verifier <cli>', 'Verifier CLI (agy, claude, gemini, codex, mock)', 'agy')
-  .option('-a, --auditor <cli>', 'Auditor CLI (gemini, claude, agy, codex, mock)', 'gemini')
+  .option('-b, --builder <cli>', 'Builder CLI (claude, agy, codex, opencode, cursor, gemini, mock)', 'claude')
+  .option('-v, --verifier <cli>', 'Verifier CLI (same choices)', 'agy')
+  .option('-a, --auditor <cli>', 'Auditor CLI (same choices)', 'claude')
   .option('--verify-cmd <cmd>', 'Verification command to execute (e.g. "npm test" or "npm run type-check")')
   .option('--max-rounds <number>', 'Maximum autonomous repair rounds', '3')
   .action(async (goal: string, options) => {
@@ -34,9 +34,18 @@ program
         verifyCmd: options.verifyCmd,
         maxRounds: parseInt(options.maxRounds, 10) || 3,
         cwd: process.cwd(),
+        // Progress lines, so a long agent turn doesn't look like a hang.
+        onStatus: (status) => {
+          if (status.stage === 'done') logger.success(status.text);
+          else if (status.stage !== 'failed') logger.info(status.text);
+        },
       });
       const result = await mesh.runMesh(goal);
-      if (!result.success) {
+      if (result.auditNotes) {
+        logger.divider();
+        console.log(result.auditNotes);
+      }
+      if (!result.success || result.audit === 'rejected') {
         process.exit(1);
       }
     } catch (err: any) {
@@ -56,20 +65,21 @@ program
   .option('--verify-cmd <command>', 'Custom verification command (e.g. "npm test" or "npm run type-check")')
   .option('-d, --dual', 'Run adversarial review on git diff with secondary model before signoff', false)
   .option('--max-retries <number>', 'Maximum self-correction retry attempts (budget)', '2')
-  .option('--timeout <ms>', 'Process timeout in milliseconds', '180000')
+  .option('--timeout <ms>', 'Process timeout in milliseconds', '900000')
   .action(async (prompt: string, options) => {
     try {
       const engine = new OrchestrationEngine(process.cwd());
-      await engine.run(prompt, {
+      const manifest = await engine.run(prompt, {
         primary: options.primary,
         reviewer: options.reviewer,
         verify: Boolean(options.verify),
         verifyCmd: options.verifyCmd,
         dual: Boolean(options.dual),
         maxRetries: parseInt(options.maxRetries, 10) || 2,
-        timeoutMs: parseInt(options.timeout, 10) || 180000,
+        timeoutMs: parseInt(options.timeout, 10) || 900000,
         cwd: process.cwd(),
       });
+      if (manifest.status === 'FAILED') process.exit(1);
     } catch (err: any) {
       logger.error('Orchestration aborted:', err.message || err);
       process.exit(1);

@@ -425,10 +425,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
+  /** Back to the terminal list and the active tab, or a first terminal when there is none. */
+  const openWorkspace = () => {
+    setPanel('terminals');
+    if (tabs.length === 0) onNewTerminal?.();
+    else onSelectTab(tabs.some((tab) => tab.id === activeTabId) ? activeTabId : tabs[0].id);
+  };
+
   const modes = [
     { label: 'Duo Loop', icon: duoLoopIcon, w: 7, h: 5.47, onClick: onOpenSquads, title: t.sidebar.duoLoopHint },
     { label: 'Agent Swarm', icon: agentSwarmIcon, w: 7, h: 8, onClick: onOpenMesh, title: t.sidebar.agentSwarmHint },
-    { label: 'Orchestrator', icon: orchestratorIcon, w: 7, h: 8, onClick: undefined, title: t.sidebar.orchestratorHint },
+    { label: 'Orchestrator', icon: orchestratorIcon, w: 7, h: 8, onClick: openWorkspace, title: t.sidebar.orchestratorHint },
   ];
 
   return (
@@ -707,8 +714,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {panel === 'memory' && (
           <div className="px-[10px] space-y-4 text-[9px]">
             <p className="text-zinc-500 leading-relaxed">
-              {t.sidebar.memoryIntro} <code className="text-zinc-300">.vulgaris-memory.json</code>{' '}
-              {t.sidebar.memoryIntroRest}
+              {t.sidebar.memoryIntro}
             </p>
 
             {/* Rules */}

@@ -109,6 +109,8 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
         run(sessionId, await depsRef.current.buildAgentRun(agent, prompt, { allowEdits }));
       const fail = (error: string) => update({ phase: 'failed', statusText: error, error });
 
+      // Project rules and facts from the Memory panel, as Agent Swarm sends them.
+      let memorySnippet = '';
       const builderPrompt = (feedback?: string) =>
         [
           `Goal: ${config.goal}`,
@@ -119,9 +121,11 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
           'Do not ask questions; make reasonable assumptions. Do not run long-lived servers.',
           `Your work will be checked with: ${config.verifyCmd}`,
           'Finish with a short summary of what you changed.',
+          memorySnippet,
         ].join('\n');
 
       void (async () => {
+        memorySnippet = (await window.warpApi?.getMemorySnippet?.().catch(() => '')) || '';
         let feedback: string | undefined;
         let reviewSkipped = false;
         try {

@@ -119,4 +119,47 @@ describe('Autonomous Agent Mesh & Message Bus Suite', () => {
     assert.equal(result.success, true);
     assert.equal(result.rounds, 2);
   });
+
+  test('AgentMesh sends an auditor rejection back to the builder and audits again', async () => {
+    const builderPrompts: string[] = [];
+    let audits = 0;
+    const ok = (stdout: string) => ({ stdout, stderr: '', exitCode: 0, durationMs: 1, timedOut: false });
+    AdapterFactory.registerAdapter('test-builder', () => ({
+      name: 'test-builder',
+      binaryPath: 'test-builder',
+      isAvailable: async () => true,
+      getVersion: async () => '1',
+      execute: async (prompt: string) => {
+        builderPrompts.push(prompt);
+        return ok('changed the code');
+      },
+    }));
+    AdapterFactory.registerAdapter('test-auditor', () => ({
+      name: 'test-auditor',
+      binaryPath: 'test-auditor',
+      isAvailable: async () => true,
+      getVersion: async () => '1',
+      execute: async () => {
+        audits++;
+        return ok(audits === 1 ? 'Empty input crashes.\nVERDICT: REJECTED: empty input' : 'VERDICT: APPROVED');
+      },
+    }));
+
+    const mesh = new AgentMesh({
+      builder: 'test-builder',
+      verifier: 'test-auditor',
+      auditor: 'test-auditor',
+      verifyCmd: 'node -e "process.exit(0)"',
+      maxRounds: 3,
+      cwd: testWorkspace,
+    });
+
+    const result = await mesh.runMesh('Add a parser');
+    assert.equal(result.success, true);
+    assert.equal(result.audit, 'approved');
+    assert.equal(result.rounds, 2);
+    assert.equal(audits, 2);
+    assert.equal(builderPrompts.length, 2);
+    assert.match(builderPrompts[1], /Empty input crashes/);
+  });
 });

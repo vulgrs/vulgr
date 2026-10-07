@@ -1,7 +1,7 @@
 import { execSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, statSync, appendFileSync, mkdirSync } from 'node:fs';
+import { join, dirname, isAbsolute } from 'node:path';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,6 +17,59 @@ function parseStatus(raw: string): string[] {
     .split('\n')
     .map((l) => l.trim().substring(3).trim())
     .filter(Boolean);
+}
+
+/** Above this size a new file is listed by name only, so one generated file can't flood an agent's prompt. */
+const MAX_UNTRACKED_BYTES = 64 * 1024;
+
+/**
+ * New (untracked) files as unified-diff additions with their contents, so a
+ * reviewing agent sees the code a builder created rather than just a file name.
+ */
+function untrackedAsDiff(cwd: string, list: string): string {
+  return list
+    .split('\n')
+    .filter(Boolean)
+    .map((f) => {
+      let body: string;
+      try {
+        const path = join(cwd, f);
+        const size = statSync(path).size;
+        const buf = size <= MAX_UNTRACKED_BYTES ? readFileSync(path) : null;
+        if (!buf) body = `+[New file: ${f}, ${size} bytes, too large to include]`;
+        else if (buf.includes(0)) body = `+[New binary file: ${f}]`;
+        else {
+          const lines = buf.toString('utf-8').replace(/\n$/, '').split('\n');
+          return `diff --git a/${f} b/${f}\nnew file mode 100644\n--- /dev/null\n+++ b/${f}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => '+' + l).join('\n')}`;
+        }
+      } catch {
+        body = `+[New file: ${f}]`;
+      }
+      return `diff --git a/${f} b/${f}\nnew file mode 100644\n--- /dev/null\n+++ b/${f}\n@@ -0,0 +1 @@\n${body}`;
+    })
+    .join('\n');
+}
+
+/**
+ * Keeps a Vulgr-owned path (run logs, sandboxes) out of `git status` by adding
+ * it to the repo's local `.git/info/exclude`, never touching the user's .gitignore.
+ */
+export function excludeFromGit(cwd: string, pattern: string): void {
+  try {
+    let gitDir = execSync('git rev-parse --git-common-dir', {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (!isAbsolute(gitDir)) gitDir = join(cwd, gitDir);
+    const excludePath = join(gitDir, 'info', 'exclude');
+    const current = existsSync(excludePath) ? readFileSync(excludePath, 'utf-8') : '';
+    if (current.split('\n').some((l) => l.trim() === pattern)) return;
+    mkdirSync(dirname(excludePath), { recursive: true });
+    appendFileSync(excludePath, `${current && !current.endsWith('\n') ? '\n' : ''}${pattern}\n`);
+  } catch {
+    // Not a git repo, or git missing: nothing to keep clean.
+  }
 }
 
 export class GitUtils {
@@ -80,11 +133,7 @@ export class GitUtils {
 
       let combinedDiff = [staged, unstaged].filter(Boolean).join('\n');
       if (untracked) {
-        const untrackedNotes = untracked
-          .split('\n')
-          .filter(Boolean)
-          .map((f) => `--- /dev/null\n+++ b/${f}\n@@ -0,0 +1 @@\n+[New untracked file: ${f}]`)
-          .join('\n');
+        const untrackedNotes = untrackedAsDiff(this.cwd, untracked);
         combinedDiff = combinedDiff ? `${combinedDiff}\n${untrackedNotes}` : untrackedNotes;
       }
 
@@ -142,12 +191,8 @@ export class GitUtils {
 
       let combinedDiff = [staged, unstaged].filter(Boolean).join('\n');
 
-      // If untracked files exist, note them
       if (untracked) {
-        const untrackedList = untracked.split('\n').filter(Boolean);
-        const untrackedNotes = untrackedList
-          .map((f) => `--- /dev/null\n+++ b/${f}\n@@ -0,0 +1 @@\n+[New untracked file: ${f}]`)
-          .join('\n');
+        const untrackedNotes = untrackedAsDiff(this.cwd, untracked);
         combinedDiff = combinedDiff ? `${combinedDiff}\n${untrackedNotes}` : untrackedNotes;
       }
 

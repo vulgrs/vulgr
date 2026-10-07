@@ -76,6 +76,8 @@ const AGENTS: OptionItem[] = [
   { value: 'claude', label: 'Claude Code' },
   { value: 'agy', label: 'AGY' },
   { value: 'codex', label: 'Codex CLI' },
+  { value: 'opencode', label: 'OpenCode' },
+  { value: 'cursor', label: 'Cursor Agent' },
   { value: 'gemini', label: 'Gemini CLI' },
 ];
 
@@ -86,6 +88,8 @@ const AGENT_META: Record<string, { icon: LucideIcon; label: string }> = {
   agy: { icon: ShieldIcon, label: 'AGY' },
   gemini: { icon: BotIcon, label: 'Gemini' },
   codex: { icon: BotIcon, label: 'Codex' },
+  opencode: { icon: BotIcon, label: 'OpenCode' },
+  cursor: { icon: BotIcon, label: 'Cursor Agent' },
   orchestrator: { icon: TerminalIcon, label: 'Vulgr' },
   broadcast: { icon: TerminalIcon, label: '' },
 };
