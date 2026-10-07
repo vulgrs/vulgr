@@ -14,3 +14,8 @@ dist/
 release/
 *.tgz
 /docs-site/assets/
+
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md
