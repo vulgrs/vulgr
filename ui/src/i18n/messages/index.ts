@@ -17,3 +17,4 @@ export { onboarding } from './onboarding.js';
 export { agentSetup } from './agentSetup.js';
 export { flow } from './flow.js';
 export { orchestra } from './orchestra.js';
+export { update } from './update.js';

@@ -13,3 +13,9 @@ dist/
 .warp-config.json
 release/
 *.tgz
+/docs-site/assets/
+
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md

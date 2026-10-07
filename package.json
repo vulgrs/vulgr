@@ -22,6 +22,7 @@
     "postinstall": "node -e \"if (process.platform !== 'win32') { const fs = require('fs'), glob = ['prebuilds/darwin-arm64/spawn-helper', 'prebuilds/darwin-x64/spawn-helper']; glob.forEach(p => { const full = 'node_modules/node-pty/' + p; if (fs.existsSync(full)) { try { fs.chmodSync(full, 0o755); } catch {} } }); }\"",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -58,6 +59,7 @@
     "cn": "^0.4.0",
     "commander": "^13.1.0",
     "dotenv": "^18.0.1",
+    "electron-updater": "^6.8.9",
     "next-themes": "^0.4.6",
     "node-pty": "^1.1.0",
     "openai": "^7.20.0",
@@ -175,6 +177,22 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Vulgr",
       "artifactName": "Vulgr-Setup-${version}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "Open-source terminal for AI coding agents"
+    },
+    "appImage": {
+      "artifactName": "Vulgr-${version}-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",
