@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { excludeFromGit } from '../git/gitUtils.js';
 import type { RunManifest, AuditLogEntry } from '../types/index.js';
 
 export class ContextBus {
@@ -12,6 +13,8 @@ export class ContextBus {
   constructor(workspaceDir: string = process.cwd()) {
     this.baseDir = join(workspaceDir, '.ai-bridge');
     this.ensureDir(this.baseDir);
+    // Run logs are Vulgr's, not the project's: keep them out of diffs and commits.
+    excludeFromGit(workspaceDir, '.ai-bridge/');
   }
 
   private ensureDir(dir: string): void {

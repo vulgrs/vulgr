@@ -26,6 +26,7 @@ export const agentSetup = ns(
     notFoundAfter: (name: string) =>
       `${name} finished installing but isn’t on PATH yet. Open a new terminal, or restart Vulgr.`,
     runInTerminal: 'Run in terminal',
+    notInstalledToast: (name: string) => `${name} isn't installed yet — install it here first`,
     open: 'Install agents',
     settingsTitle: 'AI agents',
     settingsDescription: 'Install or sign in to Claude Code, Codex, OpenCode, Antigravity and Cursor Agent.',
@@ -55,6 +56,7 @@ export const agentSetup = ns(
     notFoundAfter: (name: string) =>
       `${name} kuruldu ama henüz PATH’te görünmüyor. Yeni bir terminal aç ya da Vulgr’ı yeniden başlat.`,
     runInTerminal: 'Terminalde çalıştır',
+    notInstalledToast: (name: string) => `${name} henüz kurulu değil — önce buradan kur`,
     open: 'Ajanları kur',
     settingsTitle: 'Yapay zekâ ajanları',
     settingsDescription: 'Claude Code, Codex, OpenCode, Antigravity ve Cursor Agent’ı kur ya da giriş yap.',

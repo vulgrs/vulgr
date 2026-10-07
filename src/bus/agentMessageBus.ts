@@ -1,11 +1,13 @@
 import { existsSync, mkdirSync, writeFileSync, appendFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { excludeFromGit } from '../git/gitUtils.js';
 
-export type AgentRole = 'claude' | 'agy' | 'gemini' | 'codex' | 'orchestrator';
+export type AgentRole = 'claude' | 'agy' | 'gemini' | 'codex' | 'opencode' | 'cursor' | 'orchestrator';
 
 export type MessageType =
   | 'USER_TASK'             // Orchestrator -> Builder
+  | 'TESTS_WRITTEN'         // Verifier -> Builder (tests written from the goal)
   | 'CODE_READY'            // Builder -> Verifier
   | 'VERIFICATION_FAILED'   // Verifier -> Builder (compiler errors, test failures)
   | 'VERIFICATION_PASSED'   // Verifier -> Auditor
@@ -47,6 +49,8 @@ export class AgentMessageBus {
     if (!existsSync(this.busDir)) {
       mkdirSync(this.busDir, { recursive: true });
     }
+    // Keep the message log out of the diff the agents review and out of commits.
+    excludeFromGit(workspaceDir, '.ai-bridge/');
     this.messagesFile = join(this.busDir, 'messages.jsonl');
   }
 

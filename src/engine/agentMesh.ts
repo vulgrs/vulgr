@@ -8,13 +8,17 @@ import { WorktreeManager, type SandboxSession } from '../git/worktreeManager.js'
 import { logger } from '../utils/logger.js';
 import { ContextOptimizer } from './contextOptimizer.js';
 import { MemoryStore } from './memoryStore.js';
+import { buildTestPlanPrompt, parseTestCommand, detectTestCommand } from './testPlan.js';
 import type { ICliAdapter, CliExecutionResult } from '../types/index.js';
 
 const execAsync = promisify(exec);
 
+/** Diff lines a reviewing agent gets: it is told not to read files, so it must see the code itself. */
+const REVIEW_DIFF_LINES = 1500;
+
 /** Where a run currently is, for a live progress line in the UI. */
 export interface AgentMeshStatus {
-  stage: 'checking' | 'building' | 'verifying' | 'diagnosing' | 'repairing' | 'auditing' | 'done' | 'failed';
+  stage: 'checking' | 'planning' | 'building' | 'verifying' | 'diagnosing' | 'repairing' | 'auditing' | 'done' | 'failed';
   agent?: string;
   round: number;
   maxRounds: number;
@@ -25,6 +29,7 @@ export interface AgentMeshOptions {
   builder?: string;     // e.g. 'claude'
   verifier?: string;    // e.g. 'agy'
   auditor?: string;     // e.g. 'claude'
+  /** Command that must exit 0. Empty: the verifier writes tests from the goal and names the command. */
   verifyCmd?: string;
   maxRounds?: number;   // default: 3
   timeoutMs?: number;   // per agent call
@@ -53,6 +58,8 @@ const AGENT_LABELS: Record<string, string> = {
   claude: 'Claude',
   agy: 'AGY',
   codex: 'Codex',
+  opencode: 'OpenCode',
+  cursor: 'Cursor Agent',
   gemini: 'Gemini',
   mock: 'Mock',
 };
@@ -70,9 +77,17 @@ const MESH_TEXT = {
     missingAgents: (names: string) =>
       `Agent not installed: ${names}. Choose an agent installed on this computer or install that tool first.`,
     taskGiven: (agent: string, goal: string) => `Task given to ${agent}: "${goal}"`,
+    planningTests: (agent: string) => `${agent} is writing tests for the goal...`,
+    testsWritten: (agent: string, files: number, cmd: string) =>
+      `${agent} wrote tests for the goal (${files} file${files === 1 ? '' : 's'}). They run with "${cmd}".`,
+    testsNotWritten: (agent: string, cmd: string) => `${agent} wrote no new tests; the project's "${cmd}" will be used.`,
+    noTestCommand: (agent: string) =>
+      `${agent} wrote no tests and this project has no test command. Enter a test command and start again.`,
     building: (agent: string) => `${agent} is writing the code...`,
     buildFailed: (agent: string, tail: string) => `${agent} could not complete the task: ${tail}`,
     codeWritten: (agent: string, files: number) => `${agent} wrote the code (${files} files changed).`,
+    stoppedWithChanges: (agent: string, reason: string) =>
+      `${agent} stopped early (${reason}) but changed files; the tests decide whether the work is done.`,
     verifying: (cmd: string, round: number, max: number) => `Running "${cmd}" (round ${round}/${max})...`,
     verifyPassed: (cmd: string, round: number) => `"${cmd}" passed (round ${round}).`,
     diagnosing: (agent: string) => `${agent} is investigating the error...`,
@@ -98,10 +113,18 @@ const MESH_TEXT = {
     checking: 'Seçilen ajanların kurulu olduğu kontrol ediliyor...',
     missingAgents: (names: string) =>
       `Kurulu olmayan ajan: ${names}. Bu bilgisayarda kurulu bir ajan seçin ya da önce o aracı kurun.`,
-    taskGiven: (agent: string, goal: string) => `Görev ${agent}'a verildi: "${goal}"`,
+    taskGiven: (agent: string, goal: string) => `${agent} görevi aldı: "${goal}"`,
+    planningTests: (agent: string) => `${agent} hedefe göre testleri yazıyor...`,
+    testsWritten: (agent: string, files: number, cmd: string) =>
+      `${agent} hedefe göre testleri yazdı (${files} dosya). "${cmd}" ile çalışacak.`,
+    testsNotWritten: (agent: string, cmd: string) => `${agent} yeni test yazmadı; projenin "${cmd}" komutu kullanılacak.`,
+    noTestCommand: (agent: string) =>
+      `${agent} test yazamadı ve bu projede bir test komutu yok. Bir test komutu girip tekrar başlatın.`,
     building: (agent: string) => `${agent} kodu yazıyor...`,
     buildFailed: (agent: string, tail: string) => `${agent} görevi tamamlayamadı: ${tail}`,
     codeWritten: (agent: string, files: number) => `${agent} kodu yazdı (${files} dosya değişti).`,
+    stoppedWithChanges: (agent: string, reason: string) =>
+      `${agent} yarıda kaldı (${reason}) ama dosyaları değiştirdi; işin bitip bitmediğine testler karar verecek.`,
     verifying: (cmd: string, round: number, max: number) => `"${cmd}" çalıştırılıyor (tur ${round}/${max})...`,
     verifyPassed: (cmd: string, round: number) => `"${cmd}" başarılı (tur ${round}).`,
     diagnosing: (agent: string) => `${agent} hatayı inceliyor...`,
@@ -137,13 +160,16 @@ export class AgentMesh {
   private readonly builderName: AgentRole;
   private readonly verifierName: AgentRole;
   private readonly auditorName: AgentRole;
-  private readonly verifyCmd: string;
+  private verifyCmd: string;
+  private readonly autoTests: boolean;
   private readonly maxRounds: number;
   private readonly timeoutMs: number;
   private readonly useSandbox: boolean;
   private readonly onMessage?: (message: AgentMessage) => void;
   private readonly onStatus?: (status: AgentMeshStatus) => void;
   private readonly text: (typeof MESH_TEXT)[MeshLang];
+  /** Appended to prompts whose reply is shown to the person, so it reads in their language. */
+  private readonly replyLang: string;
 
   constructor(options: AgentMeshOptions = {}) {
     this.cwd = options.cwd || process.cwd();
@@ -153,7 +179,8 @@ export class AgentMesh {
     this.builderName = (options.builder || 'claude').toLowerCase() as AgentRole;
     this.verifierName = (options.verifier || 'agy').toLowerCase() as AgentRole;
     this.auditorName = (options.auditor || 'claude').toLowerCase() as AgentRole;
-    this.verifyCmd = options.verifyCmd || 'npm test';
+    this.verifyCmd = options.verifyCmd?.trim() || '';
+    this.autoTests = !this.verifyCmd;
     this.maxRounds = Math.max(1, options.maxRounds ?? 3);
     // Real coding turns routinely take several minutes.
     this.timeoutMs = options.timeoutMs ?? 15 * 60_000;
@@ -161,6 +188,7 @@ export class AgentMesh {
     this.onMessage = options.onMessage;
     this.onStatus = options.onStatus;
     this.text = MESH_TEXT[options.lang ?? 'tr'];
+    this.replyLang = (options.lang ?? 'tr') === 'tr' ? 'Write your reply in Turkish.' : '';
   }
 
   private status(stage: AgentMeshStatus['stage'], round: number, text: string, agent?: string) {
@@ -277,48 +305,98 @@ export class AgentMesh {
     const memory = new MemoryStore(this.cwd);
     const memorySnippet = memory.toPromptSnippet();
 
+    // The goal is the first thing in the feed, even when tests are written first.
+    await this.bus.publish(runId, 'orchestrator', this.builderName, 'USER_TASK', {
+      summary: this.text.taskGiven(label(this.builderName), goal),
+      details: goal,
+    });
+
+    // Stage 0: with no test command, the verifier first writes tests from the
+    // goal, so "done" means "does what was asked" rather than "nothing broke".
+    let testFiles: string[] = [];
+    if (this.autoTests) {
+      this.status('planning', 0, this.text.planningTests(label(this.verifierName)), this.verifierName);
+      logger.model(this.verifierName, 'Writing tests for the goal...');
+      const planExec = await verifierAdapter.execute(buildTestPlanPrompt(goal, [memorySnippet, this.replyLang]), {
+        cwd: activeCwd,
+        timeoutMs: this.timeoutMs,
+        allowEdits: true,
+        onStdout: (chunk) => logger.streamChunk(chunk),
+      });
+      const planned = planExec.exitCode === 0 && !planExec.timedOut ? parseTestCommand(planExec.stdout) : null;
+      const testDiff = activeGit.getDiff();
+      testFiles = testDiff.filesChanged;
+      this.verifyCmd = planned || detectTestCommand(activeCwd) || '';
+      if (!this.verifyCmd) {
+        return fail(this.text.noTestCommand(label(this.verifierName)), 0, activeGit, sandboxSession);
+      }
+      await this.bus.publish(runId, this.verifierName, this.builderName, 'TESTS_WRITTEN', {
+        summary: testFiles.length
+          ? this.text.testsWritten(label(this.verifierName), testFiles.length, this.verifyCmd)
+          : this.text.testsNotWritten(label(this.verifierName), this.verifyCmd),
+        details: planExec.stdout.trim().slice(-2000) || undefined,
+        gitDiff: ContextOptimizer.optimizeDiff(testDiff.diff, REVIEW_DIFF_LINES),
+        filesChanged: testFiles,
+      });
+    }
+
     // Stage 1: Builder implements the goal.
     const taskDetails = [
       goal,
       '',
       'Make the code changes directly in this repository. Do not ask questions; make reasonable assumptions.',
+      testFiles.length
+        ? [
+            `${label(this.verifierName)} already wrote tests for this goal: ${testFiles.join(', ')}. Make them pass.`,
+            'Do not delete or weaken these tests. If one is genuinely wrong, fix it and say why in your summary.',
+          ].join('\n')
+        : '',
+      `Your work will be checked with: ${this.verifyCmd}`,
       'When you are done, reply with a short summary of what you changed.',
       '',
       memorySnippet,
     ].join('\n');
-    await this.bus.publish(runId, 'orchestrator', this.builderName, 'USER_TASK', {
-      summary: this.text.taskGiven(label(this.builderName), goal),
-      details: taskDetails,
-    });
     this.status('building', 1, this.text.building(label(this.builderName)), this.builderName);
     logger.model(this.builderName, 'Writing code autonomously...');
+    const diffBeforeBuild = activeGit.getDiff().diff;
     const buildExec = await builderAdapter.execute(taskDetails, {
       cwd: activeCwd,
       timeoutMs: this.timeoutMs,
       allowEdits: true,
       onStdout: (chunk) => logger.streamChunk(chunk),
     });
-    if (buildExec.exitCode !== 0 || buildExec.timedOut) {
+    // An agent can hang or time out after finishing the edits; if it changed
+    // files, the tests decide whether the work is done.
+    const diffInitial = activeGit.getDiff();
+    const buildStopped = buildExec.exitCode !== 0 || buildExec.timedOut;
+    if (buildStopped && diffInitial.diff === diffBeforeBuild) {
       return fail(this.text.buildFailed(label(this.builderName), failureTail(buildExec, this.text)), 1, activeGit, sandboxSession);
     }
 
-    const diffInitial = activeGit.getDiff();
     await this.bus.publish(runId, this.builderName, this.verifierName, 'CODE_READY', {
-      summary: this.text.codeWritten(label(this.builderName), diffInitial.filesChanged.length),
+      summary: buildStopped
+        ? this.text.stoppedWithChanges(label(this.builderName), failureTail(buildExec, this.text).split('\n').pop() ?? '')
+        : this.text.codeWritten(label(this.builderName), diffInitial.filesChanged.length),
       details: buildExec.stdout.trim().slice(-2000),
       gitDiff: ContextOptimizer.optimizeDiff(diffInitial.diff),
       filesChanged: diffInitial.filesChanged,
     });
 
-    // Stage 2: Verify, and on failure let the verifier diagnose and the builder repair.
+    // Stage 2+3: verify; on failure the verifier diagnoses and the builder
+    // repairs. Once tests pass the auditor reviews the diff, and a rejection
+    // also goes back to the builder while rounds are left.
     let verificationPassed = false;
     let currentRound = 1;
+    let audit: AgentMeshResult['audit'] = 'skipped';
+    let auditNotes = '';
+    let finalDiff = activeGit.getDiff();
 
     for (; currentRound <= this.maxRounds; currentRound++) {
       this.status('verifying', currentRound, this.text.verifying(this.verifyCmd, currentRound, this.maxRounds));
       const verifyResult = await this.runVerificationCmd(activeCwd);
       memory.recordCommand(this.verifyCmd, verifyResult.exitCode, undefined, verifyResult.success ? 'Verification passed' : 'Verification failed');
 
+      let repairPrompt: string;
       if (verifyResult.success) {
         verificationPassed = true;
         await this.bus.publish(runId, this.verifierName, this.auditorName, 'VERIFICATION_PASSED', {
@@ -326,107 +404,122 @@ export class AgentMesh {
           gitDiff: ContextOptimizer.optimizeDiff(activeGit.getDiff().diff),
         });
         logger.success(`[${this.verifierName} -> ${this.auditorName}]: VERIFICATION_PASSED!`);
-        break;
+
+        // The auditor reviews the final diff (read-only).
+        this.status('auditing', currentRound, this.text.auditing(label(this.auditorName)), this.auditorName);
+        finalDiff = activeGit.getDiff();
+        const auditPrompt = [
+          `You are ${label(this.auditorName)}, reviewing code written by ${label(this.builderName)} for the goal "${goal}". Tests already pass.`,
+          testFiles.length
+            ? `${label(this.verifierName)} wrote the tests (${testFiles.join(', ')}) from the goal before the code; flag it if they were deleted or weakened.`
+            : '',
+          'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Look for bugs, security problems and missed requirements in this git diff:',
+          ContextOptimizer.optimizeDiff(finalDiff.diff, REVIEW_DIFF_LINES),
+          '',
+          'End your reply with exactly one line: "VERDICT: APPROVED" or "VERDICT: REJECTED: <reason>".',
+          this.replyLang ? `${this.replyLang} Keep the VERDICT line in English.` : '',
+        ].join('\n');
+
+        const auditExec = await auditorAdapter.execute(auditPrompt, { cwd: activeCwd, timeoutMs: this.timeoutMs });
+        // Only an explicit verdict counts: a reply without one (e.g. the agent was
+        // blocked from a tool and printed nothing useful) is not an approval.
+        const auditRan = auditExec.exitCode === 0 && !auditExec.timedOut;
+        audit = 'skipped';
+        if (auditRan && /VERDICT:\s*REJECTED/i.test(auditExec.stdout)) audit = 'rejected';
+        else if (auditRan && /VERDICT:\s*APPROVED/i.test(auditExec.stdout)) audit = 'approved';
+        auditNotes = auditExec.stdout.trim();
+        const skippedReason = auditRan ? this.text.auditNoVerdict : this.text.auditCouldNotRun(failureTail(auditExec, this.text));
+
+        if (audit !== 'rejected') {
+          await this.bus.publish(runId, this.auditorName, 'orchestrator', 'CONSENSUS_APPROVED', {
+            summary:
+              audit === 'skipped'
+                ? this.text.auditSkipped(label(this.auditorName), skippedReason)
+                : this.text.auditApproved(label(this.auditorName)),
+            details: auditNotes,
+            gitDiff: finalDiff.diff,
+          });
+          logger.success(`[${this.auditorName} -> orchestrator]: CONSENSUS_APPROVED! Full multi-agent consensus achieved.`);
+          break;
+        }
+
+        await this.bus.publish(runId, this.auditorName, this.builderName, 'SECURITY_CONCERN', {
+          summary: this.text.auditRejected(label(this.auditorName)),
+          details: auditNotes,
+        });
+        logger.warn(`[${this.auditorName} -> ${this.builderName}]: SECURITY_CONCERN flagged.`);
+        if (currentRound === this.maxRounds) break;
+
+        repairPrompt = [
+          `The goal is still: "${goal}". Tests pass, but ${label(this.auditorName)} reviewed your changes and rejected them:`,
+          auditNotes,
+          '',
+          'Address these points with the smallest correct change, keep the tests passing, and add tests for any bug you fix. Do not ask questions.',
+        ].join('\n');
+      } else {
+        // The verifier agent reads the failure and tells the builder what to fix.
+        this.status('diagnosing', currentRound, this.text.diagnosing(label(this.verifierName)), this.verifierName);
+        const diagnosePrompt = [
+          `You are reviewing work by another coding agent. The goal was: "${goal}".`,
+          `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
+          verifyResult.output,
+          '',
+          'Current changes (git diff):',
+          ContextOptimizer.optimizeDiff(activeGit.getDiff().diff, REVIEW_DIFF_LINES),
+          '',
+          'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Explain the root cause in 2-3 sentences, then list the concrete fixes the other agent should make.',
+          this.replyLang,
+        ].join('\n');
+        const diagnosis = await verifierAdapter.execute(diagnosePrompt, { cwd: activeCwd, timeoutMs: this.timeoutMs });
+        const diagnosisText = diagnosis.exitCode === 0 ? diagnosis.stdout.trim() : '';
+
+        await this.bus.publish(runId, this.verifierName, this.builderName, 'VERIFICATION_FAILED', {
+          summary: this.text.verifyFailed(this.verifyCmd, verifyResult.exitCode),
+          errorTrace: verifyResult.output,
+          details: diagnosisText || undefined,
+        });
+
+        if (currentRound === this.maxRounds) break;
+
+        repairPrompt = [
+          `The goal is still: "${goal}".`,
+          `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
+          verifyResult.output,
+          diagnosisText ? `\nReview from ${label(this.verifierName)}:\n${diagnosisText}` : '',
+          '',
+          'Fix the problem with the smallest correct change. Do not ask questions.',
+        ].join('\n');
       }
 
-      // The verifier agent reads the failure and tells the builder what to fix.
-      this.status('diagnosing', currentRound, this.text.diagnosing(label(this.verifierName)), this.verifierName);
-      const diagnosePrompt = [
-        `You are reviewing work by another coding agent. The goal was: "${goal}".`,
-        `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
-        verifyResult.output,
-        '',
-        'Current changes (git diff):',
-        ContextOptimizer.optimizeDiff(activeGit.getDiff().diff),
-        '',
-        'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Explain the root cause in 2-3 sentences, then list the concrete fixes the other agent should make.',
-      ].join('\n');
-      const diagnosis = await verifierAdapter.execute(diagnosePrompt, { cwd: activeCwd, timeoutMs: this.timeoutMs });
-      const diagnosisText = diagnosis.exitCode === 0 ? diagnosis.stdout.trim() : '';
-
-      await this.bus.publish(runId, this.verifierName, this.builderName, 'VERIFICATION_FAILED', {
-        summary: this.text.verifyFailed(this.verifyCmd, verifyResult.exitCode),
-        errorTrace: verifyResult.output,
-        details: diagnosisText || undefined,
-      });
-
-      if (currentRound === this.maxRounds) break;
-
       this.status('repairing', currentRound + 1, this.text.repairing(label(this.builderName), currentRound + 1, this.maxRounds), this.builderName);
-      logger.model(this.builderName, `Autonomously repairing errors reported by ${this.verifierName}...`);
-      const repairPrompt = [
-        `The goal is still: "${goal}".`,
-        `The verification command "${this.verifyCmd}" failed with exit code ${verifyResult.exitCode}:`,
-        verifyResult.output,
-        diagnosisText ? `\nReview from ${label(this.verifierName)}:\n${diagnosisText}` : '',
-        '',
-        'Fix the problem with the smallest correct change. Do not ask questions.',
-      ].join('\n');
-
+      logger.model(this.builderName, 'Autonomously repairing the reported problems...');
+      const diffBeforeRepair = activeGit.getDiff().diff;
       const repairExec = await builderAdapter.execute(repairPrompt, {
         cwd: activeCwd,
         timeoutMs: this.timeoutMs,
         allowEdits: true,
         onStdout: (chunk) => logger.streamChunk(chunk),
       });
-      if (repairExec.exitCode !== 0 || repairExec.timedOut) {
+      const diffAfterPatch = activeGit.getDiff();
+      const repairStopped = repairExec.exitCode !== 0 || repairExec.timedOut;
+      if (repairStopped && diffAfterPatch.diff === diffBeforeRepair) {
         return fail(this.text.repairFailed(label(this.builderName), failureTail(repairExec, this.text)), currentRound + 1, activeGit, sandboxSession);
       }
 
-      const diffAfterPatch = activeGit.getDiff();
       await this.bus.publish(runId, this.builderName, this.verifierName, 'PATCH_APPLIED', {
-        summary: this.text.patchApplied(label(this.builderName)),
+        summary: repairStopped
+          ? this.text.stoppedWithChanges(label(this.builderName), failureTail(repairExec, this.text).split('\n').pop() ?? '')
+          : this.text.patchApplied(label(this.builderName)),
         details: repairExec.stdout.trim().slice(-2000),
         gitDiff: diffAfterPatch.diff,
         filesChanged: diffAfterPatch.filesChanged,
       });
+      verificationPassed = false;
     }
+    currentRound = Math.min(currentRound, this.maxRounds);
 
     if (!verificationPassed) {
-      return fail(
-        this.text.outOfRounds(this.maxRounds),
-        Math.min(currentRound, this.maxRounds),
-        activeGit,
-        sandboxSession
-      );
-    }
-
-    // Stage 3: Auditor reviews the final diff (read-only).
-    this.status('auditing', currentRound, this.text.auditing(label(this.auditorName)), this.auditorName);
-    const finalDiff = activeGit.getDiff();
-    const auditPrompt = [
-      `You are ${label(this.auditorName)}, reviewing code written by ${label(this.builderName)} for the goal "${goal}". Tests already pass.`,
-      'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Look for bugs, security problems and missed requirements in this git diff:',
-      ContextOptimizer.optimizeDiff(finalDiff.diff),
-      '',
-      'End your reply with exactly one line: "VERDICT: APPROVED" or "VERDICT: REJECTED: <reason>".',
-    ].join('\n');
-
-    const auditExec = await auditorAdapter.execute(auditPrompt, { cwd: activeCwd, timeoutMs: this.timeoutMs });
-    // Only an explicit verdict counts: a reply without one (e.g. the agent was
-    // blocked from a tool and printed nothing useful) is not an approval.
-    const auditRan = auditExec.exitCode === 0 && !auditExec.timedOut;
-    let audit: AgentMeshResult['audit'] = 'skipped';
-    if (auditRan && /VERDICT:\s*REJECTED/i.test(auditExec.stdout)) audit = 'rejected';
-    else if (auditRan && /VERDICT:\s*APPROVED/i.test(auditExec.stdout)) audit = 'approved';
-    const skippedReason = auditRan ? this.text.auditNoVerdict : this.text.auditCouldNotRun(failureTail(auditExec, this.text));
-
-    if (audit === 'rejected') {
-      await this.bus.publish(runId, this.auditorName, this.builderName, 'SECURITY_CONCERN', {
-        summary: this.text.auditRejected(label(this.auditorName)),
-        details: auditExec.stdout.trim(),
-      });
-      logger.warn(`[${this.auditorName} -> ${this.builderName}]: SECURITY_CONCERN flagged.`);
-    } else {
-      await this.bus.publish(runId, this.auditorName, 'orchestrator', 'CONSENSUS_APPROVED', {
-        summary:
-          audit === 'skipped'
-            ? this.text.auditSkipped(label(this.auditorName), skippedReason)
-            : this.text.auditApproved(label(this.auditorName)),
-        details: auditExec.stdout.trim(),
-        gitDiff: finalDiff.diff,
-      });
-      logger.success(`[${this.auditorName} -> orchestrator]: CONSENSUS_APPROVED! Full multi-agent consensus achieved.`);
+      return fail(this.text.outOfRounds(this.maxRounds), currentRound, activeGit, sandboxSession);
     }
 
     this.status(
@@ -444,7 +537,7 @@ export class AgentMesh {
       durationMs: Date.now() - startTime,
       sandbox: sandboxSession,
       audit,
-      auditNotes: auditExec.stdout.trim().slice(-4000),
+      auditNotes: auditNotes.slice(-4000),
     };
   }
 }

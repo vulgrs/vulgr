@@ -16,6 +16,7 @@ import { GitUtils } from '../src/git/gitUtils.js';
 import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
 import { AgentMesh } from '../src/engine/agentMesh.js';
+import { Orchestra } from '../src/engine/orchestra.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
@@ -25,6 +26,7 @@ import { WorktreeManager } from '../src/git/worktreeManager.js';
 import { AutoSuggestEngine } from '../src/engine/autoSuggest.js';
 import { ConfigManager } from '../src/engine/configManager.js';
 import { SessionExporter } from '../src/engine/sessionExporter.js';
+import { buildTestPlanPrompt, parseTestCommand, detectTestCommand } from '../src/engine/testPlan.js';
 import { listAgentStatus, installAgent, cancelAgentInstall } from './agentInstaller.js';
 import { setupAutoUpdates } from './updater.js';
 
@@ -53,7 +55,13 @@ if (process.platform !== 'win32') {
 
 let mainWindow: BrowserWindow | null = null;
 let currentCwd = process.cwd();
-const configManager = new ConfigManager();
+// Settings live with the user, not in whatever folder the app was started from
+// (a packaged app starts in "/", which isn't writable).
+const configManager = new ConfigManager(
+  join(os.homedir(), '.vulgr'),
+  'config.json',
+  join(process.cwd(), '.warp-config.json')
+);
 const ptyManager = new PtyManager();
 ptyManager.setConfigManager(configManager);
 const claudeChatManager = new ClaudeChatManager();
@@ -467,13 +475,38 @@ function setupIpcHandlers() {
     }
   });
 
+  // Orchestra: one run at a time; Stop aborts every agent it started.
+  let orchestra: Orchestra | null = null;
+  ipcMain.handle('orchestra:run', async (_, { goal, planner, workers, reviewer, verifyCmd, maxParallel, maxRounds, cwd, lang }) => {
+    if (orchestra) return { success: false, applied: false, tasks: [], durationMs: 0, error: 'Another orchestra run is in progress.' };
+    orchestra = new Orchestra({
+      planner,
+      workers,
+      reviewer,
+      verifyCmd,
+      maxParallel,
+      maxRounds,
+      cwd: cwd || currentCwd,
+      lang: lang === 'en' ? 'en' : 'tr',
+      onEvent: (event) => mainWindow?.webContents.send('orchestra:event', event),
+    });
+    try {
+      return await orchestra.run(goal);
+    } catch (err: any) {
+      return { success: false, applied: false, tasks: [], durationMs: 0, error: err?.message || String(err) };
+    } finally {
+      orchestra = null;
+    }
+  });
+  ipcMain.handle('orchestra:stop', () => {
+    orchestra?.stop();
+    return true;
+  });
+
   // Which agent CLIs are installed, so the UI only offers ones that can run.
   ipcMain.handle('agents:available', async () => {
-    const names = ['claude', 'agy', 'codex', 'gemini'];
-    const entries = await Promise.all(
-      names.map(async (name) => [name, await AdapterFactory.getAdapter(name).isAvailable()] as const)
-    );
-    return Object.fromEntries(entries);
+    const [agents, gemini] = await Promise.all([listAgentStatus(), AdapterFactory.getAdapter('gemini').isAvailable()]);
+    return { ...Object.fromEntries(agents.map((a) => [a.id, a.installed])), gemini };
   });
 
   // Agent setup: which CLIs are installed, and installing them from inside the app.
@@ -541,6 +574,10 @@ function setupIpcHandlers() {
     return true;
   });
   ipcMain.handle('memory:promptSnippet', () => memoryStore.toPromptSnippet());
+
+  // Duo Loop without a test command: the checker writes tests from the goal.
+  ipcMain.handle('tests:planPrompt', (_, goal: string, extra: string[] = []) => buildTestPlanPrompt(goal, extra));
+  ipcMain.handle('tests:resolveCommand', (_, agentOutput = '') => parseTestCommand(agentOutput) ?? detectTestCommand(currentCwd));
 
   // Context & Token Optimizer Handlers
   ipcMain.handle('context:optimize', (_, { raw, options }) => ContextOptimizer.optimizeTerminalLog(raw, options));

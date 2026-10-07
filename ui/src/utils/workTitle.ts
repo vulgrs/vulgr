@@ -17,7 +17,8 @@ const clip = (text: string, max = MAX_TITLE) => {
  */
 export function describeCommand(command: string): WorkEntry | null {
   const cmd = command.trim();
-  if (!cmd) return null;
+  // Duo Loop's internal agent runs (prompt piped from a temp file) aren't the user's work.
+  if (!cmd || cmd.includes('vulgaris-squad')) return null;
   const words = cmd.split(/\s+/);
   const bin = words[0].replace(/^.*[\\/]/, '').replace(/\.exe$/i, '').toLowerCase();
   if (TRIVIAL.has(bin)) return null;

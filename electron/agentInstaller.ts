@@ -63,11 +63,11 @@ const RECIPES: AgentRecipe[] = [
     vendor: 'Google',
     bins: ['agy'],
     install: {
-      darwin: ['curl -fsSL https://antigravity.google/install.sh | bash'],
-      win32: ['irm https://antigravity.google/install.ps1 | iex'],
+      darwin: ['curl -fsSL https://antigravity.google/cli/install.sh | bash'],
+      win32: ['irm https://antigravity.google/cli/install.ps1 | iex'],
     },
     login: 'agy',
-    docs: 'https://antigravity.google',
+    docs: 'https://antigravity.google/docs/cli',
   },
   {
     id: 'cursor',

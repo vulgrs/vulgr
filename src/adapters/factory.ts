@@ -3,6 +3,8 @@ import { ClaudeAdapter } from './claude.js';
 import { GeminiAdapter } from './gemini.js';
 import { AgyAdapter } from './agy.js';
 import { CodexAdapter } from './codex.js';
+import { OpenCodeAdapter } from './opencode.js';
+import { CursorAgentAdapter } from './cursor.js';
 import { MockCliAdapter } from './mock.js';
 
 export class AdapterFactory {
@@ -11,6 +13,8 @@ export class AdapterFactory {
     ['gemini', (cfg) => new GeminiAdapter(cfg)],
     ['agy', (cfg) => new AgyAdapter(cfg)],
     ['codex', (cfg) => new CodexAdapter(cfg)],
+    ['opencode', (cfg) => new OpenCodeAdapter(cfg)],
+    ['cursor', (cfg) => new CursorAgentAdapter(cfg)],
     ['mock', () => new MockCliAdapter('mock')],
   ]);
 

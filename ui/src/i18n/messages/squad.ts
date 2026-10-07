@@ -4,6 +4,8 @@ import { ns } from '../ns.js';
 export const squad = ns(
   {
     building: (agent: string) => `${agent} is writing the code...`,
+    planningTests: (agent: string) => `${agent} is writing tests for the goal...`,
+    noTestCommand: 'No tests were written and this project has no test command. Enter a test command and start again.',
     repairing: (agent: string, round: number, max: number) =>
       `${agent} is fixing based on the feedback (round ${round}/${max})...`,
     builderFailed: (agent: string) =>
@@ -21,6 +23,8 @@ export const squad = ns(
   },
   {
     building: (agent: string) => `${agent} kodu yazıyor...`,
+    planningTests: (agent: string) => `${agent} hedefe göre testleri yazıyor...`,
+    noTestCommand: 'Test yazılamadı ve bu projede bir test komutu yok. Bir test komutu girip tekrar başlatın.',
     repairing: (agent: string, round: number, max: number) =>
       `${agent} geri bildirime göre düzeltiyor (tur ${round}/${max})...`,
     builderFailed: (agent: string) =>
