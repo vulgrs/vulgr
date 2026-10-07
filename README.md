@@ -21,7 +21,16 @@
 
 ## Download
 
-Grab the latest build from [Releases](https://github.com/vulgrs/vulgr/releases): `Vulgr-<version>-arm64.dmg` (Apple Silicon), `Vulgr-<version>-x64.dmg` (Intel Mac) or `Vulgr-Setup-<version>.exe` (Windows). Beta builds are not code-signed yet — on macOS, right-click the app and choose **Open** the first time; on Windows, choose **More info → Run anyway**.
+Download it from [vulgr.tech](https://vulgr.tech), which picks the right file for your computer, or grab it from [Releases](https://github.com/vulgrs/vulgr/releases):
+
+- `Vulgr-<version>-arm64.dmg` — macOS, Apple Silicon
+- `Vulgr-<version>-x64.dmg` — macOS, Intel
+- `Vulgr-Setup-<version>.exe` — Windows
+- `Vulgr-<version>-x86_64.AppImage` — Linux (`chmod +x` it, then run it)
+
+Beta builds are not code-signed yet — on macOS, right-click the app and choose **Open** the first time (or **System Settings → Privacy & Security → Open Anyway**); on Windows, choose **More info → Run anyway**.
+
+**Updates:** the Windows and Linux (AppImage) apps check for new versions on launch, download them in the background and offer **Restart and update**. On macOS, unsigned apps cannot update themselves, so Vulgr shows a notice that links to the new release instead.
 
 Or install it with npm and start it with `vulgr`:
 
@@ -45,7 +54,7 @@ vulgr
 
 ## Requirements
 
-- macOS or Windows (Linux should work but is not tested yet)
+- macOS, Windows or Linux
 - [Node.js](https://nodejs.org) 20 or newer
 - Build tools for the native terminal module (`node-pty`): Xcode Command Line Tools on macOS, the "Desktop development with C++" workload on Windows
 - The agent CLIs you want to use, installed and signed in: [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Codex CLI, AGY / Gemini CLI
@@ -68,9 +77,11 @@ npm run dev:app    # start the UI dev server and the app
 | --- | --- |
 | `npm run dev:app` | Vite dev server + Electron, with hot reload for the UI |
 | `npm run build` | Type-check and build everything into `dist/` |
-| `npm run dist:mac` / `npm run dist:win` | Package the app into a DMG / Windows installer under `release/` |
+| `npm run dist:mac` / `npm run dist:win` / `npm run dist:linux` | Package the app into a DMG / Windows installer / AppImage under `release/` |
 | `npm run type-check` | Type-check the main process and the UI |
 | `npm test` | Run the engine tests (after `npm run build`) |
+
+Releases are built by GitHub Actions: bump `version` in `package.json`, then push a matching tag (`git tag v0.2.0-beta && git push origin v0.2.0-beta`). `.github/workflows/release.yml` builds the macOS, Windows and Linux installers and attaches them, with the update files, to the GitHub Release for that tag.
 
 Project layout:
 
