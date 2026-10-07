@@ -1,4 +1,4 @@
-export type SessionType = 'claude' | 'agy' | 'codex' | 'shell';
+export type SessionType = 'claude' | 'agy' | 'codex' | 'opencode' | 'cursor' | 'shell';
 
 export interface TerminalSession {
   id: string;

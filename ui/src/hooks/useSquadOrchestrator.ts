@@ -31,6 +31,8 @@ const AGENT_LABELS: Partial<Record<SessionType, string>> = {
   claude: 'Claude',
   agy: 'AGY',
   codex: 'Codex',
+  opencode: 'OpenCode',
+  cursor: 'Cursor',
   shell: 'Terminal',
 };
 export const squadAgentLabel = (type: SessionType) => AGENT_LABELS[type] ?? type;

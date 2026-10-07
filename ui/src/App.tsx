@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 import { TopBar } from './components/TopBar.js';
 import { PaneGrid } from './components/PaneGrid.js';
 import { PaneToolbar } from './components/PaneToolbar.js';
@@ -191,6 +192,8 @@ export const App: React.FC = () => {
     runInPane: (sessionId, command) =>
       new Promise<PaneRunResult>((resolve) => {
         paneWaiters.current[sessionId] = resolve;
+        // Ctrl+U clears anything left on the prompt line by the previous step.
+        if (!/Windows/i.test(navigator.userAgent)) window.warpApi?.writeTerminal(sessionId, '\x15');
         dispatchToShell(sessionId, command);
       }),
     buildAgentRun: async (agent, prompt, { allowEdits }) => {
@@ -199,9 +202,11 @@ export const App: React.FC = () => {
         shell = (await window.warpApi?.getConfig?.())?.defaultShell || shell;
       } catch {}
       const base = await buildAgentCommand(agent);
-      // agy only takes its prompt as an argument; Windows PowerShell 5.1 mangles
-      // double quotes inside native arguments, so swap them for single quotes.
-      const text = agent === 'agy' ? prompt.replace(/"/g, "'") : prompt;
+      // agy, opencode and cursor-agent only take the prompt as an argument;
+      // Windows PowerShell 5.1 mangles double quotes inside native arguments,
+      // so swap them for single quotes.
+      const promptAsArg = agent === 'agy' || agent === 'opencode' || agent === 'cursor';
+      const text = promptAsArg ? prompt.replace(/"/g, "'") : prompt;
       const file: string = await window.warpApi.writeSquadPrompt(text);
       const read =
         shell === 'powershell'
@@ -210,11 +215,22 @@ export const App: React.FC = () => {
             ? `type "${file}"`
             : `cat '${file}'`;
 
-      if (agent === 'agy') {
-        const flags = allowEdits ? ' --mode accept-edits' : '';
-        if (shell === 'powershell') return `${base} -p (${read})${flags}`;
-        if (shell === 'cmd') return `${base} -p "${text.replace(/\s+/g, ' ').slice(0, 7000)}"${flags}`;
-        return `${base} -p "$(${read})"${flags}`;
+      if (promptAsArg) {
+        // How each CLI runs one prompt and exits, and how it is allowed to edit files.
+        const [head, flags] =
+          agent === 'agy'
+            ? // Headless agy can't ask for permission and abandons the turn when a
+              // tool (e.g. running the tests) needs it, so a writer gets every tool
+              // approved, inside agy's own terminal sandbox.
+              [`${base} -p`, allowEdits ? ' --sandbox --dangerously-skip-permissions' : '']
+            : agent === 'opencode'
+              ? [`${base} run`, '']
+              : [`${base} -p`, allowEdits ? ' --force' : ''];
+        if (shell === 'powershell') return `${head} (${read})${flags}`;
+        if (shell === 'cmd') return `${head} "${text.replace(/\s+/g, ' ').slice(0, 7000)}"${flags}`;
+        // No stdin: the prompt is an argument, and an agent holding the pane's
+        // terminal can leave stray text in it that the next command would run.
+        return `${head} "$(${read})"${flags} </dev/null`;
       }
       const run =
         agent === 'claude'
@@ -451,21 +467,35 @@ export const App: React.FC = () => {
   // prompt was and the dock steps aside until they exit.
   const AGENT_TITLES: Partial<Record<SessionType, string>> = {
     claude: 'Claude Code',
-    agy: 'Claude Code (Verifier)',
-    codex: 'Claude Code (Auditor)',
+    agy: 'Antigravity',
+    codex: 'Codex',
+    opencode: 'OpenCode',
+    cursor: 'Cursor Agent',
   };
 
+  /** The agent's own CLI, with the flags set in Settings. */
   const buildAgentCommand = async (type: SessionType): Promise<string> => {
-    const resolvedType = (type === 'agy' || type === 'codex') ? 'claude' : type;
-    if (resolvedType !== 'claude') return resolvedType;
-    const flags: string[] = [];
-    try {
-      const claude = (await window.warpApi?.getConfig?.())?.claude;
-      if (claude?.skipPermissions) flags.push('--dangerously-skip-permissions');
-      if (claude?.model && claude.model !== 'default') flags.push('--model', claude.model);
-      if (Array.isArray(claude?.additionalFlags)) flags.push(...claude.additionalFlags);
-    } catch {}
-    return ['claude', ...flags].join(' ');
+    if (type === 'shell') return '';
+    const config = await window.warpApi?.getConfig?.().catch(() => null);
+    const extra = (list: unknown) => (Array.isArray(list) ? (list as string[]) : []);
+    switch (type) {
+      case 'claude': {
+        const claude = config?.claude;
+        const flags: string[] = [];
+        if (claude?.skipPermissions) flags.push('--dangerously-skip-permissions');
+        if (claude?.model && claude.model !== 'default') flags.push('--model', claude.model);
+        return ['claude', ...flags, ...extra(claude?.additionalFlags)].join(' ');
+      }
+      // Model names change too often to pin here; the CLIs pick their own default.
+      case 'agy':
+        return ['agy', ...extra(config?.agy?.additionalFlags)].join(' ');
+      case 'codex':
+        return [config?.codex?.binaryPath || 'codex', ...extra(config?.codex?.additionalFlags)].join(' ');
+      case 'opencode':
+        return 'opencode';
+      case 'cursor':
+        return 'cursor-agent';
+    }
   };
 
 
@@ -553,6 +583,8 @@ export const App: React.FC = () => {
     const builderSession: TerminalSession = {
       id: builderSessionId,
       title: t.app.squadBuilderPane(squadAgentLabel(config.builder)),
+      // Named after its role; the squad's own commands are kept out of the log.
+      workLog: [{ text: t.app.squadBuilderPane(squadAgentLabel(config.builder)), prompt: true }],
       type: 'shell',
       command: '',
       cwd,
@@ -562,6 +594,7 @@ export const App: React.FC = () => {
     const verifierSession: TerminalSession = {
       id: verifierSessionId,
       title: t.app.squadVerifierPane(squadAgentLabel(config.verifier)),
+      workLog: [{ text: t.app.squadVerifierPane(squadAgentLabel(config.verifier)), prompt: true }],
       type: 'shell',
       command: '',
       cwd,
@@ -584,7 +617,16 @@ export const App: React.FC = () => {
   };
 
   // Tab management
-  const handleAddTab = (type: SessionType = 'shell') => {
+  const handleAddTab = async (type: SessionType = 'shell') => {
+    // A missing CLI would only print "command not found"; offer to install it instead.
+    if (type !== 'shell') {
+      const available = await window.warpApi?.getAvailableAgents?.().catch(() => null);
+      if (available && available[type] === false) {
+        toast.info(t.agentSetup.notInstalledToast(AGENT_TITLES[type] || type));
+        setAgentSetupOpen(true);
+        return;
+      }
+    }
     const title = AGENT_TITLES[type] || '';
     const sessionId = createShellTab(title);
     if (type !== 'shell') {

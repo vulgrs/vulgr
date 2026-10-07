@@ -21,14 +21,15 @@ export class AgyAdapter extends BaseCliAdapter {
   }
 
   /**
-   * `agy -p "<prompt>"` runs one turn non-interactively. Builders get
-   * `--mode accept-edits` so file edits don't wait for approval.
+   * `agy -p "<prompt>"` runs one turn non-interactively. Headless agy abandons
+   * the turn when a tool needs a permission it can't ask for, so builders get
+   * every tool approved inside agy's own terminal sandbox.
    */
   protected buildArgs(prompt: string, options?: CliExecutionOptions): string[] {
     const text =
       prompt.length > MAX_PROMPT_CHARS ? `${prompt.slice(0, MAX_PROMPT_CHARS)}\n[...truncated]` : prompt;
     const args: string[] = ['-p', text];
-    if (options?.allowEdits) args.push('--mode', 'accept-edits');
+    if (options?.allowEdits) args.push('--sandbox', '--dangerously-skip-permissions');
     if (this.extraArgs.length > 0) args.push(...this.extraArgs);
     return args;
   }

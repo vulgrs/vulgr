@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, basename } from 'node:path';
+import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 
 export interface WorkspaceFact {
   key: string;
@@ -57,7 +59,10 @@ export class MemoryStore {
       } else if (existsSync(warpPath)) {
         this.filePath = warpPath;
       } else {
-        this.filePath = join(workspaceDir, '.vulgaris-memory.json');
+        // Kept out of the project, so it never shows up in git status, the
+        // Changes panel or an agent's review of the work.
+        const id = createHash('sha1').update(resolve(workspaceDir)).digest('hex').slice(0, 12);
+        this.filePath = join(homedir(), '.vulgr', 'memory', `${basename(resolve(workspaceDir)) || 'root'}-${id}.json`);
       }
     }
     this.data = this.loadInitial(workspaceDir);

@@ -32,8 +32,10 @@ interface LiveSquadModalProps {
 
 const AGENT_ITEMS: OptionItem[] = [
   { value: 'claude', label: 'Claude Code' },
-  { value: 'agy', label: 'AGY' },
+  { value: 'agy', label: 'Antigravity (AGY)' },
   { value: 'codex', label: 'Codex CLI' },
+  { value: 'opencode', label: 'OpenCode' },
+  { value: 'cursor', label: 'Cursor Agent' },
 ];
 
 const ROUND_VALUES = [2, 3, 5];

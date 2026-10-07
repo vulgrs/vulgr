@@ -100,15 +100,17 @@ export class ConfigManager {
   private readonly configPath: string;
   private config: WarpConfig;
 
-  constructor(workspaceDir: string = process.cwd(), configFileName = '.warp-config.json') {
+  /** `legacyPath` is read when `configPath` doesn't exist yet, so older settings carry over. */
+  constructor(workspaceDir: string = process.cwd(), configFileName = '.warp-config.json', private readonly legacyPath?: string) {
     this.configPath = join(workspaceDir, configFileName);
     this.config = this.loadConfig();
   }
 
   private loadConfig(): WarpConfig {
-    if (existsSync(this.configPath)) {
+    const source = existsSync(this.configPath) ? this.configPath : this.legacyPath;
+    if (source && existsSync(source)) {
       try {
-        const raw = readFileSync(this.configPath, 'utf-8');
+        const raw = readFileSync(source, 'utf-8');
         const parsed = JSON.parse(raw);
         return {
           ...DEFAULT_CONFIG,

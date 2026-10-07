@@ -50,7 +50,7 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
   return (
     <div className="mx-2 mt-2 px-3.5 py-2 rounded-lg surface-panel border flex items-center justify-between gap-3 select-none z-10 shadow-card animate-slide-in-up">
       {/* Left: who is on which side, and the goal */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="flex size-5 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-primary">
             <Users size={11} />
@@ -91,9 +91,9 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
       </div>
 
       {/* Right: current step and controls */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 min-w-0 max-w-[55%]">
         <div
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-medium max-w-md ${style.color}`}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-medium min-w-0 ${style.color}`}
           title={squad.error || statusText}
         >
           {style.icon}
@@ -107,7 +107,7 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
           onOpenChanges && (
             <button
               onClick={onOpenChanges}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md border border-primary/40 bg-primary/10 text-xs font-medium text-primary"
+              className="flex flex-shrink-0 items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-md border border-primary/40 bg-primary/10 text-xs font-medium text-primary"
               title={t.workspace.reviewChangesHint}
             >
               <GitCompare size={11} />
@@ -117,7 +117,7 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
         ) : (
           <button
             onClick={onPauseToggle}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md border text-xs font-medium transition-all ${
+            className={`flex flex-shrink-0 items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-md border text-xs font-medium transition-all ${
               squad.paused
                 ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
                 : 'btn-ghost'

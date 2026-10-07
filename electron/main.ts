@@ -52,7 +52,13 @@ if (process.platform !== 'win32') {
 
 let mainWindow: BrowserWindow | null = null;
 let currentCwd = process.cwd();
-const configManager = new ConfigManager();
+// Settings live with the user, not in whatever folder the app was started from
+// (a packaged app starts in "/", which isn't writable).
+const configManager = new ConfigManager(
+  join(os.homedir(), '.vulgr'),
+  'config.json',
+  join(process.cwd(), '.warp-config.json')
+);
 const ptyManager = new PtyManager();
 ptyManager.setConfigManager(configManager);
 const claudeChatManager = new ClaudeChatManager();
@@ -468,11 +474,8 @@ function setupIpcHandlers() {
 
   // Which agent CLIs are installed, so the UI only offers ones that can run.
   ipcMain.handle('agents:available', async () => {
-    const names = ['claude', 'agy', 'codex', 'gemini'];
-    const entries = await Promise.all(
-      names.map(async (name) => [name, await AdapterFactory.getAdapter(name).isAvailable()] as const)
-    );
-    return Object.fromEntries(entries);
+    const [agents, gemini] = await Promise.all([listAgentStatus(), AdapterFactory.getAdapter('gemini').isAvailable()]);
+    return { ...Object.fromEntries(agents.map((a) => [a.id, a.installed])), gemini };
   });
 
   // Agent setup: which CLIs are installed, and installing them from inside the app.

@@ -468,7 +468,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {newMenuOpen && (
               <div className="absolute right-0 top-full mt-1.5 w-52 rounded-[12px] bg-base-elevated border border-zinc-800 shadow-lg p-1.5 z-50 text-[10px] animate-slide-in-up">
                 <div className="px-2 py-1 text-[8px] text-zinc-500 uppercase tracking-wider">{t.sidebar.launchAgent}</div>
-                {(['claude', 'agy', 'shell', 'codex'] as SessionType[]).map((type) => (
+                {(['shell', 'claude', 'codex', 'agy', 'opencode', 'cursor'] as SessionType[]).map((type) => (
                   <button
                     key={type}
                     onClick={() => {
