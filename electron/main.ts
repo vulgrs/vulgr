@@ -427,11 +427,10 @@ function setupIpcHandlers() {
 
   ipcMain.handle('git:status', (_, { cwd = process.cwd() } = {}) => new GitUtils(cwd).getChangedFilesAsync());
 
-  ipcMain.handle('git:revert', (_, { cwd = process.cwd() }) => {
-    const git = new GitUtils(cwd);
-    git.revertAllChanges();
-    return true;
-  });
+  // Discarding stashes the changes (recoverable), always in the open project.
+  ipcMain.handle('git:revert', (_, { cwd } = {}) => new GitUtils(cwd || currentCwd).revertAllChanges());
+  ipcMain.handle('git:revertFile', (_, { file, cwd } = {}) => new GitUtils(cwd || currentCwd).revertFile(file));
+  ipcMain.handle('git:restoreDiscarded', (_, { stash, cwd } = {}) => new GitUtils(cwd || currentCwd).restoreDiscarded(stash));
 
   ipcMain.handle('git:branch', (_, { cwd = process.cwd() } = {}) => {
     const git = new GitUtils(cwd);

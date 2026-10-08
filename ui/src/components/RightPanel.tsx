@@ -4,7 +4,7 @@ import {
   FlaskConical,
   Plus,
   X,
-  RotateCcw,
+  Undo2,
   Sparkles,
   Shield,
   Bot,
@@ -29,6 +29,8 @@ interface RightPanelProps {
   gitBranch: string | null;
   sandboxes: any[];
   onRevert: () => void;
+  /** Discards one file's changes (not the whole working tree). */
+  onRevertFile: (file: string) => void;
   onCommitAndPush: (message: string) => Promise<void> | void;
   onOpenTerminalInSandbox?: (worktreePath: string, branchName: string) => void;
   onSendDiffToAgent?: (type: SessionType) => void;
@@ -42,6 +44,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   gitBranch,
   sandboxes,
   onRevert,
+  onRevertFile,
   onCommitAndPush,
   onOpenTerminalInSandbox,
   onSendDiffToAgent,
@@ -148,7 +151,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
               title={t.dock.discardAll}
             >
-              <RotateCcw size={13} />
+              <Undo2 size={13} />
             </button>
 
             {/* Commit & Push Primary Button (Exact button from screenshot) */}
@@ -214,7 +217,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
       <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-base-app">
         {activeTab === 'changes' ? (
           <div>
-            <DiffViewer diff={diff} onRevertFile={onRevert} />
+            <DiffViewer diff={diff} onRevertFile={onRevertFile} />
 
             {/* Quick Cross-Model Review Pills */}
             {filesChanged.length > 0 && onSendDiffToAgent && (

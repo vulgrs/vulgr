@@ -20,6 +20,7 @@ import {
   SettingRow,
   SettingsDisclosure,
   isMac,
+  closeOnlyOnRequest,
   type AgentOption,
 } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
@@ -285,7 +286,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   })();
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={isOpen} onOpenChange={closeOnlyOnRequest(onClose)}>
       <DialogContent className={`${FLOW_DIALOG} sm:max-w-[720px]`}>
         <FlowHeader icon={orchestratorIcon} title={o.title} subtitle={o.subtitle} />
 

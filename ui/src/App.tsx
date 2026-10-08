@@ -765,11 +765,35 @@ export const App: React.FC = () => {
   };
 
 
+  // Discard is recoverable: the changes go to a git stash and the toast offers Undo.
+  const offerUndo = (stash: string | null, message: string) => {
+    if (!stash) return;
+    toast(message, {
+      description: t.dock.discardedHint,
+      duration: 15000,
+      action: {
+        label: t.dock.undo,
+        onClick: async () => {
+          const ok = await window.warpApi.restoreDiscarded(stash, cwd);
+          await refreshGitDiff();
+          if (ok) toast.success(t.dock.restored);
+          else toast.error(t.dock.restoreFailed);
+        },
+      },
+    });
+  };
   const handleRevertGit = async () => {
-    if (window.warpApi) {
-      await window.warpApi.revertGit();
-      await refreshGitDiff();
-    }
+    if (!window.warpApi) return;
+    const count = gitFiles.length;
+    const stash = await window.warpApi.revertGit(cwd);
+    await refreshGitDiff();
+    offerUndo(stash, t.dock.discarded(count));
+  };
+  const handleRevertFile = async (file: string) => {
+    if (!window.warpApi?.revertFile) return;
+    const stash = await window.warpApi.revertFile(file, cwd);
+    await refreshGitDiff();
+    offerUndo(stash, t.dock.discardedFile(file));
   };
 
   const handleCommitAndPush = async (message: string) => {
@@ -1388,6 +1412,7 @@ export const App: React.FC = () => {
             gitBranch={gitBranch}
             sandboxes={activeSandboxes}
             onRevert={handleRevertGit}
+            onRevertFile={handleRevertFile}
             onCommitAndPush={handleCommitAndPush}
             onOpenTerminalInSandbox={handleOpenTerminalInSandbox}
             onSendDiffToAgent={handleSendDiffToAgent}

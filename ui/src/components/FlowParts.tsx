@@ -17,6 +17,17 @@ export const MONO = "font-['Geist_Mono',ui-monospace,monospace]";
 export const FLOW_DIALOG =
   'flex max-h-[88vh] flex-col gap-0 overflow-hidden rounded-[14px] border border-zinc-800 bg-base-surface p-0 text-zinc-200 ring-0 shadow-[var(--shadow-modal)]';
 
+/**
+ * onOpenChange for the flow dialogs: they close only when the person asks
+ * (X / Close button, Escape). A click outside or focus moving to the terminal
+ * (e.g. when a run finishes) must not hide a run or its result.
+ */
+export const closeOnlyOnRequest =
+  (onClose: () => void) =>
+  (open: boolean, details?: { reason?: string }) => {
+    if (!open && (details?.reason === 'close-press' || details?.reason === 'escape-key')) onClose();
+  };
+
 export interface AgentOption {
   value: string;
   label: string;

@@ -214,16 +214,54 @@ export class GitUtils {
   }
 
   /**
-   * Reverts all changes in the working tree (staged, unstaged, untracked).
+   * Discards all changes in the working tree (staged, unstaged, untracked) by
+   * moving them into a git stash, so a mistaken discard can be undone with
+   * restoreDiscarded() (or `git stash list` / `git stash pop`). Returns the
+   * stash commit, or null when there was nothing to discard.
    */
-  revertAllChanges(): void {
-    if (!this.isGitRepo()) return;
-
+  revertAllChanges(): string | null {
+    if (!this.isGitRepo()) return null;
     try {
-      execSync('git reset --hard HEAD', { cwd: this.cwd, stdio: 'ignore' });
-      execSync('git clean -fd', { cwd: this.cwd, stdio: 'ignore' });
+      const label = `vulgr: discarded ${new Date().toISOString()}`;
+      const out = execSync(`git stash push --include-untracked -m "${label}"`, {
+        cwd: this.cwd,
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      if (/No local changes/i.test(out)) return null;
+      return execSync('git rev-parse stash@{0}', { cwd: this.cwd, encoding: 'utf-8' }).trim();
     } catch {
-      // Best effort rollback
+      return null;
+    }
+  }
+
+  /** Discards one file's changes the same recoverable way (a stash holding just that file). */
+  revertFile(file: string): string | null {
+    if (!this.isGitRepo()) return null;
+    try {
+      const label = `vulgr: discarded ${file} ${new Date().toISOString()}`;
+      execSync(`git stash push --include-untracked -m "${label.replace(/"/g, '')}" -- "${file.replace(/"/g, '')}"`, {
+        cwd: this.cwd,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const top = execSync('git stash list -1 --format=%H%x09%s', { cwd: this.cwd, encoding: 'utf-8' }).trim();
+      const [sha, subject] = top.split('\t');
+      return subject?.includes(label.replace(/"/g, '')) ? sha : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Brings back changes discarded by revertAllChanges() or revertFile(). */
+  restoreDiscarded(stashCommit: string): boolean {
+    try {
+      const list = execSync('git stash list --format=%H', { cwd: this.cwd, encoding: 'utf-8' }).split('\n');
+      const index = list.indexOf(stashCommit);
+      if (index < 0) return false;
+      execSync(`git stash pop "stash@{${index}}"`, { cwd: this.cwd, stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
     }
   }
 
