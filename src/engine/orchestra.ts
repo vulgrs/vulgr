@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import { randomBytes } from 'node:crypto';
 import { AdapterFactory } from '../adapters/factory.js';
 import { WorktreeManager, type SandboxSession } from '../git/worktreeManager.js';
+import { GitUtils } from '../git/gitUtils.js';
 import { ContextOptimizer } from './contextOptimizer.js';
 import { MemoryStore } from './memoryStore.js';
 import { detectTestCommand } from './testPlan.js';
@@ -19,7 +20,16 @@ const execFileAsync = promisify(execFile);
  */
 
 export type OrchestraTaskState = 'waiting' | 'running' | 'testing' | 'fixing' | 'merging' | 'done' | 'failed' | 'skipped';
-export type OrchestraPhase = 'checking' | 'planning' | 'working' | 'integrating' | 'reviewing' | 'done' | 'failed' | 'stopped';
+export type OrchestraPhase =
+  | 'checking'
+  | 'planning'
+  | 'working'
+  | 'integrating'
+  | 'reviewing'
+  | 'awaiting-review'
+  | 'done'
+  | 'failed'
+  | 'stopped';
 
 export interface OrchestraTask {
   id: string;
@@ -53,6 +63,12 @@ export interface OrchestraOptions {
   timeoutMs?: number;
   cwd?: string;
   lang?: OrchestraLang;
+  /**
+   * Apply the combined change to the working tree as soon as it is reviewed
+   * (CLI). When false the change waits in its copy until the developer applies
+   * (all or some files), discards or asks for changes; see applyReviewed().
+   */
+  autoApply?: boolean;
   onEvent?: (event: OrchestraEvent) => void;
 }
 
@@ -69,6 +85,10 @@ export interface OrchestraResult {
   applied: boolean;
   /** Left in place when the change could not be applied automatically. */
   sandbox?: SandboxSession;
+  /** The change is waiting for the developer (autoApply: false). */
+  pendingReview?: boolean;
+  /** Files in the combined change. */
+  files?: string[];
   error?: string;
   durationMs: number;
 }
@@ -111,6 +131,8 @@ const TEXT = {
     reviewing: (agent: string) => `${agent} is reviewing the whole change...`,
     reviewRejected: (agent: string) => `${agent} found problems; they go back for one round of fixes.`,
     reviewFixing: (agent: string) => `${agent} is fixing what the reviewer found...`,
+    revising: (agent: string) => `${agent} is making the changes you asked for...`,
+    awaitingReview: 'Ready for your review.',
     applyFailed: 'The change could not be applied to your folder automatically; it is waiting in the Sandbox panel.',
     done: 'Done.',
     stopped: 'Stopped.',
@@ -141,6 +163,8 @@ const TEXT = {
     reviewing: (agent: string) => `${agent} bütün değişikliği gözden geçiriyor...`,
     reviewRejected: (agent: string) => `${agent} sorun buldu; bir tur düzeltmeye gönderiliyor.`,
     reviewFixing: (agent: string) => `${agent} denetçinin bulduklarını düzeltiyor...`,
+    revising: (agent: string) => `${agent} istediğin değişiklikleri yapıyor...`,
+    awaitingReview: 'İncelemen için hazır.',
     applyFailed: 'Değişiklik klasörüne otomatik uygulanamadı; Sandbox panelinde seni bekliyor.',
     done: 'Tamamlandı.',
     stopped: 'Durduruldu.',
@@ -215,8 +239,14 @@ export class Orchestra {
   private readonly lang: OrchestraLang;
   private readonly text: (typeof TEXT)[OrchestraLang];
   private readonly onEvent?: (event: OrchestraEvent) => void;
+  private readonly autoApply: boolean;
   private readonly abort = new AbortController();
   private readonly serial = new Serial();
+  private readonly wm: WorktreeManager;
+  /** Copies of the tasks being worked on, for the live view. */
+  private readonly taskSandboxes = new Map<string, SandboxSession>();
+  /** The combined change waiting for the developer (autoApply: false). */
+  private pending: { goal: string; base: string; integration: SandboxSession; cmd: string } | null = null;
 
   constructor(options: OrchestraOptions = {}) {
     this.cwd = options.cwd || process.cwd();
@@ -230,6 +260,8 @@ export class Orchestra {
     this.lang = options.lang ?? 'tr';
     this.text = TEXT[this.lang];
     this.onEvent = options.onEvent;
+    this.autoApply = options.autoApply ?? true;
+    this.wm = new WorktreeManager(this.cwd);
   }
 
   /** Stops every running agent; run() then cleans up and resolves as stopped. */
@@ -316,9 +348,9 @@ export class Orchestra {
   async run(goal: string): Promise<OrchestraResult> {
     const start = Date.now();
     const runId = `orchestra-${Date.now().toString(36)}-${randomBytes(2).toString('hex')}`;
-    const wm = new WorktreeManager(this.cwd);
+    const wm = this.wm;
     let tasks: OrchestraTask[] = [];
-    const taskSandboxes = new Map<string, SandboxSession>();
+    const taskSandboxes = this.taskSandboxes;
     let integration: SandboxSession | undefined;
 
     const finish = async (partial: Partial<OrchestraResult>): Promise<OrchestraResult> => {
@@ -536,10 +568,57 @@ export class Orchestra {
     const doneTasks = tasks.filter((t) => t.state === 'done');
     if (!doneTasks.length) return finish({ summary, error: this.text.nothingDone });
 
-    // 3+4. Test everything together (fixing failures), then review the whole
-    // change. A rejection goes back once to the planner, who fixes the parts
-    // that don't fit together; then tests and review run again.
+    // 3+4. Test everything together and review the whole change.
     const cmd = this.verifyCmd || detectTestCommand(intCwd) || '';
+    const checked = await this.checkAndReview(goal, intCwd, base, cmd, 1);
+    if (this.stopped) return finish({});
+    const changedFiles = (await this.tryGit(intCwd, ['diff', '--name-only', base, 'HEAD'])).out.split('\n').filter(Boolean);
+
+    // 5. Wait for the developer, or apply right away.
+    if (!this.autoApply) {
+      for (const sb of taskSandboxes.values()) await wm.destroySandbox(sb.worktreePath, sb.branchName, true);
+      taskSandboxes.clear();
+      this.pending = { goal, base, integration: integration!, cmd };
+      this.status('awaiting-review', this.text.awaitingReview);
+      return {
+        success: true,
+        summary,
+        tasks,
+        testCommand: cmd || undefined,
+        ...checked,
+        files: changedFiles,
+        applied: false,
+        pendingReview: true,
+        durationMs: Date.now() - start,
+      };
+    }
+    const applied = await this.applyPatch(intCwd, base);
+    if (!applied) this.log('orchestrator', this.text.applyFailed);
+
+    return finish({
+      success: true,
+      summary,
+      testCommand: cmd || undefined,
+      ...checked,
+      files: changedFiles,
+      applied,
+      sandbox: applied ? undefined : integration,
+    });
+  }
+
+  /**
+   * Runs the tests in the combined copy (letting the planner fix failures),
+   * then the reviewer; a rejection goes back to the planner up to
+   * reviewFixes times.
+   */
+  private async checkAndReview(
+    goal: string,
+    intCwd: string,
+    base: string,
+    cmd: string,
+    reviewFixes: number
+  ): Promise<{ testsPassed?: boolean; review: OrchestraResult['review']; reviewNotes: string }> {
+    const replyLang = this.lang === 'tr' ? 'Turkish' : 'English';
     let testsPassed: boolean | undefined;
     let review: OrchestraResult['review'] = 'skipped';
     let reviewNotes = '';
@@ -548,7 +627,7 @@ export class Orchestra {
         for (let round = 1; ; round++) {
           this.status('integrating', this.text.integrating(cmd));
           const check = await this.runCommand(cmd, intCwd);
-          if (this.stopped) return finish({});
+          if (this.stopped) return { review, reviewNotes };
           testsPassed = check.ok;
           if (check.ok || round > this.maxRounds) break;
           this.status('integrating', this.text.integrationFixing(label(this.planner), round, this.maxRounds));
@@ -563,9 +642,8 @@ export class Orchestra {
             intCwd,
             true
           );
-          if (this.stopped) return finish({});
-          await this.tryGit(intCwd, ['add', '-A']);
-          await this.tryGit(intCwd, ['commit', '--no-verify', '-q', '-m', 'orchestra: fix combined tests']);
+          if (this.stopped) return { review, reviewNotes };
+          await this.commitAll(intCwd, 'orchestra: fix combined tests');
         }
       } else if (pass === 0) this.log('orchestrator', this.text.integrationNoTests);
 
@@ -585,7 +663,7 @@ export class Orchestra {
         intCwd,
         false
       );
-      if (this.stopped) return finish({});
+      if (this.stopped) return { testsPassed, review, reviewNotes };
       const ran = reviewRes.exitCode === 0 && !reviewRes.timedOut;
       review = !ran
         ? 'skipped'
@@ -595,7 +673,7 @@ export class Orchestra {
             ? 'approved'
             : 'skipped';
       reviewNotes = stripAnsi(reviewRes.stdout).trim().slice(-4000);
-      if (review !== 'rejected' || pass >= 1) break;
+      if (review !== 'rejected' || pass >= reviewFixes) break;
 
       this.status('integrating', this.text.reviewFixing(label(this.planner)));
       this.log(this.reviewer, this.text.reviewRejected(label(this.reviewer)));
@@ -610,36 +688,78 @@ export class Orchestra {
         intCwd,
         true
       );
-      if (this.stopped) return finish({});
-      await this.tryGit(intCwd, ['add', '-A']);
-      await this.tryGit(intCwd, ['commit', '--no-verify', '-q', '-m', 'orchestra: address review']);
+      if (this.stopped) return { testsPassed, review, reviewNotes };
+      await this.commitAll(intCwd, 'orchestra: address review');
     }
+    return { testsPassed, review, reviewNotes };
+  }
 
-    // 5. Apply the combined change to the project's working tree.
-    const patch = (await this.tryGit(intCwd, ['diff', '--binary', base, 'HEAD'])).out;
-    let applied = false;
-    if (patch.trim()) {
-      // A plain apply leaves the changes unstaged like any agent's edits; --3way
-      // (which stages them) only when the user's own edits overlap.
-      for (const mode of [[], ['--3way']]) {
-        const res = spawnSync('git', ['apply', ...mode, '--whitespace=nowarn', '-'], { cwd: this.cwd, input: patch, encoding: 'utf-8' });
-        if (res.status === 0) {
-          applied = true;
-          break;
-        }
-      }
+  private async commitAll(cwd: string, message: string) {
+    await this.tryGit(cwd, ['add', '-A']);
+    await this.tryGit(cwd, ['commit', '--no-verify', '-q', '-m', message]);
+  }
+
+  /** Writes the combined change (or only `files`) into the project's working tree. */
+  private async applyPatch(intCwd: string, base: string, files?: string[]): Promise<boolean> {
+    const patch = (await this.tryGit(intCwd, ['diff', '--binary', base, 'HEAD', ...(files?.length ? ['--', ...files] : [])])).out;
+    if (!patch.trim()) return false;
+    // A plain apply leaves the changes unstaged like any agent's edits; --3way
+    // (which stages them) only when the user's own edits overlap.
+    for (const mode of [[], ['--3way']]) {
+      const res = spawnSync('git', ['apply', ...mode, '--whitespace=nowarn', '-'], { cwd: this.cwd, input: patch, encoding: 'utf-8' });
+      if (res.status === 0) return true;
     }
-    if (!applied) this.log('orchestrator', this.text.applyFailed);
+    return false;
+  }
 
-    return finish({
-      success: true,
-      summary,
-      testsPassed,
-      testCommand: cmd || undefined,
-      review,
-      reviewNotes,
-      applied,
-      sandbox: applied ? undefined : integration,
-    });
+  /**
+   * What an agent has written so far: the uncommitted diff of a running task's
+   * copy, or of the combined copy (no taskId) while it is checked or reviewed.
+   */
+  async liveDiff(taskId?: string): Promise<string> {
+    const cwd = taskId ? this.taskSandboxes.get(taskId)?.worktreePath : this.pending?.integration.worktreePath;
+    if (!cwd) return '';
+    if (!taskId && this.pending) return (await this.tryGit(cwd, ['diff', this.pending.base, 'HEAD'])).out;
+    return (await new GitUtils(cwd).getDiffAsync()).diff;
+  }
+
+  /** Applies the reviewed change (all files, or only `files`) and removes its copy. */
+  async applyReviewed(files?: string[]): Promise<{ applied: boolean }> {
+    const p = this.pending;
+    if (!p) return { applied: false };
+    const applied = await this.applyPatch(p.integration.worktreePath, p.base, files);
+    if (applied) await this.discardReviewed();
+    return { applied };
+  }
+
+  /** Drops the waiting change without touching the project. */
+  async discardReviewed(): Promise<void> {
+    const p = this.pending;
+    this.pending = null;
+    if (p) await this.wm.destroySandbox(p.integration.worktreePath, p.integration.branchName, true);
+  }
+
+  /** The developer asked for changes: the planner makes them, then tests and review run again. */
+  async revise(feedback: string): Promise<Pick<OrchestraResult, 'testsPassed' | 'review' | 'reviewNotes' | 'files'>> {
+    const p = this.pending;
+    if (!p) return { review: 'skipped', reviewNotes: '' };
+    const intCwd = p.integration.worktreePath;
+    this.status('integrating', this.text.revising(label(this.planner)));
+    await this.execAgent(
+      this.planner,
+      [
+        `Several agents implemented "${p.goal}". The developer reviewed the result and asks for these changes:`,
+        feedback,
+        '',
+        'Make them with the smallest correct change and keep the tests passing. Do not ask questions.',
+      ].join('\n'),
+      intCwd,
+      true
+    );
+    await this.commitAll(intCwd, 'orchestra: changes requested in review');
+    const checked = await this.checkAndReview(p.goal, intCwd, p.base, p.cmd, 0);
+    const files = (await this.tryGit(intCwd, ['diff', '--name-only', p.base, 'HEAD'])).out.split('\n').filter(Boolean);
+    this.status('awaiting-review', this.text.awaitingReview);
+    return { ...checked, files };
   }
 }

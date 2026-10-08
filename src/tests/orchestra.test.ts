@@ -191,6 +191,67 @@ describe('Orchestra', () => {
     assert.equal(readFileSync(join(repo, 'a.txt'), 'utf-8'), 'fixed\n');
   });
 
+  test('with autoApply off the change waits for the developer: apply some files, revise, discard', async () => {
+    let revisePrompt = '';
+    fakeAgent('p-lead', (prompt, options) => {
+      if (prompt.includes('Reply with only this JSON')) {
+        return JSON.stringify({ tasks: [{ id: 'a', title: 'A', files: ['a.txt'] }, { id: 'b', title: 'B', files: ['b.txt'] }] });
+      }
+      if (prompt.includes('asks for these changes')) {
+        revisePrompt = prompt;
+        writeFileSync(join(options.cwd!, 'a.txt'), 'a, revised\n');
+        return 'done';
+      }
+      return 'VERDICT: APPROVED';
+    });
+    fakeAgent('p-worker', (prompt, options) => {
+      const who = prompt.match(/Your task: (\w)/)![1].toLowerCase();
+      writeFileSync(join(options.cwd!, `${who}.txt`), `${who}\n`);
+      return 'done';
+    });
+
+    const orchestra = new Orchestra({
+      planner: 'p-lead',
+      workers: ['p-worker'],
+      verifyCmd: 'node -e "process.exit(0)"',
+      cwd: repo,
+      lang: 'en',
+      autoApply: false,
+    });
+    const result = await orchestra.run('Two files');
+    assert.equal(result.pendingReview, true);
+    assert.equal(result.applied, false);
+    assert.deepEqual(result.files?.sort(), ['a.txt', 'b.txt']);
+    assert.equal(existsSync(join(repo, 'a.txt')), false, 'nothing applied before review');
+    assert.match(await orchestra.liveDiff(), /\+a/);
+
+    const revised = await orchestra.revise('Write "revised" in a.txt');
+    assert.match(revisePrompt, /Write "revised" in a\.txt/);
+    assert.equal(revised.review, 'approved');
+
+    const { applied } = await orchestra.applyReviewed(['a.txt']);
+    assert.equal(applied, true);
+    assert.equal(readFileSync(join(repo, 'a.txt'), 'utf-8'), 'a, revised\n');
+    assert.equal(existsSync(join(repo, 'b.txt')), false, 'only the chosen file');
+    assert.equal(execSync('git worktree list', { cwd: repo, encoding: 'utf-8' }).trim().split('\n').length, 1);
+  });
+
+  test('discarding a waiting change leaves the project untouched', async () => {
+    fakeAgent('d-lead', (prompt) =>
+      prompt.includes('Reply with only this JSON') ? JSON.stringify({ tasks: [{ id: 'a', title: 'A' }] }) : 'VERDICT: APPROVED'
+    );
+    fakeAgent('d-worker', (_p, options) => {
+      writeFileSync(join(options.cwd!, 'a.txt'), 'a\n');
+      return 'done';
+    });
+    const orchestra = new Orchestra({ planner: 'd-lead', workers: ['d-worker'], cwd: repo, lang: 'en', autoApply: false });
+    const result = await orchestra.run('One file');
+    assert.equal(result.pendingReview, true);
+    await orchestra.discardReviewed();
+    assert.equal(existsSync(join(repo, 'a.txt')), false);
+    assert.equal(execSync('git worktree list', { cwd: repo, encoding: 'utf-8' }).trim().split('\n').length, 1);
+  });
+
   test('parsePlan reads fenced or bare JSON and drops cycles and unknown dependencies', () => {
     const plan = parsePlan('Here:\n```json\n{"tasks":[{"id":"a","title":"A","dependsOn":["b"]},{"id":"b","title":"B","dependsOn":["a","zz"]}]}\n```');
     assert.ok(plan);

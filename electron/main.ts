@@ -474,10 +474,14 @@ function setupIpcHandlers() {
     }
   });
 
-  // Orchestra: one run at a time; Stop aborts every agent it started.
+  // Orchestra: one run at a time; Stop aborts every agent it started. In the
+  // app the result waits for the developer (apply / revise / discard).
   let orchestra: Orchestra | null = null;
+  let orchestraRunning = false;
   ipcMain.handle('orchestra:run', async (_, { goal, planner, workers, reviewer, verifyCmd, maxParallel, maxRounds, cwd, lang }) => {
-    if (orchestra) return { success: false, applied: false, tasks: [], durationMs: 0, error: 'Another orchestra run is in progress.' };
+    if (orchestraRunning) return { success: false, applied: false, tasks: [], durationMs: 0, error: 'Another orchestra run is in progress.' };
+    await orchestra?.discardReviewed();
+    orchestraRunning = true;
     orchestra = new Orchestra({
       planner,
       workers,
@@ -487,14 +491,38 @@ function setupIpcHandlers() {
       maxRounds,
       cwd: cwd || currentCwd,
       lang: lang === 'en' ? 'en' : 'tr',
+      autoApply: false,
       onEvent: (event) => mainWindow?.webContents.send('orchestra:event', event),
     });
     try {
-      return await orchestra.run(goal);
+      const result = await orchestra.run(goal);
+      if (!result.pendingReview) orchestra = null;
+      return result;
     } catch (err: any) {
+      orchestra = null;
       return { success: false, applied: false, tasks: [], durationMs: 0, error: err?.message || String(err) };
     } finally {
-      orchestra = null;
+      orchestraRunning = false;
+    }
+  });
+  ipcMain.handle('orchestra:diff', (_, taskId?: string) => orchestra?.liveDiff(taskId) ?? '');
+  ipcMain.handle('orchestra:apply', async (_, files?: string[]) => {
+    const res = (await orchestra?.applyReviewed(files)) ?? { applied: false };
+    if (res.applied) orchestra = null;
+    return res;
+  });
+  ipcMain.handle('orchestra:discard', async () => {
+    await orchestra?.discardReviewed();
+    orchestra = null;
+    return true;
+  });
+  ipcMain.handle('orchestra:revise', async (_, feedback: string) => {
+    if (!orchestra || orchestraRunning) return null;
+    orchestraRunning = true;
+    try {
+      return await orchestra.revise(feedback);
+    } finally {
+      orchestraRunning = false;
     }
   });
   ipcMain.handle('orchestra:stop', () => {
