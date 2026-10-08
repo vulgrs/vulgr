@@ -15,6 +15,7 @@ import {
 import type { TerminalSession } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
 import { useTheme, type Theme } from '../theme.js';
+import { AgentLogo } from './AgentLogo.js';
 
 const TERMINAL_THEMES: Record<Theme, ITheme> = {
   dark: {
@@ -83,6 +84,21 @@ const ERROR_PATTERN =
   /(?:error\s+TS\d+:|TS\d{4}:|FAIL\s+|Tests:\s+\d+\s+failed|AssertionError|Traceback \(most recent call last\):|error\[E\d+\]:|npm ERR!)/i;
 const ESCAPE_CODE_PATTERN = /\x1B\[[0-9;?]*[ -\/]*[@-~]/g;
 
+/** Visible text in a chunk of PTY output (escape and OSC sequences removed). */
+const visibleText = (data: string) =>
+  data.replace(/\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)/g, '').replace(ESCAPE_CODE_PATTERN, '').trim();
+
+/** Agents offered on an empty terminal, with the command that starts each. */
+const STARTERS: Array<{ id: string; name: string; command: string }> = [
+  { id: 'claude', name: 'Claude Code', command: 'claude' },
+  { id: 'agy', name: 'Antigravity', command: 'agy' },
+  { id: 'codex', name: 'Codex', command: 'codex' },
+  { id: 'opencode', name: 'OpenCode', command: 'opencode' },
+  { id: 'cursor', name: 'Cursor Agent', command: 'cursor-agent' },
+];
+let installedAgents: Promise<Record<string, boolean>> | null = null;
+let projectTestCommand: Promise<string | null> | null = null;
+
 const HOME_PATH = /^((?:[A-Za-z]:)?[\\/](?:Users|home)[\\/][^\\/]+)(.*)$/;
 
 export function formatCwdLabel(cwd: string): string {
@@ -124,6 +140,28 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   const fitAddon = useRef<FitAddon | null>(null);
   const [detectedError, setDetectedError] = useState<string | null>(null);
   const isShellSession = session.type === 'shell';
+  // A shell pane hides its prompt (commands become blocks), so until the first
+  // output or keystroke it would be an empty black box: show what to do instead.
+  const [fresh, setFresh] = useState(isShellSession);
+  const freshRef = useRef(fresh);
+  const leaveFresh = useCallback(() => {
+    if (!freshRef.current) return;
+    freshRef.current = false;
+    setFresh(false);
+  }, []);
+  const [starters, setStarters] = useState<typeof STARTERS>([]);
+  const [testCommand, setTestCommand] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fresh) return;
+    installedAgents ??= window.warpApi?.getAvailableAgents?.().catch(() => ({})) ?? Promise.resolve({});
+    projectTestCommand ??= window.warpApi?.resolveTestCommand?.('').catch(() => null) ?? Promise.resolve(null);
+    let live = true;
+    installedAgents!.then((map) => live && setStarters(STARTERS.filter((a) => map[a.id])));
+    projectTestCommand!.then((cmd) => live && setTestCommand(cmd));
+    return () => {
+      live = false;
+    };
+  }, [fresh]);
 
   // Shell sessions: the block manager (created with the terminal below) exposes
   // its "user submitted a command" entry point here so BottomCommandDock can
@@ -242,6 +280,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       const unsubscribeData = window.warpApi.onTerminalData(({ id, data }: { id: string; data: string }) => {
         if (id === session.id) {
           term.write(data);
+          if (freshRef.current && visibleText(data)) leaveFresh();
 
           // Error sniffer for self-correction trigger
           if (!sniffed && ERROR_PATTERN.test(data)) {
@@ -421,6 +460,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
 
       const startBlock = (command?: string) => {
         if (active) return;
+        leaveFresh();
         command = command || readEcho() || undefined;
         const marker =
           pendingMarker && !pendingMarker.isDisposed ? pendingMarker : term.registerMarker(-1);
@@ -533,6 +573,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
       // sessions also notice a command being submitted straight from the terminal
       // (as opposed to BottomCommandDock) so its block header opens too.
       term.onData((data) => {
+        leaveFresh();
         const idle = isShellSession && !active && !agentLaunching;
 
         // Enter on a typed agent command: hold it until the dock is gone and the
@@ -755,6 +796,39 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
 
       {/* Interactive Terminal Canvas — full-bleed, no padding */}
       <div ref={terminalRef} className="flex-1 min-h-0 min-w-0 w-full overflow-hidden bg-base-app pl-3 pr-1" />
+
+      {fresh && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+          <div className="flex max-w-md flex-col items-center text-center">
+            <p className="text-[13px] text-zinc-300">{t.terminal.readyTitle}</p>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-500">{t.terminal.readyHint}</p>
+            <div className="pointer-events-auto mt-4 flex flex-wrap justify-center gap-1.5">
+              {[
+                ...starters.map((a) => ({ key: a.id, label: a.name, command: a.command, logo: a.id })),
+                ...(testCommand ? [{ key: 'test', label: testCommand, command: testCommand, logo: '' }] : []),
+                { key: 'git', label: 'git status', command: 'git status', logo: '' },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    submitCommandRef.current?.(item.command);
+                  }}
+                  className="flex items-center gap-1.5 rounded-[8px] border border-zinc-800 bg-base-elevated/70 py-1 pr-2.5 pl-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+                >
+                  {item.logo ? (
+                    <AgentLogo id={item.logo} name={item.label} size={18} />
+                  ) : (
+                    <span className="pl-1 font-mono text-zinc-500">$</span>
+                  )}
+                  <span className={item.logo ? '' : 'font-mono'}>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
