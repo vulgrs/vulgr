@@ -6,7 +6,7 @@ import {
   Copy,
   Check,
   FileCode,
-  RotateCcw,
+  Undo2,
   ChevronsUpDown,
 } from 'lucide-react';
 import { useI18n } from '../i18n/index.js';
@@ -233,7 +233,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ diff, onRevertFile }) =>
                     className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-red-950/30 transition-colors"
                     title={t.workspace.revertFile}
                   >
-                    <RotateCcw size={12} />
+                    <Undo2 size={12} />
                   </button>
                 )}
               </div>

@@ -83,6 +83,11 @@ export interface WarpApi {
     lang?: 'en' | 'tr';
   }) => Promise<any>;
   stopOrchestra: () => Promise<boolean>;
+  /** What agents have written so far: a running task's copy, or the combined change. */
+  orchestraDiff: (taskId?: string) => Promise<string>;
+  applyOrchestra: (files?: string[]) => Promise<{ applied: boolean }>;
+  discardOrchestra: () => Promise<boolean>;
+  reviseOrchestra: (feedback: string) => Promise<any>;
   onOrchestraEvent: (callback: (event: any) => void) => () => void;
   getAvailableAgents: () => Promise<Record<string, boolean>>;
   getAgentStatus: () => Promise<any[]>;
@@ -229,6 +234,10 @@ const api: WarpApi = {
   },
   runOrchestra: (options) => ipcRenderer.invoke('orchestra:run', options),
   stopOrchestra: () => ipcRenderer.invoke('orchestra:stop'),
+  orchestraDiff: (taskId) => ipcRenderer.invoke('orchestra:diff', taskId),
+  applyOrchestra: (files) => ipcRenderer.invoke('orchestra:apply', files),
+  discardOrchestra: () => ipcRenderer.invoke('orchestra:discard'),
+  reviseOrchestra: (feedback) => ipcRenderer.invoke('orchestra:revise', feedback),
   onOrchestraEvent: (callback) => {
     const handler = (_: any, event: any) => callback(event);
     ipcRenderer.on('orchestra:event', handler);
