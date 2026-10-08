@@ -24,6 +24,7 @@ import {
   SettingRow,
   SettingsDisclosure,
   isMac,
+  closeOnlyOnRequest,
   type AgentOption,
   type RoleState,
 } from './FlowParts.js';
@@ -280,7 +281,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   })();
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={isOpen} onOpenChange={closeOnlyOnRequest(onClose)}>
       <DialogContent className={`${FLOW_DIALOG} sm:max-w-[680px]`}>
         <FlowHeader icon={agentSwarmIcon} title="Agent Swarm" subtitle={f.swarmSubtitle} />
 

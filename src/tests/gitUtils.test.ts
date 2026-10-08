@@ -43,4 +43,35 @@ describe('GitUtils diff', () => {
     assert.equal(existsSync(join(plain, '.git')), false);
     rmSync(plain, { recursive: true, force: true });
   });
+
+  test('discarding everything is recoverable, new files included', () => {
+    const git = new GitUtils(repo);
+    execSync('git add -A && git -c user.email=t@t -c user.name=t commit -q -m base', { cwd: repo });
+    writeFileSync(join(repo, '.gitignore'), 'node_modules\nchanged\n');
+    writeFileSync(join(repo, 'new.js'), 'export const x = 1;\n');
+    const stash = git.revertAllChanges();
+    assert.ok(stash);
+    assert.equal(existsSync(join(repo, 'new.js')), false);
+    assert.equal(readFileSync(join(repo, '.gitignore'), 'utf-8'), 'node_modules\n');
+    assert.equal(git.restoreDiscarded(stash), true);
+    assert.equal(readFileSync(join(repo, 'new.js'), 'utf-8'), 'export const x = 1;\n');
+    assert.match(readFileSync(join(repo, '.gitignore'), 'utf-8'), /changed/);
+  });
+
+  test('discarding one file leaves the others alone', () => {
+    const git = new GitUtils(repo);
+    writeFileSync(join(repo, 'a.js'), 'a\n');
+    writeFileSync(join(repo, 'b.js'), 'b\n');
+    const stash = git.revertFile('a.js');
+    assert.ok(stash);
+    assert.equal(existsSync(join(repo, 'a.js')), false);
+    assert.equal(readFileSync(join(repo, 'b.js'), 'utf-8'), 'b\n');
+    assert.equal(git.restoreDiscarded(stash), true);
+    assert.equal(readFileSync(join(repo, 'a.js'), 'utf-8'), 'a\n');
+  });
+
+  test('nothing to discard returns null', () => {
+    execSync('git add -A && git -c user.email=t@t -c user.name=t commit -q -m base', { cwd: repo });
+    assert.equal(new GitUtils(repo).revertAllChanges(), null);
+  });
 });

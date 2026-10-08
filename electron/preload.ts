@@ -45,7 +45,10 @@ export interface WarpApi {
   getGitDiff: (cwd?: string) => Promise<{ hasChanges: boolean; diff: string; filesChanged: string[] }>;
   /** Changed file paths only: a cheap check for the changes badge. */
   getGitStatus: (cwd?: string) => Promise<string[]>;
-  revertGit: (cwd?: string) => Promise<boolean>;
+  /** Stashes every uncommitted change; resolves to the stash commit (null if nothing changed). */
+  revertGit: (cwd?: string) => Promise<string | null>;
+  restoreDiscarded: (stash: string, cwd?: string) => Promise<boolean>;
+  revertFile: (file: string, cwd?: string) => Promise<string | null>;
   getGitBranch: (cwd?: string) => Promise<string | null>;
   gitCommit: (message: string, cwd?: string) => Promise<boolean>;
   gitPush: (remote?: string, branch?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;
@@ -205,6 +208,8 @@ const api: WarpApi = {
   getGitDiff: (cwd?: string) => ipcRenderer.invoke('git:diff', { cwd }),
   getGitStatus: (cwd?: string) => ipcRenderer.invoke('git:status', { cwd }),
   revertGit: (cwd?: string) => ipcRenderer.invoke('git:revert', { cwd }),
+  restoreDiscarded: (stash: string, cwd?: string) => ipcRenderer.invoke('git:restoreDiscarded', { stash, cwd }),
+  revertFile: (file: string, cwd?: string) => ipcRenderer.invoke('git:revertFile', { file, cwd }),
   getGitBranch: (cwd?: string) => ipcRenderer.invoke('git:branch', { cwd }),
   gitCommit: (message: string, cwd?: string) => ipcRenderer.invoke('git:commit', { message, cwd }),
   gitPush: (remote?: string, branch?: string, cwd?: string) => ipcRenderer.invoke('git:push', { remote, branch, cwd }),

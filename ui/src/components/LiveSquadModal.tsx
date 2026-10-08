@@ -18,6 +18,7 @@ import {
   SettingRow,
   SettingsDisclosure,
   isMac,
+  closeOnlyOnRequest,
   type AgentOption,
 } from './FlowParts.js';
 import type { SessionType } from '../types/warp.js';
@@ -111,7 +112,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
   const summary = [cmd ? f.testCmd(cmd) : f.autoTests, f.rounds(Number(maxRounds))].join(' · ');
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={isOpen} onOpenChange={closeOnlyOnRequest(onClose)}>
       <DialogContent className={`${FLOW_DIALOG} sm:max-w-[560px]`}>
         <FlowHeader icon={duoLoopIcon} title="Duo Loop" subtitle={f.duoSubtitle} />
 
