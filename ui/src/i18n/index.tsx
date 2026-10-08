@@ -1,11 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as namespaces from './messages/index.js';
+import { de } from './locales/de.js';
+import { es } from './locales/es.js';
+import { fr } from './locales/fr.js';
 
-export type Lang = 'en' | 'tr';
+export type Lang = 'en' | 'tr' | 'de' | 'es' | 'fr';
 
 export const LANGUAGES: { value: Lang; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'tr', label: 'Türkçe' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
 ];
 
 type Namespaces = typeof namespaces;
@@ -13,17 +19,25 @@ export type Messages = { [K in keyof Namespaces]: Namespaces[K]['en'] };
 
 const STORAGE_KEY = 'vulgaris.lang';
 
+const isLang = (value: unknown): value is Lang => LANGUAGES.some((l) => l.value === value);
+
 function detectLang(): Lang {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'en' || saved === 'tr') return saved;
+    if (isLang(saved)) return saved;
   } catch {}
-  return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('tr') ? 'tr' : 'en';
+  const system = typeof navigator !== 'undefined' ? navigator.language?.toLowerCase().slice(0, 2) : '';
+  return isLang(system) ? system : 'en';
 }
 
+/** English and Turkish live next to each other in messages/; the other languages are one file each in locales/. */
+const LOCALES: Partial<Record<Lang, Messages>> = { de, es, fr };
+
 export function getMessages(lang: Lang): Messages {
+  const whole = LOCALES[lang];
+  if (whole) return whole;
   const out = {} as Record<string, unknown>;
-  for (const [key, table] of Object.entries(namespaces)) out[key] = table[lang];
+  for (const [key, table] of Object.entries(namespaces)) out[key] = table[lang === 'tr' ? 'tr' : 'en'];
   return out as Messages;
 }
 

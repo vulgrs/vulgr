@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Sparkles,
   Shield,
@@ -13,8 +13,17 @@ import {
   Eye,
   XCircle,
   GitCompare,
+  Network,
 } from 'lucide-react';
+import { SystemMap } from './SystemMap.js';
+import { duoMap } from './flowMaps.js';
+import { ACCENT, MONO, accentStyle } from './FlowParts.js';
 import { squadAgentLabel } from '../hooks/useSquadOrchestrator.js';
+
+const MAP_AGENTS = ['claude', 'agy', 'codex', 'opencode', 'cursor', 'shell'].map((id) => ({
+  value: id,
+  label: squadAgentLabel(id as SquadSession['builderType']),
+}));
 import type { SquadSession } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
 
@@ -38,6 +47,7 @@ const PHASE_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
 
 export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStopSquad, onOpenChanges }) => {
   const { t } = useI18n();
+  const [showMap, setShowMap] = useState(false);
   if (!squad.active) return null;
 
   const finished = squad.phase === 'consensus' || squad.phase === 'failed';
@@ -49,11 +59,12 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
     : squad.statusText || '';
 
   return (
-    <div className="mx-2 mt-2 px-3.5 py-2 rounded-lg surface-panel border flex items-center justify-between gap-3 select-none z-10 shadow-card animate-slide-in-up">
+    <div className="mx-2 mt-2 rounded-lg surface-panel border select-none z-10 shadow-card animate-slide-in-up" style={accentStyle(ACCENT.duo)}>
+    <div className="px-3.5 py-2 flex items-center justify-between gap-3">
       {/* Left: who is on which side, and the goal */}
       <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="flex size-5 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-primary">
+          <div className="flex size-5 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-[color:var(--flow-accent)]">
             <Users size={11} />
           </div>
           <span className="font-semibold text-xs text-zinc-100 font-sans">{t.workspace.squadTitle}</span>
@@ -104,6 +115,20 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
           )}
         </div>
 
+        <button
+          onClick={() => setShowMap((v) => !v)}
+          className={`flex flex-shrink-0 items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-md border text-xs font-medium transition-colors ${
+            showMap
+              ? 'border-[color:var(--flow-accent)] text-zinc-100 bg-[color-mix(in_oklab,var(--flow-accent)_12%,transparent)]'
+              : 'btn-ghost'
+          }`}
+          title={showMap ? t.flow.hideSystem : t.flow.mapLive}
+          aria-expanded={showMap}
+        >
+          <Network size={11} />
+          <span>{t.flow.showSystem}</span>
+        </button>
+
         {finished ? (
           onOpenChanges && (
             <button
@@ -138,6 +163,57 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
           <X size={14} />
         </button>
       </div>
+    </div>
+
+    {showMap && (
+      <div className="grid gap-3 border-t border-zinc-900 p-3 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div>
+          <SystemMap
+            {...duoMap(
+              {
+                builder: squad.builderType,
+                verifier: squad.verifierType,
+                phase: squad.paused ? undefined : squad.phase,
+                round: squad.round,
+                maxRounds: squad.maxRounds,
+                verifyCmd: squad.verifyCmd,
+              },
+              t.flow,
+              MAP_AGENTS
+            )}
+            height={210}
+          />
+          <p className="mt-1.5 text-[11px] text-zinc-500">{t.flow.mapLiveShort}</p>
+        </div>
+        <div className="min-w-0">
+          <div className={`mb-1.5 text-[9.5px] uppercase tracking-[0.1em] text-zinc-500 ${MONO}`}>{t.flow.stepsSoFar}</div>
+          <ol className="max-h-[210px] overflow-y-auto border-l border-zinc-800 pl-3">
+            {(squad.log ?? []).map((entry, i, all) => {
+              const current = i === all.length - 1 && !finished;
+              return (
+                <li key={entry.at + ':' + i} className="relative pb-2 last:pb-0">
+                  <span
+                    className={`absolute -left-[16.5px] top-[5px] size-2 rounded-full ${
+                      current
+                        ? 'animate-pulse bg-[color:var(--flow-accent)]'
+                        : entry.phase === 'failed'
+                          ? 'bg-red-400'
+                          : entry.phase === 'consensus'
+                            ? 'bg-emerald-400'
+                            : 'bg-zinc-600'
+                    }`}
+                  />
+                  <p className={`text-[11.5px] leading-snug ${current ? 'text-zinc-100' : 'text-zinc-400'}`}>{entry.text}</p>
+                  <span className={`text-[9.5px] text-zinc-600 ${MONO}`}>
+                    {new Date(entry.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </div>
+    )}
     </div>
   );
 };

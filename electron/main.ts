@@ -458,7 +458,7 @@ function setupIpcHandlers() {
       // The project folder picked in the sidebar, not wherever the app was launched from.
       cwd: cwd || currentCwd,
       useSandbox: useSandbox ?? false,
-      lang: lang === 'en' ? 'en' : 'tr',
+      lang: lang === 'tr' ? 'tr' : 'en',
       onMessage: (message) => {
         mainWindow?.webContents.send('mesh:event', message);
       },
@@ -490,7 +490,7 @@ function setupIpcHandlers() {
       maxParallel,
       maxRounds,
       cwd: cwd || currentCwd,
-      lang: lang === 'en' ? 'en' : 'tr',
+      lang: lang === 'tr' ? 'tr' : 'en',
       autoApply: false,
       onEvent: (event) => mainWindow?.webContents.send('orchestra:event', event),
     });

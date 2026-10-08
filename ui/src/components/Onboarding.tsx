@@ -485,8 +485,8 @@ export const Onboarding: React.FC<{
 
           {step === 'prefs' && (
             <div className="mt-5 space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="w-14 text-[11px] text-zinc-500">{t.onboarding.prefs.language}</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="w-14 flex-shrink-0 text-[11px] text-zinc-500">{t.onboarding.prefs.language}</span>
                 {LANGUAGES.map((l) => (
                   <button key={l.value} onClick={() => setLang(l.value)} className={choice(lang === l.value)}>
                     {l.label}

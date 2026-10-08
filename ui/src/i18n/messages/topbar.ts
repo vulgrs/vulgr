@@ -4,7 +4,6 @@ export const topbar = ns(
   {
     toggleSidebar: 'Show / hide left panel',
     toggleSidebarHint: 'Show / hide left panel (Ctrl+Shift+B)',
-    claudeChatHint: 'Claude Code Chat — talk to Claude Code and watch its output as chat, with a live diff panel',
     memory: 'Memory',
     memoryHint: 'Memory & templates (Ctrl+Shift+K) — save commands you use often and write rules the agents should remember about your project',
     paletteHint: 'Command palette (Ctrl+Shift+P) — search and run any action in the app by name',
@@ -27,7 +26,6 @@ export const topbar = ns(
   {
     toggleSidebar: 'Sol paneli göster / gizle',
     toggleSidebarHint: 'Sol paneli göster / gizle (Ctrl+Shift+B)',
-    claudeChatHint: 'Claude Code Sohbet — Claude Code ile konuşun, çıktısını sohbet olarak ve canlı fark paneliyle izleyin',
     memory: 'Hafıza',
     memoryHint: 'Hafıza ve şablonlar (Ctrl+Shift+K) — sık kullandığınız komutları saklayın, ajanların projeniz hakkında hatırlaması gereken kuralları yazın',
     paletteHint: 'Komut paleti (Ctrl+Shift+P) — uygulamadaki her işlemi adıyla arayıp çalıştırın',

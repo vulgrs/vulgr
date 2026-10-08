@@ -8,9 +8,12 @@ import { Switch } from '@/components/ui/switch.js';
 import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
 import appLogo from '../assets/sidebar/logo.svg';
 import { AgentLogo } from './AgentLogo.js';
+import { SystemMap, ViewToggle } from './SystemMap.js';
+import { swarmMap } from './flowMaps.js';
 import {
+  ACCENT,
+  ACCENT_BUTTON,
   FLOW_DIALOG,
-  FlowArrow,
   FlowFooter,
   FlowHeader,
   FlowInput,
@@ -18,11 +21,13 @@ import {
   Kbd,
   MONO,
   MissingAgents,
+  RailStep,
   RoleCard,
   SectionLabel,
   Segmented,
   SettingRow,
   SettingsDisclosure,
+  accentStyle,
   isMac,
   closeOnlyOnRequest,
   type AgentOption,
@@ -84,6 +89,13 @@ const AGENTS: AgentOption[] = [
 const ROUND_VALUES = ['1', '2', '3', '5'];
 
 type Role = 'tests' | 'code' | 'review';
+
+/** The messages each role sends, for "what did this agent do" on the map. */
+const ROLE_TYPES: Record<Role, string[]> = {
+  tests: ['TESTS_WRITTEN', 'VERIFICATION_FAILED', 'VERIFICATION_PASSED'],
+  code: ['CODE_READY', 'PATCH_APPLIED'],
+  review: ['SECURITY_CONCERN', 'CONSENSUS_APPROVED'],
+};
 
 /** Which card a running stage belongs to. */
 const STAGE_ROLE: Partial<Record<MeshStatus['stage'], Role>> = {
@@ -151,6 +163,8 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [status, setStatus] = useState<MeshStatus | null>(null);
   const [result, setResult] = useState<MeshResult | null>(null);
+  const [view, setView] = useState<'list' | 'map'>(() => (loadSetting('view', 'list') === 'map' ? 'map' : 'list'));
+  const [picked, setPicked] = useState<Role | null>(null);
 
   const feedEndRef = useRef<HTMLDivElement>(null);
   const openRef = useRef(isOpen);
@@ -256,6 +270,15 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     return types.has('CONSENSUS_APPROVED') ? 'done' : 'idle';
   };
 
+  const graph = swarmMap(
+    { verifier, builder, auditor, stage: started ? status?.stage : undefined, seen: types, result },
+    f,
+    AGENTS
+  );
+  const pickedMessage = picked
+    ? [...messages].reverse().find((msg) => ROLE_TYPES[picked].includes(msg.type))
+    : undefined;
+
   const summary = [cmd ? f.testCmd(cmd) : f.autoTests, f.rounds(Number(maxRounds)), useSandbox ? f.sandboxOn : '']
     .filter(Boolean)
     .join(' · ');
@@ -282,8 +305,22 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={closeOnlyOnRequest(onClose)}>
-      <DialogContent className={`${FLOW_DIALOG} sm:max-w-[680px]`}>
-        <FlowHeader icon={agentSwarmIcon} title="Agent Swarm" subtitle={f.swarmSubtitle} />
+      <DialogContent className={`${FLOW_DIALOG} sm:max-w-[680px]`} style={accentStyle(ACCENT.swarm)}>
+        <FlowHeader
+          icon={agentSwarmIcon}
+          title="Agent Swarm"
+          subtitle={f.swarmSubtitle}
+          actions={
+            <ViewToggle
+              value={view}
+              labels={{ list: f.viewList, map: f.viewMap }}
+              onChange={(v) => {
+                setView(v);
+                saveSetting('view', v);
+              }}
+            />
+          }
+        />
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
           {started ? (
@@ -312,37 +349,72 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
               <p className="rounded-[11px] border border-dashed border-zinc-800 px-3.5 py-4 text-center text-[12px] text-zinc-500">
                 {f.noAgents}
               </p>
+            ) : view === 'map' ? (
+              <>
+                <SystemMap
+                  {...graph}
+                  height={250}
+                  demo={!started}
+                  selected={picked}
+                  onSelect={started ? (id) => (['tests', 'code', 'review'].includes(id) ? setPicked(id as Role) : undefined) : undefined}
+                />
+                <p className="mt-2 text-[11px] text-zinc-500">{started ? f.mapLive : f.mapIntro}</p>
+                {started && picked && (
+                  <div className="mt-2 rounded-[11px] border border-zinc-800 bg-base-elevated/60 px-3.5 py-2.5">
+                    {pickedMessage ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Sender id={pickedMessage.from} />
+                          <span className={`text-[10.5px] text-zinc-400 ${MONO}`}>{m.types[pickedMessage.type] ?? pickedMessage.type}</span>
+                        </div>
+                        <p className="mt-1 text-[12px] leading-relaxed text-zinc-200">{pickedMessage.payload.summary}</p>
+                        {(pickedMessage.payload.errorTrace || pickedMessage.payload.details) && (
+                          <pre className={`mt-1.5 max-h-48 overflow-y-auto rounded-[8px] border border-zinc-800 bg-base-app p-2.5 text-[10.5px] whitespace-pre-wrap text-zinc-300 ${MONO}`}>
+                            {pickedMessage.payload.errorTrace || pickedMessage.payload.details}
+                          </pre>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[11.5px] text-zinc-500">{f.noActivity}</p>
+                    )}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="flex items-stretch gap-2">
-                <RoleCard
-                  step={`1 · ${f.stepTests}`}
-                  duty={cmd ? f.dutyRunTests : f.dutyWriteTests}
-                  value={verifier}
-                  options={installedItems}
-                  disabled={started}
-                  state={roleState('tests')}
-                  onChange={setVerifier}
-                />
-                <FlowArrow />
-                <RoleCard
-                  step={`2 · ${f.stepCode}`}
-                  duty={f.dutyCode}
-                  value={builder}
-                  options={installedItems}
-                  disabled={started}
-                  state={roleState('code')}
-                  onChange={setBuilder}
-                />
-                <FlowArrow />
-                <RoleCard
-                  step={`3 · ${f.stepReview}`}
-                  duty={f.dutyReview}
-                  value={auditor}
-                  options={installedItems}
-                  disabled={started}
-                  state={roleState('review')}
-                  onChange={setAuditor}
-                />
+              <div>
+                <RailStep n={1} state={roleState('tests')}>
+                  <RoleCard
+                    step={f.stepTests}
+                    duty={cmd ? f.dutyRunTests : f.dutyWriteTests}
+                    value={verifier}
+                    options={installedItems}
+                    disabled={started}
+                    state={roleState('tests')}
+                    onChange={setVerifier}
+                  />
+                </RailStep>
+                <RailStep n={2} state={roleState('code')}>
+                  <RoleCard
+                    step={f.stepCode}
+                    duty={f.dutyCode}
+                    value={builder}
+                    options={installedItems}
+                    disabled={started}
+                    state={roleState('code')}
+                    onChange={setBuilder}
+                  />
+                </RailStep>
+                <RailStep n={3} last state={roleState('review')}>
+                  <RoleCard
+                    step={f.stepReview}
+                    duty={f.dutyReview}
+                    value={auditor}
+                    options={installedItems}
+                    disabled={started}
+                    state={roleState('review')}
+                    onChange={setAuditor}
+                  />
+                </RailStep>
               </div>
             )}
           </div>
@@ -419,7 +491,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                 ))}
                 {isRunning && (
                   <li className="relative pl-4">
-                    <span className="absolute -left-[4.5px] top-[7px] size-2 animate-pulse rounded-full bg-primary ring-4 ring-[var(--base-surface)]" />
+                    <span className="absolute -left-[4.5px] top-[7px] size-2 animate-pulse rounded-full bg-[color:var(--flow-accent)] ring-4 ring-[var(--base-surface)]" />
                     <div className="flex items-center gap-2 text-[12px] text-zinc-300">
                       <span>{status?.text ?? m.running}</span>
                       {status && status.round > 0 && (
@@ -457,7 +529,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
               <Button variant="ghost" size="sm" onClick={onClose}>
                 {f.cancel}
               </Button>
-              <Button size="sm" disabled={!goal.trim() || noneInstalled} onClick={handleStartMesh}>
+              <Button size="sm" className={ACCENT_BUTTON} disabled={!goal.trim() || noneInstalled} onClick={handleStartMesh}>
                 <Play data-icon="inline-start" />
                 {f.start}
               </Button>

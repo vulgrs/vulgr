@@ -74,6 +74,9 @@ const TAB_DRAG_TYPE = 'application/x-vulgr-tab';
 
 /** The sidebar is laid out at the Figma frame's 1.4× scale, then enlarged uniformly for legibility. */
 const SIDEBAR_ZOOM = 1.25;
+/** Unzoomed layout width; the sidebar takes SIDEBAR_WIDTH pixels on screen. */
+const SIDEBAR_BASE_WIDTH = 200;
+export const SIDEBAR_WIDTH = SIDEBAR_BASE_WIDTH * SIDEBAR_ZOOM;
 
 /** Design icon rendered at the sidebar's 1.4× scale of its Figma frame size. */
 const DesignIcon: React.FC<{ src: string; w: number; h: number; className?: string }> = ({
@@ -442,8 +445,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div
-      style={{ zoom: SIDEBAR_ZOOM }}
-      className="relative w-64 bg-base-app border-r border-zinc-900 flex flex-col h-full select-none font-['Geist_Mono',ui-monospace,monospace] text-zinc-100 z-20 flex-shrink-0 animate-slide-in-left overflow-hidden">
+      style={{ zoom: SIDEBAR_ZOOM, width: SIDEBAR_BASE_WIDTH }}
+      className="relative bg-base-app border-r border-zinc-900 flex flex-col h-full select-none font-['Geist_Mono',ui-monospace,monospace] text-zinc-100 z-20 flex-shrink-0 overflow-hidden">
       {/* Halftone artwork behind the profile card; its gray dots are lightened on the dark theme. */}
       <img
         src={halftoneImage}

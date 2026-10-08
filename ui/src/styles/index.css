@@ -301,6 +301,22 @@
   animation: slide-in-up 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+@keyframes map-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+.animate-map-flow {
+  animation: map-flow 0.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-map-flow {
+    animation: none;
+  }
+}
+
 .animate-slide-in-left {
   animation: slide-in-left 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }

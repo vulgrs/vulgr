@@ -1,22 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeftRight, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button.js';
 import { Dialog, DialogContent } from '@/components/ui/dialog.js';
 import duoLoopIcon from '../assets/sidebar/duo-loop.svg';
+import { SystemMap, ViewToggle } from './SystemMap.js';
+import { duoMap } from './flowMaps.js';
 import {
+  ACCENT,
+  ACCENT_BUTTON,
   FLOW_DIALOG,
-  FlowArrow,
   FlowFooter,
   FlowHeader,
   FlowInput,
   GoalInput,
   Kbd,
+  LoopRing,
   MissingAgents,
+  PaneFrame,
   RoleCard,
   SectionLabel,
   Segmented,
   SettingRow,
   SettingsDisclosure,
+  accentStyle,
   isMac,
   closeOnlyOnRequest,
   type AgentOption,
@@ -73,6 +79,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
   const [verifyCmd, setVerifyCmd] = useState(() => load('testCommand', ''));
   const [maxRounds, setMaxRounds] = useState(() => load('maxRounds', '3'));
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
+  const [view, setView] = useState<'list' | 'map'>(() => (load('view', 'list') === 'map' ? 'map' : 'list'));
 
   useEffect(() => {
     if (!isOpen || !window.warpApi?.getAvailableAgents) return;
@@ -113,8 +120,22 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
 
   return (
     <Dialog open={isOpen} onOpenChange={closeOnlyOnRequest(onClose)}>
-      <DialogContent className={`${FLOW_DIALOG} sm:max-w-[560px]`}>
-        <FlowHeader icon={duoLoopIcon} title="Duo Loop" subtitle={f.duoSubtitle} />
+      <DialogContent className={`${FLOW_DIALOG} sm:max-w-[600px]`} style={accentStyle(ACCENT.duo)}>
+        <FlowHeader
+          icon={duoLoopIcon}
+          title="Duo Loop"
+          subtitle={f.duoSubtitle}
+          actions={
+            <ViewToggle
+              value={view}
+              labels={{ list: f.viewList, map: f.viewMap }}
+              onChange={(v) => {
+                setView(v);
+                save('view', v);
+              }}
+            />
+          }
+        />
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
           <div>
@@ -134,23 +155,20 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
               <p className="rounded-[11px] border border-dashed border-zinc-800 px-3.5 py-4 text-center text-[12px] text-zinc-500">
                 {f.noAgents}
               </p>
+            ) : view === 'map' ? (
+              <>
+                <SystemMap {...duoMap({ builder, verifier, verifyCmd: cmd }, f, verifierItems)} height={230} demo />
+                <p className="mt-2 text-[11px] text-zinc-500">{f.mapIntro}</p>
+              </>
             ) : (
               <div className="flex items-stretch gap-2">
-                <RoleCard
-                  step={`${f.leftPane} · ${f.writer}`}
-                  duty={f.dutyWriter}
-                  value={builder}
-                  options={installed}
-                  onChange={setBuilder}
-                />
-                <FlowArrow icon={<ArrowLeftRight size={13} />} />
-                <RoleCard
-                  step={`${f.rightPane} · ${f.checker}`}
-                  duty={checkerDuty}
-                  value={verifier}
-                  options={verifierItems}
-                  onChange={setVerifier}
-                />
+                <PaneFrame title={f.leftPane}>
+                  <RoleCard step={f.writer} duty={f.dutyWriter} value={builder} options={installed} onChange={setBuilder} />
+                </PaneFrame>
+                <LoopRing label={`×${maxRounds}`} />
+                <PaneFrame title={f.rightPane}>
+                  <RoleCard step={f.checker} duty={checkerDuty} value={verifier} options={verifierItems} onChange={setVerifier} />
+                </PaneFrame>
               </div>
             )}
           </div>
@@ -198,7 +216,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
           <Button variant="ghost" size="sm" onClick={onClose}>
             {f.cancel}
           </Button>
-          <Button size="sm" disabled={!goal.trim() || noBuilder} onClick={handleSubmit}>
+          <Button size="sm" className={ACCENT_BUTTON} disabled={!goal.trim() || noBuilder} onClick={handleSubmit}>
             <Play data-icon="inline-start" />
             {f.start}
           </Button>

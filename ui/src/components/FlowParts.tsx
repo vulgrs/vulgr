@@ -33,15 +33,36 @@ export interface AgentOption {
   label: string;
 }
 
-export const FlowHeader: React.FC<{ icon: string; title: string; subtitle: string }> = ({ icon, title, subtitle }) => (
-  <div className="flex items-center gap-3 border-b border-zinc-900 px-5 py-4 pr-12">
-    <span className="flex size-9 flex-shrink-0 items-center justify-center rounded-[10px] border border-zinc-800 bg-base-elevated">
+/** The main action of a flow, in the flow's own colour. */
+export const ACCENT_BUTTON =
+  'bg-[color:var(--flow-accent)] text-zinc-950 hover:bg-[color:color-mix(in_oklab,var(--flow-accent)_85%,white)] disabled:opacity-40';
+
+/** Each flow has its own colour, set on the dialog as --flow-accent. */
+export const ACCENT = {
+  duo: '#22d3ee',
+  swarm: '#a78bfa',
+  orchestra: '#f59e0b',
+} as const;
+
+export const accentStyle = (accent: string) => ({ '--flow-accent': accent }) as React.CSSProperties;
+
+export const FlowHeader: React.FC<{
+  icon: string;
+  title: string;
+  subtitle: string;
+  /** Drawn left of the dialog's close button, e.g. the List / System switch. */
+  actions?: React.ReactNode;
+}> = ({ icon, title, subtitle, actions }) => (
+  <div className="relative flex items-center gap-3 overflow-hidden border-b border-zinc-900 px-5 py-4 pr-12 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--flow-accent)_10%,transparent),transparent)]">
+    <span className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--flow-accent),transparent)] opacity-70" />
+    <span className="relative flex size-9 flex-shrink-0 items-center justify-center rounded-[10px] border border-[color:color-mix(in_oklab,var(--flow-accent)_45%,transparent)] bg-[color-mix(in_oklab,var(--flow-accent)_12%,var(--color-base-elevated))]">
       <img src={icon} alt="" draggable={false} className="h-[15px] w-auto" />
     </span>
-    <div className="min-w-0">
+    <div className="relative min-w-0 flex-1">
       <DialogTitle className="text-[15px] font-medium text-zinc-100">{title}</DialogTitle>
       <DialogDescription className={`mt-0.5 text-[10.5px] text-zinc-500 ${MONO}`}>{subtitle}</DialogDescription>
     </div>
+    {actions && <div className="relative flex-shrink-0">{actions}</div>}
   </div>
 );
 
@@ -104,7 +125,7 @@ export const RoleCard: React.FC<{
   const current = options.find((o) => o.value === value) ?? { value, label: value };
   const frame =
     state === 'active'
-      ? 'border-primary/60 bg-primary/[0.07]'
+      ? 'border-[color:var(--flow-accent)] bg-[color-mix(in_oklab,var(--flow-accent)_8%,transparent)]'
       : state === 'failed'
         ? 'border-red-500/40 bg-red-500/[0.05]'
         : state === 'warn'
@@ -114,7 +135,7 @@ export const RoleCard: React.FC<{
     <div className={`min-w-0 flex-1 rounded-[11px] border px-3 py-2.5 transition-colors ${frame}`}>
       <div className="flex items-center justify-between gap-2">
         <span className={`text-[9.5px] uppercase tracking-[0.1em] text-zinc-500 ${MONO}`}>{step}</span>
-        {state === 'active' && <Loader2 size={11} className="animate-spin text-primary" />}
+        {state === 'active' && <Loader2 size={11} className="animate-spin text-[color:var(--flow-accent)]" />}
         {state === 'done' && <Check size={12} className="text-emerald-400" />}
         {state === 'warn' && <TriangleAlert size={11} className="text-amber-400" />}
         {state === 'failed' && <X size={12} className="text-red-400" />}
@@ -272,3 +293,69 @@ export const MissingAgents: React.FC<{ names: string[]; text: (names: string) =>
       )}
     </span>
   );
+
+/** Lines fanning out from one card to many (split) or back into one (join), for the Orchestrator's tree. */
+export const TreeFan: React.FC<{ branches: number; join?: boolean }> = ({ branches, join }) => {
+  const n = Math.max(1, Math.min(branches, 5));
+  const xs = Array.from({ length: n }, (_, i) => (n === 1 ? 50 : 14 + (72 * i) / (n - 1)));
+  return (
+    <svg viewBox="0 0 100 24" preserveAspectRatio="none" className="h-6 w-full" aria-hidden>
+      {xs.map((x) => (
+        <path
+          key={x}
+          d={join ? `M ${x} 0 C ${x} 14, 50 10, 50 24` : `M 50 0 C 50 14, ${x} 10, ${x} 24`}
+          fill="none"
+          stroke="color-mix(in oklab, var(--flow-accent) 55%, transparent)"
+          strokeWidth={1.25}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
+  );
+};
+
+/** A role card drawn as a small terminal pane, for Duo Loop where each agent gets a pane. */
+export const PaneFrame: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="min-w-0 flex-1 overflow-hidden rounded-[11px] border border-zinc-800 bg-base-app">
+    <div className="flex items-center gap-1.5 border-b border-zinc-900 px-2.5 py-1.5">
+      <span className="size-[7px] rounded-full bg-zinc-700" />
+      <span className="size-[7px] rounded-full bg-zinc-700" />
+      <span className="size-[7px] rounded-full bg-zinc-700" />
+      <span className={`ml-1.5 truncate text-[9.5px] uppercase tracking-[0.1em] text-zinc-500 ${MONO}`}>{title}</span>
+    </div>
+    <div className="p-1.5 [&>div]:border-0 [&>div]:bg-transparent">{children}</div>
+  </div>
+);
+
+/** Duo Loop's centre piece: a ring with arrows going round, the loop the two agents run. */
+export const LoopRing: React.FC<{ label?: string; spinning?: boolean }> = ({ label, spinning }) => (
+  <div className="relative flex size-[64px] flex-shrink-0 items-center justify-center self-center">
+    <svg viewBox="0 0 64 64" className={`absolute inset-0 ${spinning ? 'animate-[spin_6s_linear_infinite]' : ''}`} aria-hidden>
+      <circle cx="32" cy="32" r="26" fill="none" stroke="var(--color-zinc-800)" strokeWidth="1.5" />
+      <path d="M 32 6 A 26 26 0 0 1 58 32" fill="none" stroke="var(--flow-accent)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M 32 58 A 26 26 0 0 1 6 32" fill="none" stroke="var(--flow-accent)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M 55 26 L 58 32 L 61 26" fill="none" stroke="var(--flow-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M 9 38 L 6 32 L 3 38" fill="none" stroke="var(--flow-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+    {label && <span className={`relative text-[10px] text-zinc-300 ${MONO}`}>{label}</span>}
+  </div>
+);
+
+/** Swarm's pipeline: numbered stops on a vertical rail, one role per stop. */
+export const RailStep: React.FC<{ n: number; last?: boolean; state?: RoleState; children: React.ReactNode }> = ({ n, last, state = 'idle', children }) => (
+  <div className="relative flex gap-3">
+    {!last && <span className="absolute top-8 bottom-[-8px] left-[13px] w-px bg-zinc-800" />}
+    <span
+      className={`relative z-[1] mt-2.5 flex size-[27px] flex-shrink-0 items-center justify-center rounded-full border text-[11px] ${MONO} ${
+        state === 'active'
+          ? 'border-[color:var(--flow-accent)] bg-[color-mix(in_oklab,var(--flow-accent)_18%,var(--color-base-app))] text-zinc-100'
+          : state === 'done'
+            ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300'
+            : 'border-zinc-800 bg-base-app text-zinc-500'
+      }`}
+    >
+      {n}
+    </span>
+    <div className="min-w-0 flex-1 pb-2">{children}</div>
+  </div>
+);

@@ -5,9 +5,12 @@ import { Dialog, DialogContent } from '@/components/ui/dialog.js';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
 import { AgentLogo } from './AgentLogo.js';
 import { DiffViewer } from './DiffViewer.js';
+import { SystemMap, ViewToggle } from './SystemMap.js';
+import { orchestraMap } from './flowMaps.js';
 import {
+  ACCENT,
+  ACCENT_BUTTON,
   FLOW_DIALOG,
-  FlowArrow,
   FlowFooter,
   FlowHeader,
   FlowInput,
@@ -20,6 +23,8 @@ import {
   Segmented,
   SettingRow,
   SettingsDisclosure,
+  TreeFan,
+  accentStyle,
   isMac,
   closeOnlyOnRequest,
   type AgentOption,
@@ -92,10 +97,10 @@ const save = (key: string, value: string) => {
 
 const STATE_ICON: Record<TaskState, React.ReactNode> = {
   waiting: <span className="size-1.5 rounded-full bg-zinc-600" />,
-  running: <Loader2 size={12} className="animate-spin text-primary" />,
-  testing: <Loader2 size={12} className="animate-spin text-primary" />,
+  running: <Loader2 size={12} className="animate-spin text-[color:var(--flow-accent)]" />,
+  testing: <Loader2 size={12} className="animate-spin text-[color:var(--flow-accent)]" />,
   fixing: <Loader2 size={12} className="animate-spin text-amber-400" />,
-  merging: <Loader2 size={12} className="animate-spin text-primary" />,
+  merging: <Loader2 size={12} className="animate-spin text-[color:var(--flow-accent)]" />,
   done: <Check size={13} className="text-emerald-400" />,
   failed: <X size={13} className="text-red-400" />,
   skipped: <Minus size={13} className="text-zinc-500" />,
@@ -110,9 +115,9 @@ const WorkerPicker: React.FC<{
   disabled?: boolean;
   onChange: (value: string[]) => void;
 }> = ({ step, duty, options, value, disabled, onChange }) => (
-  <div className="min-w-0 flex-[1.4] rounded-[11px] border border-zinc-800 bg-base-elevated/60 px-3 py-2.5">
-    <span className={`text-[9.5px] uppercase tracking-[0.1em] text-zinc-500 ${MONO}`}>{step}</span>
-    <div className="mt-2 flex flex-wrap gap-1.5">
+  <div className="w-full min-w-0 rounded-[11px] border border-zinc-800 bg-base-elevated/60 px-3 py-2.5">
+    <span className={`block text-center text-[9.5px] uppercase tracking-[0.1em] text-zinc-500 ${MONO}`}>{step}</span>
+    <div className="mt-2 flex flex-wrap justify-center gap-1.5">
       {options.map((o) => {
         const on = value.includes(o.value);
         return (
@@ -132,7 +137,7 @@ const WorkerPicker: React.FC<{
         );
       })}
     </div>
-    <p className="mt-2 text-[11px] leading-snug text-zinc-500">{duty}</p>
+    <p className="mt-2 text-center text-[11px] leading-snug text-zinc-500">{duty}</p>
   </div>
 );
 
@@ -155,6 +160,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   const [parallel, setParallel] = useState(() => load('parallel', '3'));
   const [rounds, setRounds] = useState(() => load('rounds', '2'));
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
+  const [view, setView] = useState<'list' | 'map'>(() => (load('view', 'list') === 'map' ? 'map' : 'list'));
 
   const [running, setRunning] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -352,6 +358,22 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     return 'idle';
   };
 
+  const mapGraph = orchestraMap(
+    {
+      planner,
+      reviewer,
+      workers,
+      tasks,
+      phase: started ? phase : null,
+      review: result?.review,
+      pending,
+      decision,
+    },
+    f,
+    o,
+    AGENTS
+  );
+
   const settingsSummary = [verifyCmd.trim() ? f.testCmd(verifyCmd.trim()) : '', o.parallel(Number(parallel)), f.rounds(Number(rounds))]
     .filter(Boolean)
     .join(' · ');
@@ -381,8 +403,10 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     }
     if (result.pendingReview) {
       return {
-        tone: clean ? 'border-primary/40 bg-primary/[0.06]' : 'border-amber-500/30 bg-amber-500/[0.06]',
-        icon: clean ? <CheckCircle2 size={15} className="text-primary" /> : <TriangleAlert size={15} className="text-amber-400" />,
+        tone: clean
+          ? 'border-[color:color-mix(in_oklab,var(--flow-accent)_45%,transparent)] bg-[color-mix(in_oklab,var(--flow-accent)_6%,transparent)]'
+          : 'border-amber-500/30 bg-amber-500/[0.06]',
+        icon: clean ? <CheckCircle2 size={15} className="text-[color:var(--flow-accent)]" /> : <TriangleAlert size={15} className="text-amber-400" />,
         title: o.readyTitle(done, result.tasks.length, tests, review),
         body: applyFailed ? o.applyFailed : o.reviewHint,
       };
@@ -397,8 +421,22 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={closeOnlyOnRequest(onClose)}>
-      <DialogContent className={`${FLOW_DIALOG} sm:max-w-[720px]`}>
-        <FlowHeader icon={orchestratorIcon} title={o.title} subtitle={o.subtitle} />
+      <DialogContent className={`${FLOW_DIALOG} sm:max-w-[720px]`} style={accentStyle(ACCENT.orchestra)}>
+        <FlowHeader
+          icon={orchestratorIcon}
+          title={o.title}
+          subtitle={o.subtitle}
+          actions={
+            <ViewToggle
+              value={view}
+              labels={{ list: f.viewList, map: f.viewMap }}
+              onChange={(v) => {
+                setView(v);
+                save('view', v);
+              }}
+            />
+          }
+        />
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
           {started ? (
@@ -423,10 +461,17 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                   <p className="rounded-[11px] border border-dashed border-zinc-800 px-3.5 py-4 text-center text-[12px] text-zinc-500">
                     {f.noAgents}
                   </p>
+                ) : view === 'map' ? (
+                  <>
+                    <SystemMap {...mapGraph} height={Math.max(220, 70 * workers.length + 40)} demo />
+                    <p className="mt-2 text-[11px] text-zinc-500">{f.mapIntro}</p>
+                  </>
                 ) : (
-                  <div className="flex items-stretch gap-2">
-                    <RoleCard step={`1 · ${o.stepPlan}`} duty={o.dutyPlan} value={planner} options={installed} onChange={setPlanner} />
-                    <FlowArrow />
+                  <div className="flex flex-col items-center">
+                    <div className="w-full max-w-[300px]">
+                      <RoleCard step={`1 · ${o.stepPlan}`} duty={o.dutyPlan} value={planner} options={installed} onChange={setPlanner} />
+                    </div>
+                    <TreeFan branches={Math.max(workers.length, 1)} />
                     <WorkerPicker
                       step={`2 · ${o.stepWork}`}
                       duty={workers.length ? o.dutyWork : o.pickWorkers}
@@ -434,8 +479,10 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                       value={workers}
                       onChange={setWorkers}
                     />
-                    <FlowArrow />
-                    <RoleCard step={`3 · ${o.stepReview}`} duty={o.dutyReview} value={reviewer} options={installed} onChange={setReviewer} />
+                    <TreeFan branches={Math.max(workers.length, 1)} join />
+                    <div className="w-full max-w-[300px]">
+                      <RoleCard step={`3 · ${o.stepReview}`} duty={o.dutyReview} value={reviewer} options={installed} onChange={setReviewer} />
+                    </div>
                   </div>
                 )}
               </div>
@@ -469,8 +516,22 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
             </>
           )}
 
+          {started && view === 'map' && (
+            <div>
+              <SystemMap
+                {...mapGraph}
+                height={Math.max(200, 64 * (tasks.length || workers.length) + 40)}
+                selected={watching}
+                onSelect={(id) => tasks.some((t) => t.id === id) && setWatching(id === watching ? null : id)}
+              />
+              <p className="mt-2 text-[11px] text-zinc-500">{summary || f.mapLive}</p>
+            </div>
+          )}
+
           {started && (
             <>
+              {view === 'list' && (
+              <>
               <div className="grid grid-cols-5 gap-1.5">
                 {PHASES.map((p, i) => {
                   const s = phaseState(i);
@@ -478,7 +539,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                     <div key={p} className="flex flex-col gap-1.5">
                       <div
                         className={`h-1 rounded-full ${
-                          s === 'done' ? 'bg-emerald-400/70' : s === 'active' ? 'animate-pulse bg-primary' : s === 'failed' ? 'bg-red-400/70' : 'bg-zinc-800'
+                          s === 'done' ? 'bg-emerald-400/70' : s === 'active' ? 'animate-pulse bg-[color:var(--flow-accent)]' : s === 'failed' ? 'bg-red-400/70' : 'bg-zinc-800'
                         }`}
                       />
                       <span className={`text-[10px] ${s === 'active' ? 'text-zinc-200' : 'text-zinc-500'} ${MONO}`}>{o.phases[p]}</span>
@@ -501,10 +562,10 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                           key={task.id}
                           onClick={() => setWatching(task.id === watching ? null : task.id)}
                           className={`flex min-w-0 flex-col rounded-[11px] border px-3 py-2.5 text-left transition-colors ${
-                            watching === task.id && running ? 'ring-1 ring-primary/60 ' : ''
+                            watching === task.id && running ? 'ring-1 ring-[color:var(--flow-accent)] ' : ''
                           }${
                             active
-                              ? 'border-primary/50 bg-primary/[0.05]'
+                              ? 'border-[color:color-mix(in_oklab,var(--flow-accent)_60%,transparent)] bg-[color-mix(in_oklab,var(--flow-accent)_6%,transparent)]'
                               : task.state === 'failed'
                                 ? 'border-red-500/30 bg-red-500/[0.04]'
                                 : 'border-zinc-800 bg-base-elevated/60'
@@ -534,6 +595,8 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                   {running && !watching && <p className="mt-2 text-[11px] text-zinc-500">{o.watchHint}</p>}
                 </div>
               )}
+              </>
+              )}
 
               {running && watching && tasks.find((t) => t.id === watching) && (() => {
                 const task = tasks.find((t) => t.id === watching)!;
@@ -558,14 +621,14 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
 
               {running && (
                 <div className="flex items-center gap-2 text-[12px] text-zinc-300">
-                  <Loader2 size={12} className="animate-spin text-primary" />
+                  <Loader2 size={12} className="animate-spin text-[color:var(--flow-accent)]" />
                   <span>{stopping ? o.stopping : statusText}</span>
                 </div>
               )}
 
               {revising && (
                 <div className="flex items-center gap-2 text-[12px] text-zinc-300">
-                  <Loader2 size={12} className="animate-spin text-primary" />
+                  <Loader2 size={12} className="animate-spin text-[color:var(--flow-accent)]" />
                   <span>{statusText || o.revising}</span>
                 </div>
               )}
@@ -602,7 +665,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                             on ? 'border-zinc-600 bg-zinc-800/70 text-zinc-100' : 'border-zinc-800 text-zinc-500 line-through'
                           }`}
                         >
-                          <span className={`flex size-3 items-center justify-center rounded-[3px] border ${on ? 'border-primary bg-primary' : 'border-zinc-600'}`}>
+                          <span className={`flex size-3 items-center justify-center rounded-[3px] border ${on ? 'border-[color:var(--flow-accent)] bg-[color:var(--flow-accent)]' : 'border-zinc-600'}`}>
                             {on && <Check size={9} className="text-white" />}
                           </span>
                           {file}
@@ -655,7 +718,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
               <Button variant="ghost" size="sm" onClick={onClose}>
                 {f.cancel}
               </Button>
-              <Button size="sm" disabled={!canStart} onClick={start}>
+              <Button size="sm" className={ACCENT_BUTTON} disabled={!canStart} onClick={start}>
                 <Play data-icon="inline-start" />
                 {f.start}
               </Button>
@@ -681,7 +744,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                   {o.requestChanges}
                 </Button>
               )}
-              <Button size="sm" disabled={revising || selected.length === 0} onClick={applySelected}>
+              <Button size="sm" className={ACCENT_BUTTON} disabled={revising || selected.length === 0} onClick={applySelected}>
                 <Check data-icon="inline-start" />
                 {o.applySelected(selected.length)}
               </Button>

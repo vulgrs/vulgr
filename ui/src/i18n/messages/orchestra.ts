@@ -66,6 +66,9 @@ export const orchestra = ns(
     stoppedTitle: 'Stopped',
     stoppedBody: 'All agents were stopped and their copies removed. Nothing was changed in your project.',
     failedTitle: 'Orchestra could not finish',
+    plannerNode: 'Planner',
+    reviewerNode: 'Reviewer',
+    taskNode: (n: number) => `Task ${n}`,
   },
   {
     title: 'Orchestrator',
@@ -131,5 +134,8 @@ export const orchestra = ns(
     stoppedTitle: 'Durduruldu',
     stoppedBody: 'Bütün ajanlar durduruldu, kopyaları silindi. Projende hiçbir şey değişmedi.',
     failedTitle: 'Orkestra tamamlanamadı',
+    plannerNode: 'Planlayıcı',
+    reviewerNode: 'Denetçi',
+    taskNode: (n: number) => `Görev ${n}`,
   }
 );

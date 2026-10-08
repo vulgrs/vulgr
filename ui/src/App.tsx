@@ -8,7 +8,7 @@ import { Onboarding, shouldShowOnboarding } from './components/Onboarding.js';
 import { BottomCommandDock } from './components/BottomCommandDock.js';
 import { RightPanel } from './components/RightPanel.js';
 import { ClaudeChatView } from './components/ClaudeChatView.js';
-import { Sidebar } from './components/Sidebar.js';
+import { Sidebar, SIDEBAR_WIDTH } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { AgentMeshModal } from './components/AgentMeshModal.js';
@@ -17,7 +17,7 @@ import { SquadBar } from './components/SquadBar.js';
 import { LiveSquadModal } from './components/LiveSquadModal.js';
 import { SkillsModal } from './components/SkillsModal.js';
 import { SandboxDrawer } from './components/SandboxDrawer.js';
-import { SettingsModal } from './components/SettingsModal.js';
+import { SettingsView } from './components/SettingsView.js';
 import { ExportReportModal } from './components/ExportReportModal.js';
 import { TokenOptimizerHUD } from './components/TokenOptimizerHUD.js';
 import { GuideModal, type GuideAction } from './components/GuideModal.js';
@@ -1316,16 +1316,27 @@ export const App: React.FC = () => {
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenSkillsModal={() => setSkillsModalOpen(true)}
         onOpenExportReport={handleOpenExportModal}
-        onOpenChat={() => setChatModeOpen(true)}
         onOpenGuide={() => setGuideOpen(true)}
       />
 
 
       {/* Main Content: Sidebar + Center Workspace + Right Panel */}
       <div className="flex-1 w-full min-h-0 relative flex bg-base-app">
-        {sidebarOpen && (
+        {/* Kept mounted so it can slide closed; the wrapper's width animates and clips it. */}
+        <div
+          className="flex-shrink-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+          style={{ width: sidebarOpen ? SIDEBAR_WIDTH : 0 }}
+          inert={!sidebarOpen}
+          aria-hidden={!sidebarOpen}
+        >
+          <div
+            className={`h-full transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
+              sidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-6 opacity-0'
+            }`}
+            style={{ width: SIDEBAR_WIDTH }}
+          >
           <Sidebar
-            isOpen={sidebarOpen}
+            isOpen
             onToggleSidebar={() => setSidebarOpen((v) => !v)}
             gitBranch={gitBranch}
             tabs={tabs}
@@ -1359,9 +1370,21 @@ export const App: React.FC = () => {
             onAddMemoryFact={handleAddMemoryFact}
             onDeleteMemoryFact={handleDeleteMemoryFact}
           />
-        )}
+          </div>
+        </div>
 
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-base-app">
+        <div className="relative flex-1 min-w-0 min-h-0 flex flex-col bg-base-app">
+          {/* Settings open as a page over the terminals, which stay mounted underneath. */}
+          <SettingsView
+            isOpen={settingsModalOpen}
+            onClose={() => setSettingsModalOpen(false)}
+            onShowWelcome={() => {
+              setSettingsModalOpen(false);
+              setOnboardingOpen(true);
+            }}
+            onOpenAgents={() => setAgentSetupOpen(true)}
+          />
+
           {/* Live Squad Status Banner (if active on current tab) */}
           {squad && squad.tabId === activeTabId && squad.active && (
             <SquadBar
@@ -1511,20 +1534,6 @@ export const App: React.FC = () => {
         onInsertIntoInput={(command) => {
           insertIntoDock(command);
           setSkillsModalOpen(false);
-        }}
-      />
-
-      {/* CLI Permissions & Settings Modal */}
-      <SettingsModal
-        isOpen={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-        onShowWelcome={() => {
-          setSettingsModalOpen(false);
-          setOnboardingOpen(true);
-        }}
-        onOpenAgents={() => {
-          setSettingsModalOpen(false);
-          setAgentSetupOpen(true);
         }}
       />
 

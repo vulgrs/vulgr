@@ -97,6 +97,15 @@ export interface SquadSession {
   error?: string;
   /** The loop holds before its next step so the user can step in. */
   paused?: boolean;
+  /** Every step so far, for the live system view. */
+  log?: SquadLogEntry[];
+}
+
+export interface SquadLogEntry {
+  phase: SquadPhase;
+  text: string;
+  round: number;
+  at: number;
 }
 
 export interface TerminalCommandBlock {

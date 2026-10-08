@@ -67,7 +67,16 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
   const runIdRef = useRef(0);
   const pausedRef = useRef(false);
 
-  const update = (patch: Partial<SquadSession>) => setSquad((prev) => (prev ? { ...prev, ...patch } : prev));
+  // A new phase with a status line is also added to the step log.
+  const update = (patch: Partial<SquadSession>) =>
+    setSquad((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      if (patch.phase && patch.statusText) {
+        next.log = [...(prev.log ?? []), { phase: patch.phase, text: patch.statusText, round: next.round, at: Date.now() }];
+      }
+      return next;
+    });
 
   const startSquad = useCallback(
     (config: SquadConfig, tabId: string, builderSessionId: string, verifierSessionId: string) => {
@@ -90,6 +99,8 @@ export const useSquadOrchestrator = (deps: SquadDeps) => {
         round: 1,
         maxRounds: config.maxRounds,
         statusText: msg().building(label(config.builder)),
+        // Without a test command the first step is the verifier writing tests, logged by step().
+        log: config.verifyCmd.trim() ? [{ phase: 'building', text: msg().building(label(config.builder)), round: 1, at: Date.now() }] : [],
       });
 
       // Throws once this run was stopped or replaced; holds while paused.

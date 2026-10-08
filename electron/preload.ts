@@ -65,7 +65,7 @@ export interface WarpApi {
     maxRounds?: number;
     cwd?: string;
     useSandbox?: boolean;
-    lang?: 'en' | 'tr';
+    lang?: string;
   }) => Promise<any>;
   onMeshEvent: (callback: (message: any) => void) => () => void;
   onMeshStatus: (callback: (status: any) => void) => () => void;
@@ -80,7 +80,7 @@ export interface WarpApi {
     maxParallel?: number;
     maxRounds?: number;
     cwd?: string;
-    lang?: 'en' | 'tr';
+    lang?: string;
   }) => Promise<any>;
   stopOrchestra: () => Promise<boolean>;
   /** What agents have written so far: a running task's copy, or the combined change. */

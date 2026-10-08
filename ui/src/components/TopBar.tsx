@@ -6,7 +6,6 @@ import {
   Sliders,
   GitCompare,
   FileDown,
-  Sparkles,
   Minus,
   Square,
 
@@ -21,7 +20,6 @@ interface TopBarProps {
   onToggleDiff: () => void;
   onOpenSkillsModal: () => void;
   onOpenExportReport: () => void;
-  onOpenChat: () => void;
   doctor: DoctorStatus | null;
   hasUncommittedDiff: boolean;
   sidebarOpen: boolean;
@@ -60,7 +58,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleDiff,
   onOpenSkillsModal,
   onOpenExportReport,
-  onOpenChat,
   doctor,
   hasUncommittedDiff,
   sidebarOpen,
@@ -104,15 +101,6 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           {sidebarOpen ? <PanelLeftClose size={13} /> : <PanelLeft size={13} />}
         </button>
-        {onOpenChat && (
-          <ToolButton
-            onClick={onOpenChat}
-            icon={<Sparkles size={13} />}
-            label="Claude Chat"
-            highlight
-            title={t.topbar.claudeChatHint}
-          />
-        )}
         <ToolButton
           onClick={onOpenSkillsModal}
           icon={<Sliders size={13} />}
