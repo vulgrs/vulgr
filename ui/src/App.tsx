@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import { TopBar } from './components/TopBar.js';
 import { PaneGrid } from './components/PaneGrid.js';
@@ -11,16 +11,8 @@ import { ClaudeChatView } from './components/ClaudeChatView.js';
 import { Sidebar, SIDEBAR_WIDTH, SIDEBAR_MAX_WIDTH, clampSidebarWidth } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
-import { AgentMeshModal } from './components/AgentMeshModal.js';
-import { OrchestraModal } from './components/OrchestraModal.js';
 import { SquadBar } from './components/SquadBar.js';
-import { LiveSquadModal } from './components/LiveSquadModal.js';
-import { SkillsModal } from './components/SkillsModal.js';
-import { SandboxDrawer } from './components/SandboxDrawer.js';
-import { SettingsView } from './components/SettingsView.js';
-import { ExportReportModal } from './components/ExportReportModal.js';
-import { TokenOptimizerHUD } from './components/TokenOptimizerHUD.js';
-import { GuideModal, type GuideAction } from './components/GuideModal.js';
+import type { GuideAction } from './components/GuideModal.js';
 import { AgentSetupModal } from './components/AgentSetupModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
@@ -45,6 +37,25 @@ declare global {
   interface Window {
     warpApi: any;
   }
+}
+
+// Dialogs and pages that are not needed to start are loaded the first time they open,
+// and then stay mounted (a running Agent Swarm keeps listening while its dialog is closed).
+const SettingsView = lazy(() => import('./components/SettingsView.js').then((m) => ({ default: m.SettingsView })));
+const TokenOptimizerHUD = lazy(() => import('./components/TokenOptimizerHUD.js').then((m) => ({ default: m.TokenOptimizerHUD })));
+const SandboxDrawer = lazy(() => import('./components/SandboxDrawer.js').then((m) => ({ default: m.SandboxDrawer })));
+const AgentMeshModal = lazy(() => import('./components/AgentMeshModal.js').then((m) => ({ default: m.AgentMeshModal })));
+const OrchestraModal = lazy(() => import('./components/OrchestraModal.js').then((m) => ({ default: m.OrchestraModal })));
+const LiveSquadModal = lazy(() => import('./components/LiveSquadModal.js').then((m) => ({ default: m.LiveSquadModal })));
+const SkillsModal = lazy(() => import('./components/SkillsModal.js').then((m) => ({ default: m.SkillsModal })));
+const GuideModal = lazy(() => import('./components/GuideModal.js').then((m) => ({ default: m.GuideModal })));
+const ExportReportModal = lazy(() => import('./components/ExportReportModal.js').then((m) => ({ default: m.ExportReportModal })));
+
+/** True from the first time `flag` is true on. */
+function useOpenedOnce(flag: boolean): boolean {
+  const opened = useRef(false);
+  if (flag) opened.current = true;
+  return opened.current;
 }
 
 const loadPersisted = <T,>(key: string, fallback: T): T => {
@@ -154,6 +165,15 @@ export const App: React.FC = () => {
   const [hudOpen, setHudOpen] = useState(false);
   const [contextTelemetry, setContextTelemetry] = useState<ContextTelemetry | null>(null);
   const [sessionCommands, setSessionCommands] = useState<ReportCommandBlock[]>([]);
+  const settingsViewLoaded = useOpenedOnce(settingsModalOpen);
+  const tokenOptimizerHUDLoaded = useOpenedOnce(hudOpen);
+  const sandboxDrawerLoaded = useOpenedOnce(sandboxDrawerOpen);
+  const agentMeshModalLoaded = useOpenedOnce(meshModalOpen);
+  const orchestraModalLoaded = useOpenedOnce(orchestraOpen);
+  const liveSquadModalLoaded = useOpenedOnce(squadModalOpen);
+  const skillsModalLoaded = useOpenedOnce(skillsModalOpen);
+  const guideModalLoaded = useOpenedOnce(guideOpen);
+  const exportReportModalLoaded = useOpenedOnce(exportModalOpen);
 
   // Project Workspace & Memory State
   const [pastConversations, setPastConversations] = useState<PastProjectConversation[]>([]);
@@ -1479,16 +1499,20 @@ export const App: React.FC = () => {
 
         <div className="relative flex-1 min-w-0 min-h-0 flex flex-col bg-base-app">
           {/* Settings open as a page over the terminals, which stay mounted underneath. */}
-          <SettingsView
-            isOpen={settingsModalOpen}
-            onClose={() => setSettingsModalOpen(false)}
-            onShowWelcome={() => {
-              setSettingsModalOpen(false);
-              setOnboardingOpen(true);
-            }}
-            onOpenAgents={() => setAgentSetupOpen(true)}
-            cwd={cwd || undefined}
-          />
+          {settingsViewLoaded && (
+            <Suspense fallback={null}>
+              <SettingsView
+                isOpen={settingsModalOpen}
+                onClose={() => setSettingsModalOpen(false)}
+                onShowWelcome={() => {
+                  setSettingsModalOpen(false);
+                  setOnboardingOpen(true);
+                }}
+                onOpenAgents={() => setAgentSetupOpen(true)}
+                cwd={cwd || undefined}
+              />
+            </Suspense>
+          )}
 
           {/* Live Squad Status Banner (if active on current tab) */}
           {squad && squad.tabId === activeTabId && squad.active && (
@@ -1574,20 +1598,28 @@ export const App: React.FC = () => {
       />
 
       {/* Token & Context Optimizer HUD Modal */}
-      <TokenOptimizerHUD
-        isOpen={hudOpen}
-        onClose={() => setHudOpen(false)}
-        telemetry={contextTelemetry}
-        onRefreshTelemetry={fetchContextTelemetry}
-      />
+      {tokenOptimizerHUDLoaded && (
+        <Suspense fallback={null}>
+          <TokenOptimizerHUD
+            isOpen={hudOpen}
+            onClose={() => setHudOpen(false)}
+            telemetry={contextTelemetry}
+            onRefreshTelemetry={fetchContextTelemetry}
+          />
+        </Suspense>
+      )}
 
       {/* Safe Git Worktree Sandbox Review Drawer */}
-      <SandboxDrawer
-        isOpen={sandboxDrawerOpen}
-        onClose={() => setSandboxDrawerOpen(false)}
-        onOpenTerminalInSandbox={handleOpenTerminalInSandbox}
-        onRefreshDiff={refreshGitDiff}
-      />
+      {sandboxDrawerLoaded && (
+        <Suspense fallback={null}>
+          <SandboxDrawer
+            isOpen={sandboxDrawerOpen}
+            onClose={() => setSandboxDrawerOpen(false)}
+            onOpenTerminalInSandbox={handleOpenTerminalInSandbox}
+            onRefreshDiff={refreshGitDiff}
+          />
+        </Suspense>
+      )}
 
       {/* Command Palette */}
       <CommandPalette
@@ -1597,52 +1629,68 @@ export const App: React.FC = () => {
       />
 
       {/* Autonomous Agent Mesh Modal */}
-      <AgentMeshModal
-        isOpen={meshModalOpen}
-        onClose={() => setMeshModalOpen(false)}
-        cwd={cwd}
-        onOpenChanges={() => {
-          refreshGitDiff();
-          setRightPanelOpen(true);
-        }}
-        onOpenSandboxes={() => setSandboxDrawerOpen(true)}
-        onInstallAgents={() => setAgentSetupOpen(true)}
-      />
+      {agentMeshModalLoaded && (
+        <Suspense fallback={null}>
+          <AgentMeshModal
+            isOpen={meshModalOpen}
+            onClose={() => setMeshModalOpen(false)}
+            cwd={cwd}
+            onOpenChanges={() => {
+              refreshGitDiff();
+              setRightPanelOpen(true);
+            }}
+            onOpenSandboxes={() => setSandboxDrawerOpen(true)}
+            onInstallAgents={() => setAgentSetupOpen(true)}
+          />
+        </Suspense>
+      )}
 
       {/* Orchestra: a planner splits the goal, workers run the parts in parallel */}
-      <OrchestraModal
-        isOpen={orchestraOpen}
-        onClose={() => setOrchestraOpen(false)}
-        cwd={cwd}
-        onOpenChanges={() => {
-          refreshGitDiff();
-          setRightPanelOpen(true);
-        }}
-        onOpenSandboxes={() => setSandboxDrawerOpen(true)}
-        onInstallAgents={() => setAgentSetupOpen(true)}
-      />
+      {orchestraModalLoaded && (
+        <Suspense fallback={null}>
+          <OrchestraModal
+            isOpen={orchestraOpen}
+            onClose={() => setOrchestraOpen(false)}
+            cwd={cwd}
+            onOpenChanges={() => {
+              refreshGitDiff();
+              setRightPanelOpen(true);
+            }}
+            onOpenSandboxes={() => setSandboxDrawerOpen(true)}
+            onInstallAgents={() => setAgentSetupOpen(true)}
+          />
+        </Suspense>
+      )}
 
       {/* Live Autonomous Squad Modal */}
-      <LiveSquadModal
-        isOpen={squadModalOpen}
-        cwd={cwd || undefined}
-        onClose={() => setSquadModalOpen(false)}
-        onLaunchSquad={handleLaunchLiveSquad}
-        onInstallAgents={() => setAgentSetupOpen(true)}
-      />
+      {liveSquadModalLoaded && (
+        <Suspense fallback={null}>
+          <LiveSquadModal
+            isOpen={squadModalOpen}
+            cwd={cwd || undefined}
+            onClose={() => setSquadModalOpen(false)}
+            onLaunchSquad={handleLaunchLiveSquad}
+            onInstallAgents={() => setAgentSetupOpen(true)}
+          />
+        </Suspense>
+      )}
 
       {/* Universal Shared Skills & Persistent Memory Modal */}
-      <SkillsModal
-        isOpen={skillsModalOpen}
-        onClose={() => setSkillsModalOpen(false)}
-        onRunInTerminal={(command) => {
-          if (activeSession) handleSendInputToActive(command);
-        }}
-        onInsertIntoInput={(command) => {
-          insertIntoDock(command);
-          setSkillsModalOpen(false);
-        }}
-      />
+      {skillsModalLoaded && (
+        <Suspense fallback={null}>
+          <SkillsModal
+            isOpen={skillsModalOpen}
+            onClose={() => setSkillsModalOpen(false)}
+            onRunInTerminal={(command) => {
+              if (activeSession) handleSendInputToActive(command);
+            }}
+            onInsertIntoInput={(command) => {
+              insertIntoDock(command);
+              setSkillsModalOpen(false);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Install / sign in to the agent CLIs */}
       <AgentSetupModal
@@ -1652,7 +1700,11 @@ export const App: React.FC = () => {
       />
 
       {/* First-run / F1 feature guide */}
-      <GuideModal isOpen={guideOpen} onClose={closeGuide} onAction={handleGuideAction} />
+      {guideModalLoaded && (
+        <Suspense fallback={null}>
+          <GuideModal isOpen={guideOpen} onClose={closeGuide} onAction={handleGuideAction} />
+        </Suspense>
+      )}
       {onboardingOpen && (
         <Onboarding
           onDone={() => setOnboardingOpen(false)}
@@ -1661,11 +1713,15 @@ export const App: React.FC = () => {
       )}
 
       {/* Vulgr Session Timeline & Technical Report Modal */}
-      <ExportReportModal
-        isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        reportData={reportData}
-      />
+      {exportReportModalLoaded && (
+        <Suspense fallback={null}>
+          <ExportReportModal
+            isOpen={exportModalOpen}
+            onClose={() => setExportModalOpen(false)}
+            reportData={reportData}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

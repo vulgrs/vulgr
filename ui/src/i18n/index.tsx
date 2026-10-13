@@ -1,8 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as namespaces from './messages/index.js';
-import { de } from './locales/de.js';
-import { es } from './locales/es.js';
-import { fr } from './locales/fr.js';
 
 export type Lang = 'en' | 'tr' | 'de' | 'es' | 'fr';
 
@@ -30,15 +27,40 @@ function detectLang(): Lang {
   return isLang(system) ? system : 'en';
 }
 
-/** English and Turkish live next to each other in messages/; the other languages are one file each in locales/. */
-const LOCALES: Partial<Record<Lang, Messages>> = { de, es, fr };
+/**
+ * English and Turkish live next to each other in messages/ and are always loaded.
+ * The other languages are one file each in locales/, loaded only when chosen,
+ * so they don't slow down starting the app.
+ */
+const LOADERS: Partial<Record<Lang, () => Promise<Messages>>> = {
+  de: () => import('./locales/de.js').then((m) => m.de),
+  es: () => import('./locales/es.js').then((m) => m.es),
+  fr: () => import('./locales/fr.js').then((m) => m.fr),
+};
+const loaded: Partial<Record<Lang, Messages>> = {};
 
-export function getMessages(lang: Lang): Messages {
-  const whole = LOCALES[lang];
-  if (whole) return whole;
+function builtIn(lang: 'en' | 'tr'): Messages {
   const out = {} as Record<string, unknown>;
-  for (const [key, table] of Object.entries(namespaces)) out[key] = table[lang === 'tr' ? 'tr' : 'en'];
+  for (const [key, table] of Object.entries(namespaces)) out[key] = table[lang];
   return out as Messages;
+}
+
+/** The language's messages if they are already at hand, without loading anything. */
+export function getMessages(lang: Lang): Messages | undefined {
+  if (lang === 'en' || lang === 'tr') return (loaded[lang] ??= builtIn(lang));
+  return loaded[lang];
+}
+
+/** Loads a language's messages; falls back to English if its file can't be loaded. */
+export async function loadMessages(lang: Lang): Promise<Messages> {
+  const ready = getMessages(lang);
+  if (ready) return ready;
+  try {
+    return (loaded[lang] = await LOADERS[lang]!());
+  } catch (err) {
+    console.error(`Failed to load the ${lang} interface language:`, err);
+    return getMessages('en')!;
+  }
 }
 
 interface I18nValue {
@@ -51,6 +73,11 @@ const I18nContext = createContext<I18nValue | null>(null);
 
 export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [lang, setLangState] = useState<Lang>(detectLang);
+  // The language on screen; it switches once the chosen one's messages have loaded.
+  const [shown, setShown] = useState<{ lang: Lang; t: Messages } | null>(() => {
+    const t = getMessages(lang);
+    return t ? { lang, t } : null;
+  });
 
   const setLang = useCallback((next: Lang) => {
     setLangState(next);
@@ -60,10 +87,23 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    let live = true;
+    loadMessages(lang).then((t) => {
+      if (live) setShown({ lang, t });
+    });
+    return () => {
+      live = false;
+    };
+  }, [lang]);
+
+  useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
 
-  const value = useMemo(() => ({ lang, setLang, t: getMessages(lang) }), [lang, setLang]);
+  const value = useMemo(() => (shown ? { lang, setLang, t: shown.t } : null), [lang, setLang, shown]);
+  // Only when starting in a language that isn't loaded yet; that takes a moment, and
+  // showing English first would flash the wrong language.
+  if (!value) return null;
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };
 
