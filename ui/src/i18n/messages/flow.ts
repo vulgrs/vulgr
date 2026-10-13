@@ -71,6 +71,13 @@ export const flow = ns(
     stepsSoFar: 'Steps so far',
     mapWorking: (names: string) => `Working: ${names}`,
     mapStopped: (names: string) => `Stopped at ${names}`,
+    tokensEstimate: (n: string) => `≈${n} tokens`,
+    tokensHint: 'Estimated from what the agent wrote (about 4 characters per token)',
+    replay: 'Replay',
+    replayPause: 'Pause',
+    replayExit: 'Leave replay',
+    replayStep: (n: number, total: number) => `Step ${n} of ${total}`,
+    openPaneHint: 'Click to open its terminal',
   },
   {
     goal: 'Ne yapılsın?',
@@ -139,5 +146,12 @@ export const flow = ns(
     stepsSoFar: 'Şimdiye kadarki adımlar',
     mapWorking: (names: string) => `Çalışıyor: ${names}`,
     mapStopped: (names: string) => `Durdu: ${names}`,
+    tokensEstimate: (n: string) => `≈${n} token`,
+    tokensHint: 'Ajanın yazdıklarından tahmin edildi (token başına yaklaşık 4 karakter)',
+    replay: 'Tekrar oynat',
+    replayPause: 'Duraklat',
+    replayExit: 'Tekrar oynatmadan çık',
+    replayStep: (n: number, total: number) => `Adım ${n} / ${total}`,
+    openPaneHint: 'Terminalini açmak için tıkla',
   }
 );

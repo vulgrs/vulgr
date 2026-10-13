@@ -1496,6 +1496,7 @@ export const App: React.FC = () => {
               squad={squad}
               onPauseToggle={togglePause}
               onStopSquad={stopSquad}
+              onFocusPane={(sessionId) => handleSelectPane(squad.tabId, sessionId)}
               onOpenChanges={() => {
                 refreshGitDiff();
                 setRightPanelOpen(true);

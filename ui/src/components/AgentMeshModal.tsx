@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch.js';
 import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
 import appLogo from '../assets/sidebar/logo.svg';
 import { AgentLogo } from './AgentLogo.js';
-import { SystemMap, ViewToggle } from './SystemMap.js';
+import { SystemMap, ViewToggle, estimateTokens } from './SystemMap.js';
 import { swarmMap } from './flowMaps.js';
 import {
   ACCENT,
@@ -272,11 +272,27 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     return types.has('CONSENSUS_APPROVED') ? 'done' : 'idle';
   };
 
-  const graph = swarmMap(
+  const baseGraph = swarmMap(
     { verifier, builder, auditor, stage: started ? status?.stage : undefined, seen: types, result },
     f,
     AGENTS
   );
+  // Each agent's rough token count, from what it has reported so far.
+  const graph = started
+    ? {
+        ...baseGraph,
+        nodes: baseGraph.nodes.map((node) => {
+          const types = ROLE_TYPES[node.id as Role];
+          if (!types) return node;
+          const tokens = estimateTokens(
+            ...messages
+              .filter((msg) => types.includes(msg.type))
+              .flatMap((msg) => [msg.payload.summary, msg.payload.details, msg.payload.gitDiff, msg.payload.errorTrace])
+          );
+          return tokens > 0 ? { ...node, tokens } : node;
+        }),
+      }
+    : baseGraph;
   const pickedMessage = picked
     ? [...messages].reverse().find((msg) => ROLE_TYPES[picked].includes(msg.type))
     : undefined;

@@ -825,6 +825,13 @@ export const fr: Messages = {
     stepsSoFar: 'Étapes jusqu’ici',
     mapWorking: (names: string) => `En cours : ${names}`,
     mapStopped: (names: string) => `Arrêté à ${names}`,
+    tokensEstimate: (n: string) => `≈${n} jetons`,
+    tokensHint: 'Estimé à partir de ce que l’agent a écrit (environ 4 caractères par jeton)',
+    replay: 'Rejouer',
+    replayPause: 'Pause',
+    replayExit: 'Quitter la relecture',
+    replayStep: (n: number, total: number) => `Étape ${n} sur ${total}`,
+    openPaneHint: 'Cliquez pour ouvrir son terminal',
   },
   orchestra: {
     title: 'Orchestrator',

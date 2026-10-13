@@ -32,7 +32,12 @@ interface SquadBarProps {
   onPauseToggle: () => void;
   onStopSquad: () => void;
   onOpenChanges?: () => void;
+  /** Bring one of the squad's terminal panes to the front. */
+  onFocusPane?: (sessionId: string) => void;
 }
+
+/** Which pane each node of the Duo Loop map stands for. */
+const NODE_PANE: Record<string, 'builder' | 'verifier'> = { writer: 'builder', tests: 'verifier', checker: 'verifier' };
 
 const PHASE_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
   planning: { color: 'bg-zinc-800 border-zinc-700 text-zinc-200', icon: <Shield size={13} className="text-zinc-400" /> },
@@ -45,7 +50,7 @@ const PHASE_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
   failed: { color: 'bg-red-500/15 border-red-500/40 text-red-200', icon: <XCircle size={13} className="text-red-400" /> },
 };
 
-export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStopSquad, onOpenChanges }) => {
+export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStopSquad, onOpenChanges, onFocusPane }) => {
   const { t } = useI18n();
   const [showMap, setShowMap] = useState(false);
   if (!squad.active) return null;
@@ -182,6 +187,15 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
               MAP_AGENTS
             )}
             height={210}
+            selectHint={onFocusPane ? t.flow.openPaneHint : undefined}
+            onSelect={
+              onFocusPane
+                ? (id) => {
+                    const pane = NODE_PANE[id];
+                    if (pane) onFocusPane(pane === 'builder' ? squad.builderSessionId : squad.verifierSessionId);
+                  }
+                : undefined
+            }
           />
           <p className="mt-1.5 text-[11px] text-zinc-500">{t.flow.mapLiveShort}</p>
         </div>

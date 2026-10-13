@@ -45,6 +45,8 @@ interface Task {
   state: TaskState;
   note?: string;
   output?: string;
+  /** Characters the agent has written so far, for a rough token count. */
+  outputChars?: number;
 }
 
 interface Result {
@@ -215,7 +217,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
       } else if (e.type === 'task') {
         setTasks((prev) => prev.map((t) => (t.id === e.id ? { ...t, state: e.state, note: e.note } : t)));
       } else if (e.type === 'output') {
-        setTasks((prev) => prev.map((t) => (t.id === e.id ? { ...t, output: e.text } : t)));
+        setTasks((prev) => prev.map((t) => (t.id === e.id ? { ...t, output: e.text, outputChars: e.chars } : t)));
       }
     });
   }, []);
@@ -297,7 +299,13 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
         lang,
       });
       setResult(res);
-      if (res.tasks?.length) setTasks((prev) => res.tasks.map((t) => ({ ...t, output: prev.find((p) => p.id === t.id)?.output })));
+      if (res.tasks?.length)
+        setTasks((prev) =>
+          res.tasks.map((t) => {
+            const live = prev.find((p) => p.id === t.id);
+            return { ...t, output: live?.output, outputChars: live?.outputChars };
+          })
+        );
     } catch (err: any) {
       setResult({ success: false, tasks: [], applied: false, error: err?.message || String(err) });
     } finally {
@@ -360,7 +368,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     return 'idle';
   };
 
-  const mapGraph = orchestraMap(
+  const baseMapGraph = orchestraMap(
     {
       planner,
       reviewer,
@@ -374,7 +382,15 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     f,
     o,
     AGENTS
-  );
+  );  // Each task's rough token count, from the output its agent has written.
+  const mapGraph = {
+    ...baseMapGraph,
+    nodes: baseMapGraph.nodes.map((node) => {
+      const chars = tasks.find((task) => task.id === node.id)?.outputChars;
+      return chars ? { ...node, tokens: Math.round(chars / 4) } : node;
+    }),
+  };
+
 
   const settingsSummary = [verifyCmd.trim() ? f.testCmd(verifyCmd.trim()) : '', o.parallel(Number(parallel)), f.rounds(Number(rounds))]
     .filter(Boolean)

@@ -46,7 +46,8 @@ export type OrchestraEvent =
   | { type: 'status'; phase: OrchestraPhase; text: string }
   | { type: 'plan'; summary: string; tasks: OrchestraTask[] }
   | { type: 'task'; id: string; state: OrchestraTaskState; note?: string }
-  | { type: 'output'; id: string; text: string }
+  /** `chars`: everything the agent has written for this task so far, for a rough token count. */
+  | { type: 'output'; id: string; text: string; chars: number }
   | { type: 'log'; agent: string; text: string; time: string };
 
 export type OrchestraLang = 'en' | 'tr';
@@ -320,11 +321,12 @@ export class Orchestra {
   /** Runs an agent, streaming its last output lines to the UI for this task. */
   private execAgent(name: string, prompt: string, cwd: string, allowEdits: boolean, taskId?: string) {
     let buffer = '';
+    let chars = 0;
     let last = 0;
     const flush = () => {
       if (!taskId) return;
       const lines = stripAnsi(buffer).trim().split('\n').filter(Boolean).slice(-4).join('\n');
-      if (lines) this.emit({ type: 'output', id: taskId, text: lines.slice(-600) });
+      if (lines) this.emit({ type: 'output', id: taskId, text: lines.slice(-600), chars });
     };
     return this.adapter(name).execute(prompt, {
       cwd,
@@ -332,6 +334,7 @@ export class Orchestra {
       timeoutMs: this.timeoutMs,
       signal: this.abort.signal,
       onStdout: (chunk) => {
+        chars += stripAnsi(chunk).length;
         buffer = (buffer + chunk).slice(-4000);
         if (Date.now() - last > 700) {
           last = Date.now();
@@ -340,6 +343,8 @@ export class Orchestra {
       },
     }).then((res) => {
       buffer = res.stdout || buffer;
+      // Agents that print nothing until the end are counted from their final output.
+      if (chars === 0 && res.stdout) chars = stripAnsi(res.stdout).length;
       flush();
       return res;
     });

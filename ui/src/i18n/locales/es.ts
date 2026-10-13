@@ -825,6 +825,13 @@ export const es: Messages = {
     stepsSoFar: 'Pasos hasta ahora',
     mapWorking: (names: string) => `Trabajando: ${names}`,
     mapStopped: (names: string) => `Detenido en ${names}`,
+    tokensEstimate: (n: string) => `≈${n} tokens`,
+    tokensHint: 'Estimado a partir de lo que escribió el agente (unos 4 caracteres por token)',
+    replay: 'Reproducir',
+    replayPause: 'Pausa',
+    replayExit: 'Salir de la reproducción',
+    replayStep: (n: number, total: number) => `Paso ${n} de ${total}`,
+    openPaneHint: 'Haz clic para abrir su terminal',
   },
   orchestra: {
     title: 'Orchestrator',
