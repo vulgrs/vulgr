@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as namespaces from './messages/index.js';
 
-export type Lang = 'en' | 'tr' | 'de' | 'es' | 'fr';
+export type Lang = 'en' | 'tr' | 'de' | 'es' | 'fr' | 'ja' | 'zh' | 'ru';
 
 export const LANGUAGES: { value: Lang; label: string }[] = [
   { value: 'en', label: 'English' },
@@ -9,6 +9,9 @@ export const LANGUAGES: { value: Lang; label: string }[] = [
   { value: 'de', label: 'Deutsch' },
   { value: 'es', label: 'Español' },
   { value: 'fr', label: 'Français' },
+  { value: 'ja', label: '日本語' },
+  { value: 'zh', label: '简体中文' },
+  { value: 'ru', label: 'Русский' },
 ];
 
 type Namespaces = typeof namespaces;
@@ -36,6 +39,9 @@ const LOADERS: Partial<Record<Lang, () => Promise<Messages>>> = {
   de: () => import('./locales/de.js').then((m) => m.de),
   es: () => import('./locales/es.js').then((m) => m.es),
   fr: () => import('./locales/fr.js').then((m) => m.fr),
+  ja: () => import('./locales/ja.js').then((m) => m.ja),
+  zh: () => import('./locales/zh.js').then((m) => m.zh),
+  ru: () => import('./locales/ru.js').then((m) => m.ru),
 };
 const loaded: Partial<Record<Lang, Messages>> = {};
 
