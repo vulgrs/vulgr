@@ -1235,10 +1235,10 @@ export const App: React.FC = () => {
         return;
       }
 
-      // Ctrl+, for settings
+      // Ctrl+, opens settings; the settings page closes itself, so unsaved changes aren't lost.
       if (key === ',' && !e.shiftKey) {
         e.preventDefault();
-        setSettingsModalOpen((v) => !v);
+        setSettingsModalOpen(true);
         return;
       }
 

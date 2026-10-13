@@ -69,6 +69,8 @@ export const flow = ns(
     showSystem: 'System',
     hideSystem: 'Hide system',
     stepsSoFar: 'Steps so far',
+    mapWorking: (names: string) => `Working: ${names}`,
+    mapStopped: (names: string) => `Stopped at ${names}`,
   },
   {
     goal: 'Ne yapılsın?',
@@ -135,5 +137,7 @@ export const flow = ns(
     showSystem: 'Sistem',
     hideSystem: 'Sistemi gizle',
     stepsSoFar: 'Şimdiye kadarki adımlar',
+    mapWorking: (names: string) => `Çalışıyor: ${names}`,
+    mapStopped: (names: string) => `Durdu: ${names}`,
   }
 );

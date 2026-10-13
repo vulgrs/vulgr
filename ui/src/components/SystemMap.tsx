@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Check, Loader2, TriangleAlert, X } from 'lucide-react';
 import { AgentLogo } from './AgentLogo.js';
 import { MONO } from './FlowParts.js';
+import { useI18n } from '../i18n/index.js';
 
 /**
  * A live map of how a feature's agents work together: each agent (or step) is a
@@ -74,8 +75,18 @@ export const SystemMap: React.FC<{
   /** Draws every edge as moving, to explain the flow before a run. */
   demo?: boolean;
 }> = ({ nodes, edges, height = 240, selected, onSelect, demo }) => {
+  const { t } = useI18n();
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
+
+  // While running, say in words who is working (or where it stopped), not only with the glow.
+  const titlesIn = (state: MapState) =>
+    nodes
+      .filter((n) => n.state === state)
+      .map((n) => n.title)
+      .join(', ');
+  const working = demo ? '' : titlesIn('active');
+  const stopped = demo || working ? '' : titlesIn('failed');
 
   useLayoutEffect(() => {
     const el = boxRef.current;
@@ -156,6 +167,20 @@ export const SystemMap: React.FC<{
             );
           })}
         </svg>
+      )}
+
+      {(working || stopped) && (
+        <div
+          role="status"
+          className={`absolute left-2.5 top-2.5 z-10 flex max-w-[60%] items-center gap-1.5 rounded-full border bg-base-elevated/90 px-2.5 py-1 text-[10.5px] backdrop-blur ${
+            working ? 'border-[color:var(--flow-accent)]/40 text-zinc-200' : 'border-red-500/40 text-red-300'
+          }`}
+        >
+          <span
+            className={`size-1.5 flex-shrink-0 rounded-full ${working ? 'animate-pulse bg-[color:var(--flow-accent)]' : 'bg-red-400'}`}
+          />
+          <span className="truncate">{working ? t.flow.mapWorking(working) : t.flow.mapStopped(stopped)}</span>
+        </div>
       )}
 
       {nodes.map((node) => {
