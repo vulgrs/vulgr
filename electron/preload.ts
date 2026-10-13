@@ -134,7 +134,10 @@ export interface WarpApi {
   getAutoSuggestion: (input: string) => Promise<{ input: string; completion: string; suffix: string; source: 'history' | 'skill' | 'builtin'; description?: string } | null>;
 
   // Settings & Configuration
-  getConfig: () => Promise<any>;
+  /** With a project folder, that project's overrides are applied on top. */
+  getConfig: (projectDir?: string) => Promise<any>;
+  getProjectConfig: (projectDir: string) => Promise<any>;
+  setProjectConfig: (projectDir: string, overrides: any) => Promise<any>;
   updateConfig: (updates: any) => Promise<any>;
   resetConfig: () => Promise<any>;
 
@@ -291,7 +294,9 @@ const api: WarpApi = {
   getAutoSuggestion: (input) => ipcRenderer.invoke('suggest:get', input),
 
   // Settings & Configuration
-  getConfig: () => ipcRenderer.invoke('config:get'),
+  getConfig: (projectDir) => ipcRenderer.invoke('config:get', projectDir),
+  getProjectConfig: (projectDir) => ipcRenderer.invoke('config:project-get', projectDir),
+  setProjectConfig: (projectDir, overrides) => ipcRenderer.invoke('config:project-set', projectDir, overrides),
   updateConfig: (updates) => ipcRenderer.invoke('config:update', updates),
   resetConfig: () => ipcRenderer.invoke('config:reset'),
 

@@ -16,6 +16,7 @@ import type { TerminalSession } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
 import { useTheme, type Theme } from '../theme.js';
 import { AgentLogo } from './AgentLogo.js';
+import { useTerminalPrefs } from '../terminalPrefs.js';
 
 const TERMINAL_THEMES: Record<Theme, ITheme> = {
   dark: {
@@ -174,6 +175,23 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   const onPipeErrorRef = useRef(onPipeErrorToAgent);
   onPipeErrorRef.current = onPipeErrorToAgent;
 
+  const termPrefs = useTerminalPrefs();
+  const termPrefsRef = useRef(termPrefs);
+  termPrefsRef.current = termPrefs;
+
+  // Follow font size and cursor changes from Settings in an already-open terminal.
+  useEffect(() => {
+    const term = xtermInstance.current;
+    if (!term) return;
+    if (term.options.cursorStyle !== termPrefs.cursorStyle) term.options.cursorStyle = termPrefs.cursorStyle;
+    if (term.options.fontSize === termPrefs.fontSize) return;
+    term.options.fontSize = termPrefs.fontSize;
+    try {
+      fitAddon.current?.fit();
+      if (term.cols > 0 && term.rows > 0) window.warpApi.resizeTerminal(session.id, term.cols, term.rows);
+    } catch {}
+  }, [termPrefs, session.id]);
+
   // Follow theme switches in an already-open terminal.
   useEffect(() => {
     if (xtermInstance.current) xtermInstance.current.options.theme = TERMINAL_THEMES[theme];
@@ -191,8 +209,8 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
     const term = new Terminal({
       allowProposedApi: true, // registerDecoration (command block headers)
       cursorBlink: true,
-      cursorStyle: 'bar',
-      fontSize: 13,
+      cursorStyle: termPrefsRef.current.cursorStyle,
+      fontSize: termPrefsRef.current.fontSize,
       fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace",
       theme: TERMINAL_THEMES[themeRef.current],
     });

@@ -618,7 +618,14 @@ function setupIpcHandlers() {
   ipcMain.handle('suggest:get', (_, input: string) => autoSuggestEngine.getSuggestion(input));
 
   // Settings & Configuration Handlers
-  ipcMain.handle('config:get', () => configManager.getConfig());
+  // With a project folder, the project's overrides are applied on top.
+  ipcMain.handle('config:get', (_, projectDir?: string) =>
+    projectDir ? configManager.getEffectiveConfig(projectDir) : configManager.getConfig()
+  );
+  ipcMain.handle('config:project-get', (_, projectDir: string) => configManager.getProjectOverrides(projectDir));
+  ipcMain.handle('config:project-set', (_, projectDir: string, overrides) =>
+    configManager.setProjectOverrides(projectDir, overrides)
+  );
   ipcMain.handle('config:update', (_, updates) => configManager.updateConfig(updates));
   ipcMain.handle('config:reset', () => configManager.resetConfig());
 

@@ -242,7 +242,7 @@ export interface SandboxMergeResult {
   error?: string;
 }
 
-export type ShellType = 'powershell' | 'cmd' | 'wsl' | 'bash' | 'zsh' | 'default';
+export type ShellType = 'powershell' | 'cmd' | 'wsl' | 'bash' | 'zsh' | 'fish' | 'default';
 export type CursorStyleType = 'block' | 'underline' | 'bar';
 
 export interface ClaudeConfig {
@@ -275,7 +275,15 @@ export interface WarpConfig {
   codex: CodexConfig;
   autoSandbox: boolean;
   defaultVerifyCmd: string;
+  /** Per-project overrides, keyed by project folder; changed only through setProjectConfig. */
+  projects?: Record<string, ProjectOverrides>;
   lastUpdated: string;
+}
+
+/** Settings one project folder sets differently from the global ones; a missing key uses the global value. */
+export interface ProjectOverrides {
+  claude?: { model?: string; skipPermissions?: boolean };
+  defaultVerifyCmd?: string;
 }
 
 export interface ReportCommandBlock {

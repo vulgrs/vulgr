@@ -186,7 +186,7 @@ export class PtyManager {
     // If launching specific CLI like Claude, append flags
     if (options.command && options.command !== 'powershell.exe' && options.command !== 'cmd.exe' && options.command !== 'wsl.exe') {
       const claudeFlags = (options.command === 'claude' && this.configManager)
-        ? this.configManager.getClaudeCliFlags()
+        ? this.configManager.getClaudeCliFlags(options.cwd)
         : [];
 
       if (isWindows) {

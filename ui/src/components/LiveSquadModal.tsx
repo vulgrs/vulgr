@@ -29,9 +29,12 @@ import {
 } from './FlowParts.js';
 import type { SessionType } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
+import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 
 interface LiveSquadModalProps {
   isOpen: boolean;
+  /** The project folder, for its own test command from Settings. */
+  cwd?: string;
   onClose: () => void;
   onLaunchSquad: (config: {
     goal: string;
@@ -67,7 +70,7 @@ const save = (key: string, value: string) => {
   } catch {}
 };
 
-export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose, onLaunchSquad, onInstallAgents }) => {
+export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, cwd, onClose, onLaunchSquad, onInstallAgents }) => {
   const { t } = useI18n();
   const f = t.flow;
   const d = t.modals.duo;
@@ -77,6 +80,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, onClose,
   // Empty by default: the checker writes tests from the goal. Earlier versions
   // saved 'npm test' under 'verifyCmd', so the optional override uses a new key.
   const [verifyCmd, setVerifyCmd] = useState(() => load('testCommand', ''));
+  useProjectTestCommand(isOpen, cwd, verifyCmd, setVerifyCmd);
   const [maxRounds, setMaxRounds] = useState(() => load('maxRounds', '3'));
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
   const [view, setView] = useState<'list' | 'map'>(() => (load('view', 'list') === 'map' ? 'map' : 'list'));

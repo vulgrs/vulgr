@@ -30,6 +30,7 @@ import {
   type AgentOption,
 } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
+import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 
 type TaskState = 'waiting' | 'running' | 'testing' | 'fixing' | 'merging' | 'done' | 'failed' | 'skipped';
 type Phase = 'checking' | 'planning' | 'working' | 'integrating' | 'reviewing' | 'awaiting-review' | 'done' | 'failed' | 'stopped';
@@ -157,6 +158,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   const [workers, setWorkers] = useState<string[]>(() => load('workers', 'claude,agy').split(',').filter(Boolean));
   const [reviewer, setReviewer] = useState(() => load('reviewer', 'claude'));
   const [verifyCmd, setVerifyCmd] = useState(() => load('testCommand', ''));
+  useProjectTestCommand(isOpen, cwd, verifyCmd, setVerifyCmd);
   const [parallel, setParallel] = useState(() => load('parallel', '3'));
   const [rounds, setRounds] = useState(() => load('rounds', '2'));
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);

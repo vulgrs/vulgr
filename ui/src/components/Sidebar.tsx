@@ -24,6 +24,8 @@ import halftoneImage from '../assets/sidebar/halftone.png';
 
 interface SidebarProps {
   isOpen: boolean;
+  /** On-screen width in pixels; the sidebar can be dragged wider. */
+  width?: number;
   onClose?: () => void;
   onToggleSidebar?: () => void;
   gitBranch: string | null;
@@ -76,7 +78,11 @@ const TAB_DRAG_TYPE = 'application/x-vulgr-tab';
 const SIDEBAR_ZOOM = 1.25;
 /** Unzoomed layout width; the sidebar takes SIDEBAR_WIDTH pixels on screen. */
 const SIDEBAR_BASE_WIDTH = 200;
+/** Default on-screen width, also the narrowest it can be dragged to. */
 export const SIDEBAR_WIDTH = SIDEBAR_BASE_WIDTH * SIDEBAR_ZOOM;
+export const SIDEBAR_MAX_WIDTH = 440;
+export const clampSidebarWidth = (w: number) =>
+  Math.round(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_WIDTH, Number.isFinite(w) ? w : SIDEBAR_WIDTH)));
 
 /** Design icon rendered at the sidebar's 1.4× scale of its Figma frame size. */
 const DesignIcon: React.FC<{ src: string; w: number; h: number; className?: string }> = ({
@@ -251,6 +257,7 @@ const PaneRow: React.FC<{
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
+  width,
   onToggleSidebar,
   gitBranch,
   tabs,
@@ -445,7 +452,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div
-      style={{ zoom: SIDEBAR_ZOOM, width: SIDEBAR_BASE_WIDTH }}
+      style={{ zoom: SIDEBAR_ZOOM, width: (width ?? SIDEBAR_WIDTH) / SIDEBAR_ZOOM }}
       className="relative bg-base-app border-r border-zinc-900 flex flex-col h-full select-none font-['Geist_Mono',ui-monospace,monospace] text-zinc-100 z-20 flex-shrink-0 overflow-hidden">
       {/* Halftone artwork behind the profile card; its gray dots are lightened on the dark theme. */}
       <img

@@ -34,6 +34,7 @@ import {
   type RoleState,
 } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
+import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 
 export interface AgentMessage {
   id: string;
@@ -155,6 +156,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   // Empty by default: the checker writes tests from the goal. Earlier versions
   // saved 'npm test' under 'verifyCmd', so the optional override uses a new key.
   const [verifyCmd, setVerifyCmd] = useState(() => loadSetting('testCommand', ''));
+  useProjectTestCommand(isOpen, cwd, verifyCmd, setVerifyCmd);
   const [maxRounds, setMaxRounds] = useState(() => loadSetting('maxRounds', '3'));
   const [useSandbox, setUseSandbox] = useState(false);
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);

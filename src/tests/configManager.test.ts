@@ -131,4 +131,45 @@ describe('ConfigManager Suite', () => {
     assert.strictEqual(manager.getConfig().claude.model, 'default');
     assert.ok(!manager.getClaudeCliFlags().includes('--model'));
   });
+
+  it('applies project overrides on top of the global settings', () => {
+    const manager = new ConfigManager(process.cwd(), testFileName);
+    manager.updateConfig({ defaultVerifyCmd: 'npm test' });
+    manager.setProjectOverrides('/work/app', { claude: { model: 'haiku', skipPermissions: true }, defaultVerifyCmd: ' pnpm test ' });
+
+    const effective = manager.getEffectiveConfig('/work/app');
+    assert.strictEqual(effective.claude.model, 'haiku');
+    assert.strictEqual(effective.claude.skipPermissions, true);
+    assert.strictEqual(effective.defaultVerifyCmd, 'pnpm test');
+    assert.deepStrictEqual(manager.getClaudeCliFlags('/work/app'), ['--dangerously-skip-permissions', '--model', 'haiku']);
+
+    // Other folders and the global settings are untouched.
+    assert.strictEqual(manager.getEffectiveConfig('/work/other').claude.model, 'default');
+    assert.deepStrictEqual(manager.getClaudeCliFlags(), []);
+
+    // Survives a restart.
+    const reloaded = new ConfigManager(process.cwd(), testFileName);
+    assert.strictEqual(reloaded.getEffectiveConfig('/work/app').claude.model, 'haiku');
+  });
+
+  it('removes a project entry when every override is cleared, and keeps projects on reset or update', () => {
+    const manager = new ConfigManager(process.cwd(), testFileName);
+    manager.setProjectOverrides('/work/app', { defaultVerifyCmd: 'make test' });
+
+    manager.updateConfig({ fontSize: 15, projects: {} });
+    assert.strictEqual(manager.getProjectOverrides('/work/app').defaultVerifyCmd, 'make test');
+    manager.resetConfig();
+    assert.strictEqual(manager.getProjectOverrides('/work/app').defaultVerifyCmd, 'make test');
+
+    manager.setProjectOverrides('/work/app', { claude: {}, defaultVerifyCmd: '  ' });
+    assert.strictEqual(manager.getConfig().projects?.['/work/app'], undefined);
+  });
+
+  it('resolves fish to a shell that exists', () => {
+    const manager = new ConfigManager(process.cwd(), testFileName);
+    manager.updateConfig({ defaultShell: 'fish' });
+    const { shell } = manager.resolveShellBinary();
+    assert.ok(shell.length > 0);
+    if (process.platform === 'win32') assert.strictEqual(shell, 'powershell.exe');
+  });
 });
