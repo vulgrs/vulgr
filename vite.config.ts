@@ -22,8 +22,10 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
           if (id.includes('/@xterm/')) return 'xterm';
-          if (id.includes('/react-dom/') || id.includes('/scheduler/') || /\/node_modules\/react\//.test(id)) return 'react';
+          // UI kit first: @floating-ui/react-dom must not be mistaken for react-dom,
+          // or the two chunks import each other and React is undefined at start.
           if (id.includes('/@base-ui/') || id.includes('/@floating-ui/') || id.includes('/@radix-ui/')) return 'ui-kit';
+          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
         },
       },
     },
