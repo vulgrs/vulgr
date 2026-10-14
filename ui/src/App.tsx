@@ -56,6 +56,9 @@ const ExportReportModal = lazy(() => import('./components/ExportReportModal.js')
 const RunHistoryModal = lazy(() => import('./components/RunHistoryModal.js').then((m) => ({ default: m.RunHistoryModal })));
 
 /** True from the first time `flag` is true on. */
+/** Terminal commands at least this long notify when they end in the background. */
+const LONG_COMMAND_MS = 20_000;
+
 function useOpenedOnce(flag: boolean): boolean {
   const opened = useRef(false);
   if (flag) opened.current = true;
@@ -109,6 +112,9 @@ const saveSessions = (tabs: WorkspaceTab[], activeTabId: string, groups: Termina
 
 export const App: React.FC = () => {
   const { t } = useI18n();
+  // For callbacks that are created once but must speak the current language.
+  const tRef = useRef(t);
+  tRef.current = t;
   const [savedSessions] = useState(loadSavedSessions);
   const [tabs, setTabs] = useState<WorkspaceTab[]>(() => savedSessions?.tabs ?? [
     {
@@ -219,10 +225,23 @@ export const App: React.FC = () => {
   }, []);
 
   const handleCommandFinished = useCallback(
-    (sessionId: string, result: { command?: string; exitCode: number; output: string }) => {
+    (sessionId: string, result: { command?: string; exitCode: number; output: string; durationMs?: number }) => {
       if (result.command) recordWork(sessionId, result.command);
       const resolve = paneWaiters.current[sessionId];
-      if (!resolve) return;
+      if (!resolve) {
+        // A long command the user started: tell them it ended if they went elsewhere.
+        if (result.command && (result.durationMs ?? 0) >= LONG_COMMAND_MS) {
+          const n = tRef.current.notify;
+          void window.warpApi
+            ?.notify?.({
+              title: result.exitCode === 0 ? n.commandDone : n.commandFailed(result.exitCode),
+              body: result.command,
+              kind: 'command',
+            })
+            .catch(() => {});
+        }
+        return;
+      }
       delete paneWaiters.current[sessionId];
       resolve({ exitCode: result.exitCode, output: result.output });
     },

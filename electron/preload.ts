@@ -145,6 +145,9 @@ export interface WarpApi {
   updateConfig: (updates: any) => Promise<any>;
   resetConfig: () => Promise<any>;
 
+  /** Shows a system notification if the window is in the background and that kind is switched on. */
+  notify: (notice: { title: string; body?: string; kind: 'run' | 'command' }) => Promise<boolean>;
+
   // History of finished Duo Loop, Agent Swarm and Orchestrator runs
   listRuns: (cwd?: string) => Promise<any[]>;
   getRun: (id: string) => Promise<any | null>;
@@ -322,6 +325,7 @@ const api: WarpApi = {
   updateConfig: (updates) => ipcRenderer.invoke('config:update', updates),
   resetConfig: () => ipcRenderer.invoke('config:reset'),
 
+  notify: (notice) => ipcRenderer.invoke('notify', notice),
   listRuns: (cwd) => ipcRenderer.invoke('runs:list', cwd),
   getRun: (id) => ipcRenderer.invoke('runs:get', id),
   saveRun: (record) => ipcRenderer.invoke('runs:save', record),

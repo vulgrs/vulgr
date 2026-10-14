@@ -274,6 +274,8 @@ export interface WarpConfig {
   agy: AgyConfig;
   codex: CodexConfig;
   autoSandbox: boolean;
+  notifyRuns: boolean;
+  notifyCommands: boolean;
   defaultVerifyCmd: string;
   /** Per-project overrides, keyed by project folder; changed only through setProjectConfig. */
   projects?: Record<string, ProjectOverrides>;

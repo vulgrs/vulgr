@@ -3,7 +3,7 @@ import type { SquadSession } from '../types/warp.js';
 import { duoMap } from '../components/flowMaps.js';
 import { MAP_AGENTS } from '../components/SquadBar.js';
 import { useI18n } from '../i18n/index.js';
-import { newRunId, saveRun, useRunRecorder } from '../runHistory.js';
+import { newRunId, runNotice, saveRun, useRunRecorder, type RunRecord } from '../runHistory.js';
 
 const EMPTY = { nodes: [], edges: [] };
 const isOver = (s: SquadSession) => s.phase === 'consensus' || s.phase === 'failed';
@@ -36,8 +36,8 @@ export function useDuoHistory(squad: SquadSession | null, cwd: string) {
 
   useEffect(() => {
     const prev = current.current;
-    const save = (s: SquadSession, startedAt: number, outcome: 'success' | 'failed' | 'stopped') =>
-      void saveRun({
+    const save = (s: SquadSession, startedAt: number, outcome: 'success' | 'failed' | 'stopped') => {
+      const record: RunRecord = {
         id: newRunId(),
         kind: 'duo',
         goal: s.goal,
@@ -49,7 +49,10 @@ export function useDuoHistory(squad: SquadSession | null, cwd: string) {
         agents: [...new Set([s.builderType, s.verifierType])],
         log: (s.log ?? []).map((entry) => ({ at: entry.at, text: entry.text })),
         map: recordMap(),
-      });
+      };
+      // Closing the bar yourself is not news; only a loop that ended on its own notifies.
+      void saveRun(record, outcome === 'stopped' ? undefined : runNotice(t, record));
+    };
 
     // Closed (or replaced by a new run) before it ended: stopped by the user.
     const replaced = prev && (!squad || squad.builderSessionId !== prev.squad.builderSessionId || squad.goal !== prev.squad.goal);

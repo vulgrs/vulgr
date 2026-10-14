@@ -44,6 +44,10 @@ export interface WarpConfig {
 
   // Autonomy & Safety Settings
   autoSandbox: boolean;         // Always run autonomous agents inside Git Worktree Sandboxes
+
+  // System notifications while the app is in the background
+  notifyRuns: boolean;          // a Duo Loop / Agent Swarm / Orchestrator run ended
+  notifyCommands: boolean;      // a terminal command that ran for a while ended
   defaultVerifyCmd: string;     // Default command to verify builds (e.g. 'npm test')
 
   // OpenRouter API access (used by the deterministic "System 1" JSON compiler)
@@ -87,6 +91,8 @@ export const DEFAULT_CONFIG: WarpConfig = {
   },
 
   autoSandbox: true,
+  notifyRuns: true,
+  notifyCommands: true,
   defaultVerifyCmd: 'npm test',
   openRouterApiKey: '',
   systemOneModel: 'poolside/laguna-s-2.1-20260720:free',

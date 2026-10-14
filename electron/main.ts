@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, Notification } from 'electron';
 
 app.name = 'Vulgr';
 import { fileURLToPath } from 'node:url';
@@ -305,6 +305,7 @@ async function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+  mainWindow.on('focus', () => mainWindow?.flashFrame(false));
 }
 
 function setupIpcHandlers() {
@@ -650,6 +651,23 @@ function setupIpcHandlers() {
   );
   ipcMain.handle('config:update', (_, updates) => configManager.updateConfig(updates));
   ipcMain.handle('config:reset', () => configManager.resetConfig());
+
+  // System notification, only while the window is in the background and the kind is switched on.
+  ipcMain.handle('notify', (_, { title, body, kind }: { title: string; body?: string; kind: 'run' | 'command' }) => {
+    const config = configManager.getConfig();
+    if ((kind === 'run' ? config.notifyRuns : config.notifyCommands) === false) return false;
+    if (!mainWindow || mainWindow.isFocused() || !Notification.isSupported()) return false;
+    const notice = new Notification({ title: String(title).slice(0, 200), body: String(body ?? '').slice(0, 300) });
+    notice.on('click', () => {
+      if (mainWindow?.isMinimized()) mainWindow.restore();
+      mainWindow?.show();
+      mainWindow?.focus();
+    });
+    notice.show();
+    if (process.platform === 'darwin') app.dock?.bounce('informational');
+    else mainWindow.flashFrame(true);
+    return true;
+  });
 
   // Run history
   ipcMain.handle('runs:list', (_, cwd?: string) => runHistory.list(cwd));

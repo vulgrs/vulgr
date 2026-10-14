@@ -31,7 +31,7 @@ import {
 } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
-import { newRunId, runTokens, saveRun, useRunRecorder, type RunUsage } from '../runHistory.js';
+import { newRunId, runNotice, runTokens, saveRun, useRunRecorder, type RunRecord, type RunUsage } from '../runHistory.js';
 import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
 import { TemplateBar } from './TemplateBar.js';
 
@@ -425,7 +425,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     savedResultRef.current = result;
     const map = recordMap();
     const done = result.tasks.filter((task) => task.state === 'done').length;
-    void saveRun({
+    const record: RunRecord = {
       id: newRunId(),
       kind: 'orchestra',
       goal: runGoal,
@@ -438,7 +438,9 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
       log: runLogRef.current,
       map,
       ...runTokens(result.usage, map),
-    });
+    };
+    // Stopped with the Stop button: the user already knows.
+    void saveRun(record, record.outcome === 'stopped' ? undefined : runNotice(t, record, !!result.pendingReview));
   }, [result, running]);
 
 

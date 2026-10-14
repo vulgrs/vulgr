@@ -78,7 +78,7 @@ interface XtermPaneProps {
   onRegisterCommandHandler?: (sessionId: string, handler: ((command: string) => void) | null) => void;
   onSessionState?: (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => void;
   /** A shell command finished: its exit code and the output it printed. */
-  onCommandFinished?: (sessionId: string, result: { command?: string; exitCode: number; output: string }) => void;
+  onCommandFinished?: (sessionId: string, result: { command?: string; exitCode: number; output: string; durationMs?: number }) => void;
 }
 
 const ERROR_PATTERN =
@@ -521,7 +521,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
         b.endLine = term.buffer.active.baseY + term.buffer.active.cursorY;
         paintLabel(b);
         refreshHeader(b);
-        onCommandFinishedRef.current?.(session.id, { command: b.command, exitCode, output: blockText(b) });
+        onCommandFinishedRef.current?.(session.id, { command: b.command, exitCode, output: blockText(b), durationMs: b.endMs });
         setDetectedError(exitCode !== 0 && sniffed ? sniffed : null);
         sniffed = null;
       };

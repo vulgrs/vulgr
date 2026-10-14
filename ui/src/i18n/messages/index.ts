@@ -21,3 +21,4 @@ export { update } from './update.js';
 export { history } from './history.js';
 export { changes } from './changes.js';
 export { templates } from './templates.js';
+export { notify } from './notify.js';

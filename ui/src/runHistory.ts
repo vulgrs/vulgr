@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { edgeKey, type MapEdge, type MapNode, type Snapshot } from './components/SystemMap.js';
+import type { Messages } from './i18n/index.js';
 
 export type RunKind = 'duo' | 'swarm' | 'orchestra';
 export type RunOutcome = 'success' | 'failed' | 'stopped';
@@ -53,8 +54,27 @@ export type RunSummary = Omit<RunRecord, 'log' | 'map'>;
 
 export const newRunId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-/** Saves a finished run; failing to save never interrupts the app. */
-export async function saveRun(record: RunRecord): Promise<void> {
+const KIND_LABEL: Record<RunKind, string> = { duo: 'Duo Loop', swarm: 'Agent Swarm', orchestra: 'Orchestrator' };
+
+/** The system notification for a finished run: "Agent Swarm finished" with the goal. */
+export function runNotice(t: Messages, record: Pick<RunRecord, 'kind' | 'outcome' | 'goal'>, awaitingReview = false) {
+  const kind = KIND_LABEL[record.kind];
+  const title = awaitingReview
+    ? t.notify.awaitingReview
+    : record.outcome === 'success'
+      ? t.notify.runDone(kind)
+      : record.outcome === 'failed'
+        ? t.notify.runFailed(kind)
+        : t.notify.runStopped(kind);
+  return { title, body: record.goal };
+}
+
+/**
+ * Saves a finished run; failing to save never interrupts the app. With a
+ * notice, the user also gets a system notification if Vulgr is in the background.
+ */
+export async function saveRun(record: RunRecord, notice?: { title: string; body?: string }): Promise<void> {
+  if (notice) void window.warpApi?.notify?.({ ...notice, kind: 'run' }).catch(() => {});
   try {
     await window.warpApi?.saveRun?.(record);
     window.dispatchEvent(new Event('vulgr:runs-changed'));

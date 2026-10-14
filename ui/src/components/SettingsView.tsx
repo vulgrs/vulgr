@@ -121,7 +121,7 @@ const cursors = (t: Messages): OptionItem[] => [
 const LANGUAGE_ITEMS: OptionItem[] = LANGUAGES.map((l) => ({ value: l.value, label: l.label }));
 
 /** Settings that travel in an export; secrets, per-project entries and timestamps stay behind. */
-const EXPORT_KEYS = ['defaultShell', 'fontSize', 'cursorStyle', 'claude', 'agy', 'codex', 'autoSandbox', 'defaultVerifyCmd'] as const;
+const EXPORT_KEYS = ['defaultShell', 'fontSize', 'cursorStyle', 'claude', 'agy', 'codex', 'autoSandbox', 'notifyRuns', 'notifyCommands', 'defaultVerifyCmd'] as const;
 const EXPORT_FORMAT = 'vulgr-settings';
 
 /** Takes the known settings from an imported file, keeping each only if its type matches the current one. */
@@ -677,6 +677,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                       </Row>
                       <Row label={s.languageTitle} hint={s.languageDescription} htmlFor="ui-language">
                         <OptionSelect id="ui-language" value={lang} items={LANGUAGE_ITEMS} onValueChange={(value) => setLang(value as Lang)} />
+                      </Row>
+                    </Group>
+                    <Group title={s.notifyTitle}>
+                      <Row label={s.notifyRuns} hint={s.notifyRunsHint}>
+                        <div className="flex justify-end">
+                          <Switch checked={config.notifyRuns !== false} onCheckedChange={(checked) => setConfig({ ...config, notifyRuns: checked })} />
+                        </div>
+                      </Row>
+                      <Row label={s.notifyCommands} hint={s.notifyCommandsHint}>
+                        <div className="flex justify-end">
+                          <Switch checked={config.notifyCommands !== false} onCheckedChange={(checked) => setConfig({ ...config, notifyCommands: checked })} />
+                        </div>
                       </Row>
                     </Group>
                     <Group title={s.setup}>

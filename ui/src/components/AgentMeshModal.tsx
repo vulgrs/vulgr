@@ -35,7 +35,7 @@ import {
 } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
-import { newRunId, runTokens, saveRun, useRunRecorder, type RunUsage } from '../runHistory.js';
+import { newRunId, runNotice, runTokens, saveRun, useRunRecorder, type RunRecord, type RunUsage } from '../runHistory.js';
 import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
 import { TemplateBar } from './TemplateBar.js';
 
@@ -314,7 +314,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     if (!result || isRunning || savedResultRef.current === result || !runStartRef.current) return;
     savedResultRef.current = result;
     const map = recordMap();
-    void saveRun({
+    const record: RunRecord = {
       id: newRunId(),
       kind: 'swarm',
       goal: runGoal,
@@ -327,7 +327,8 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
       log: messages.map((msg) => ({ at: Date.parse(msg.timestamp) || undefined, who: msg.from, text: msg.payload.summary })),
       map,
       ...runTokens(result.usage, map),
-    });
+    };
+    void saveRun(record, runNotice(t, record));
   }, [result, isRunning]);
 
   const summary = [cmd ? f.testCmd(cmd) : f.autoTests, f.rounds(Number(maxRounds)), useSandbox ? f.sandboxOn : '']
