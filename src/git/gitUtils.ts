@@ -1,4 +1,4 @@
-import { execSync, execFile } from 'node:child_process';
+import { execSync, execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, statSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join, dirname, isAbsolute } from 'node:path';
@@ -290,11 +290,9 @@ export class GitUtils {
     if (!this.isGitRepo()) return false;
 
     try {
-      execSync('git add -A', { cwd: this.cwd, stdio: 'ignore' });
-      execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
-        cwd: this.cwd,
-        stdio: 'ignore',
-      });
+      execFileSync('git', ['add', '-A'], { cwd: this.cwd, stdio: 'ignore' });
+      // No shell: a message with quotes, backticks or $(...) is taken literally.
+      execFileSync('git', ['commit', '-m', message], { cwd: this.cwd, stdio: 'ignore' });
       return true;
     } catch {
       return false;

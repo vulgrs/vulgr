@@ -26,6 +26,16 @@ describe('GitUtils diff', () => {
     assert.equal((await new GitUtils(repo).getDiffAsync()).diff, diff);
   });
 
+  test('commitAll takes the message literally, without running it in a shell', () => {
+    execSync('git config user.email t@t && git config user.name t', { cwd: repo });
+    writeFileSync(join(repo, 'a.txt'), 'a\n');
+    const message = 'Add `touch pwned` and $(touch pwned2) "quoted"';
+    assert.equal(new GitUtils(repo).commitAll(message), true);
+    assert.equal(execSync('git log -1 --format=%s', { cwd: repo, encoding: 'utf-8' }).trim(), message);
+    assert.equal(existsSync(join(repo, 'pwned')), false);
+    assert.equal(existsSync(join(repo, 'pwned2')), false);
+  });
+
   test('excludeFromGit hides Vulgr folders without touching .gitignore', () => {
     mkdirSync(join(repo, '.ai-bridge'));
     writeFileSync(join(repo, '.ai-bridge', 'log.json'), '{}');
