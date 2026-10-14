@@ -109,6 +109,9 @@ function resolveAppIcon(): string | undefined {
   const isMac = process.platform === 'darwin';
   const candidates = isMac
     ? [
+        // The rounded macOS-style icon, so the Dock matches other apps (packaged builds use build/icon.png).
+        join(__dirname, '../ui/icon-mac.png'),
+        join(__dirname, '../../ui/public/icon-mac.png'),
         join(__dirname, '../ui/logo.png'),
         join(__dirname, '../../ui/public/logo.png'),
         join(process.cwd(), 'ui/public/logo.png'),
