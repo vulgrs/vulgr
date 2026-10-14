@@ -8,6 +8,8 @@ import { ContextOptimizer } from './contextOptimizer.js';
 import { MemoryStore } from './memoryStore.js';
 import { detectTestCommand } from './testPlan.js';
 import type { CliExecutionResult, ICliAdapter } from '../types/index.js';
+import { LANG_NAMES, type EngineLang } from './engineLang.js';
+import { ORCHESTRA_TEXT as TEXT, type OrchestraText } from './text/orchestraText.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -50,7 +52,7 @@ export type OrchestraEvent =
   | { type: 'output'; id: string; text: string; chars: number }
   | { type: 'log'; agent: string; text: string; time: string };
 
-export type OrchestraLang = 'en' | 'tr';
+export type OrchestraLang = EngineLang;
 
 export interface OrchestraOptions {
   planner?: string;
@@ -105,72 +107,6 @@ const LABELS: Record<string, string> = {
 };
 const label = (name: string) => LABELS[name] ?? name;
 
-const TEXT = {
-  en: {
-    checking: 'Checking the agents and the project...',
-    noGit: 'Orchestra works in a git repository with at least one commit, so each agent can get its own copy. Initialise git (git init, then commit) and start again.',
-    missing: (names: string) => `Agent not installed: ${names}. Pick installed agents or install them first.`,
-    planning: (agent: string) => `${agent} is splitting the goal into tasks...`,
-    planFallback: 'The plan could not be read, so the goal runs as one task.',
-    planned: (n: number) => `Plan ready: ${n} task${n === 1 ? '' : 's'}.`,
-    working: (running: number, done: number, total: number) => `${running} agent${running === 1 ? '' : 's'} working · ${done}/${total} tasks done`,
-    taskStarted: (agent: string, title: string) => `${agent} started "${title}".`,
-    taskTesting: (cmd: string) => `Running "${cmd}"...`,
-    taskFixing: (round: number, max: number) => `Tests failed, fixing (round ${round}/${max})...`,
-    taskNoChange: 'Finished without changing any file.',
-    taskTestsFailed: (max: number) => `Tests still failed after ${max} rounds.`,
-    taskAgentFailed: (tail: string) => `The agent stopped: ${tail}`,
-    taskMerging: 'Merging into the combined copy...',
-    taskConflict: (files: string) => `Merge conflict in ${files}; resolving...`,
-    taskConflictFailed: 'The merge conflict could not be resolved.',
-    taskDone: (agent: string, title: string) => `${agent} finished "${title}" and it was merged.`,
-    taskSkipped: 'Skipped: a task it depends on did not finish.',
-    nothingDone: 'No task finished, so there is nothing to combine.',
-    integrating: (cmd: string) => `Testing everything together with "${cmd}"...`,
-    integrationNoTests: 'No test command found; the combined change was not tested.',
-    integrationFixing: (agent: string, round: number, max: number) => `Tests failed together; ${agent} is fixing (round ${round}/${max})...`,
-    reviewing: (agent: string) => `${agent} is reviewing the whole change...`,
-    reviewRejected: (agent: string) => `${agent} found problems; they go back for one round of fixes.`,
-    reviewFixing: (agent: string) => `${agent} is fixing what the reviewer found...`,
-    revising: (agent: string) => `${agent} is making the changes you asked for...`,
-    awaitingReview: 'Ready for your review.',
-    applyFailed: 'The change could not be applied to your folder automatically; it is waiting in the Sandbox panel.',
-    done: 'Done.',
-    stopped: 'Stopped.',
-  },
-  tr: {
-    checking: 'Ajanlar ve proje kontrol ediliyor...',
-    noGit: 'Orkestra, her ajana ayrı bir kopya verebilmek için en az bir commit’i olan bir git deposunda çalışır. Önce git’i başlat (git init, sonra commit) ve tekrar dene.',
-    missing: (names: string) => `Kurulu olmayan ajan: ${names}. Kurulu ajanları seç ya da önce onları kur.`,
-    planning: (agent: string) => `${agent} hedefi görevlere bölüyor...`,
-    planFallback: 'Plan okunamadı; hedef tek bir görev olarak yürütülecek.',
-    planned: (n: number) => `Plan hazır: ${n} görev.`,
-    working: (running: number, done: number, total: number) => `${running} ajan çalışıyor · ${done}/${total} görev bitti`,
-    taskStarted: (agent: string, title: string) => `${agent} "${title}" görevine başladı.`,
-    taskTesting: (cmd: string) => `"${cmd}" çalıştırılıyor...`,
-    taskFixing: (round: number, max: number) => `Testler kırıldı, düzeltiliyor (tur ${round}/${max})...`,
-    taskNoChange: 'Hiçbir dosyayı değiştirmeden bitti.',
-    taskTestsFailed: (max: number) => `${max} turda testler geçmedi.`,
-    taskAgentFailed: (tail: string) => `Ajan durdu: ${tail}`,
-    taskMerging: 'Ortak kopyaya birleştiriliyor...',
-    taskConflict: (files: string) => `${files} dosyasında çakışma var; çözülüyor...`,
-    taskConflictFailed: 'Birleştirme çakışması çözülemedi.',
-    taskDone: (agent: string, title: string) => `${agent} "${title}" görevini bitirdi, birleştirildi.`,
-    taskSkipped: 'Atlandı: bağlı olduğu görev bitmedi.',
-    nothingDone: 'Hiçbir görev bitmedi; birleştirilecek bir şey yok.',
-    integrating: (cmd: string) => `Hepsi birlikte "${cmd}" ile test ediliyor...`,
-    integrationNoTests: 'Test komutu bulunamadı; birleşik değişiklik test edilmedi.',
-    integrationFixing: (agent: string, round: number, max: number) => `Birlikte testler kırıldı; ${agent} düzeltiyor (tur ${round}/${max})...`,
-    reviewing: (agent: string) => `${agent} bütün değişikliği gözden geçiriyor...`,
-    reviewRejected: (agent: string) => `${agent} sorun buldu; bir tur düzeltmeye gönderiliyor.`,
-    reviewFixing: (agent: string) => `${agent} denetçinin bulduklarını düzeltiyor...`,
-    revising: (agent: string) => `${agent} istediğin değişiklikleri yapıyor...`,
-    awaitingReview: 'İncelemen için hazır.',
-    applyFailed: 'Değişiklik klasörüne otomatik uygulanamadı; Sandbox panelinde seni bekliyor.',
-    done: 'Tamamlandı.',
-    stopped: 'Durduruldu.',
-  },
-};
 
 /** Runs async work one at a time (git commands that touch shared refs). */
 class Serial {
@@ -238,7 +174,7 @@ export class Orchestra {
   private readonly maxRounds: number;
   private readonly timeoutMs: number;
   private readonly lang: OrchestraLang;
-  private readonly text: (typeof TEXT)[OrchestraLang];
+  private readonly text: OrchestraText;
   private readonly onEvent?: (event: OrchestraEvent) => void;
   private readonly autoApply: boolean;
   private readonly abort = new AbortController();
@@ -399,7 +335,7 @@ export class Orchestra {
     }
     const intCwd = integration.worktreePath;
     const memory = new MemoryStore(this.cwd).toPromptSnippet();
-    const replyLang = this.lang === 'tr' ? 'Turkish' : 'English';
+    const replyLang = LANG_NAMES[this.lang];
 
     // 1. Plan.
     this.status('planning', this.text.planning(label(this.planner)));
@@ -623,7 +559,7 @@ export class Orchestra {
     cmd: string,
     reviewFixes: number
   ): Promise<{ testsPassed?: boolean; review: OrchestraResult['review']; reviewNotes: string }> {
-    const replyLang = this.lang === 'tr' ? 'Turkish' : 'English';
+    const replyLang = LANG_NAMES[this.lang];
     let testsPassed: boolean | undefined;
     let review: OrchestraResult['review'] = 'skipped';
     let reviewNotes = '';

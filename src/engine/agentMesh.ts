@@ -10,6 +10,8 @@ import { ContextOptimizer } from './contextOptimizer.js';
 import { MemoryStore } from './memoryStore.js';
 import { buildTestPlanPrompt, parseTestCommand, detectTestCommand } from './testPlan.js';
 import type { ICliAdapter, CliExecutionResult } from '../types/index.js';
+import { LANG_NAMES, type EngineLang } from './engineLang.js';
+import { MESH_TEXT, type MeshText } from './text/meshText.js';
 
 const execAsync = promisify(exec);
 
@@ -66,88 +68,10 @@ const AGENT_LABELS: Record<string, string> = {
 
 const label = (name: string) => AGENT_LABELS[name] ?? name;
 
-export type MeshLang = 'en' | 'tr';
-
-/** UI-facing texts (status lines, message summaries, errors). Agent prompts stay in English. */
-const MESH_TEXT = {
-  en: {
-    timedOut: 'timed out',
-    exitCode: (code: number | null) => `exit code ${code}`,
-    checking: 'Checking that the selected agents are installed...',
-    missingAgents: (names: string) =>
-      `Agent not installed: ${names}. Choose an agent installed on this computer or install that tool first.`,
-    taskGiven: (agent: string, goal: string) => `Task given to ${agent}: "${goal}"`,
-    planningTests: (agent: string) => `${agent} is writing tests for the goal...`,
-    testsWritten: (agent: string, files: number, cmd: string) =>
-      `${agent} wrote tests for the goal (${files} file${files === 1 ? '' : 's'}). They run with "${cmd}".`,
-    testsNotWritten: (agent: string, cmd: string) => `${agent} wrote no new tests; the project's "${cmd}" will be used.`,
-    noTestCommand: (agent: string) =>
-      `${agent} wrote no tests and this project has no test command. Enter a test command and start again.`,
-    building: (agent: string) => `${agent} is writing the code...`,
-    buildFailed: (agent: string, tail: string) => `${agent} could not complete the task: ${tail}`,
-    codeWritten: (agent: string, files: number) => `${agent} wrote the code (${files} files changed).`,
-    stoppedWithChanges: (agent: string, reason: string) =>
-      `${agent} stopped early (${reason}) but changed files; the tests decide whether the work is done.`,
-    verifying: (cmd: string, round: number, max: number) => `Running "${cmd}" (round ${round}/${max})...`,
-    verifyPassed: (cmd: string, round: number) => `"${cmd}" passed (round ${round}).`,
-    diagnosing: (agent: string) => `${agent} is investigating the error...`,
-    verifyFailed: (cmd: string, code: number | null) => `"${cmd}" failed (exit code ${code}).`,
-    repairing: (agent: string, round: number, max: number) => `${agent} is fixing the error (round ${round}/${max})...`,
-    repairFailed: (agent: string, tail: string) => `${agent} could not apply a fix: ${tail}`,
-    patchApplied: (agent: string) => `${agent} applied the fix, testing again.`,
-    outOfRounds: (max: number) =>
-      `Tests did not pass in ${max} rounds. The last error is above; the changes are still in place, review them in the "Changes" panel.`,
-    auditing: (agent: string) => `${agent} is auditing the final changes...`,
-    auditNoVerdict: 'gave no clear verdict',
-    auditCouldNotRun: (tail: string) => `could not run: ${tail}`,
-    auditRejected: (agent: string) => `${agent} found problems in the changes.`,
-    auditSkipped: (agent: string, reason: string) =>
-      `Tests passed. ${agent}'s audit ${reason}; review the changes yourself.`,
-    auditApproved: (agent: string) => `Tests passed and ${agent} approved the changes.`,
-    doneRejected: 'Tests passed, but the auditor found problems.',
-    done: 'Done: tests passed.',
-  },
-  tr: {
-    timedOut: 'zaman aşımı',
-    exitCode: (code: number | null) => `çıkış kodu ${code}`,
-    checking: 'Seçilen ajanların kurulu olduğu kontrol ediliyor...',
-    missingAgents: (names: string) =>
-      `Kurulu olmayan ajan: ${names}. Bu bilgisayarda kurulu bir ajan seçin ya da önce o aracı kurun.`,
-    taskGiven: (agent: string, goal: string) => `${agent} görevi aldı: "${goal}"`,
-    planningTests: (agent: string) => `${agent} hedefe göre testleri yazıyor...`,
-    testsWritten: (agent: string, files: number, cmd: string) =>
-      `${agent} hedefe göre testleri yazdı (${files} dosya). "${cmd}" ile çalışacak.`,
-    testsNotWritten: (agent: string, cmd: string) => `${agent} yeni test yazmadı; projenin "${cmd}" komutu kullanılacak.`,
-    noTestCommand: (agent: string) =>
-      `${agent} test yazamadı ve bu projede bir test komutu yok. Bir test komutu girip tekrar başlatın.`,
-    building: (agent: string) => `${agent} kodu yazıyor...`,
-    buildFailed: (agent: string, tail: string) => `${agent} görevi tamamlayamadı: ${tail}`,
-    codeWritten: (agent: string, files: number) => `${agent} kodu yazdı (${files} dosya değişti).`,
-    stoppedWithChanges: (agent: string, reason: string) =>
-      `${agent} yarıda kaldı (${reason}) ama dosyaları değiştirdi; işin bitip bitmediğine testler karar verecek.`,
-    verifying: (cmd: string, round: number, max: number) => `"${cmd}" çalıştırılıyor (tur ${round}/${max})...`,
-    verifyPassed: (cmd: string, round: number) => `"${cmd}" başarılı (tur ${round}).`,
-    diagnosing: (agent: string) => `${agent} hatayı inceliyor...`,
-    verifyFailed: (cmd: string, code: number | null) => `"${cmd}" başarısız (çıkış kodu ${code}).`,
-    repairing: (agent: string, round: number, max: number) => `${agent} hatayı düzeltiyor (tur ${round}/${max})...`,
-    repairFailed: (agent: string, tail: string) => `${agent} düzeltme yapamadı: ${tail}`,
-    patchApplied: (agent: string) => `${agent} düzeltmeyi uyguladı, tekrar test ediliyor.`,
-    outOfRounds: (max: number) =>
-      `${max} turda testler geçmedi. Son hata yukarıda; değişiklikler yerinde duruyor, "Değişiklikler" panelinden inceleyebilirsiniz.`,
-    auditing: (agent: string) => `${agent} son değişiklikleri denetliyor...`,
-    auditNoVerdict: 'net bir karar vermedi',
-    auditCouldNotRun: (tail: string) => `çalışamadı: ${tail}`,
-    auditRejected: (agent: string) => `${agent} değişikliklerde sorun buldu.`,
-    auditSkipped: (agent: string, reason: string) =>
-      `Testler geçti. ${agent} denetimi ${reason}; değişiklikleri kendiniz gözden geçirin.`,
-    auditApproved: (agent: string) => `Testler geçti ve ${agent} değişiklikleri onayladı.`,
-    doneRejected: 'Testler geçti, ancak denetçi sorun buldu.',
-    done: 'Tamamlandı: testler geçti.',
-  },
-};
+export type MeshLang = EngineLang;
 
 /** Last lines of a failed agent call, for an error message a person can act on. */
-function failureTail(res: CliExecutionResult, text: (typeof MESH_TEXT)[MeshLang]): string {
+function failureTail(res: CliExecutionResult, text: MeshText): string {
   const output = [res.stderr, res.stdout].filter(Boolean).join('\n').trim();
   if (res.timedOut) return text.timedOut;
   return output.split('\n').slice(-6).join('\n') || text.exitCode(res.exitCode);
@@ -167,7 +91,7 @@ export class AgentMesh {
   private readonly useSandbox: boolean;
   private readonly onMessage?: (message: AgentMessage) => void;
   private readonly onStatus?: (status: AgentMeshStatus) => void;
-  private readonly text: (typeof MESH_TEXT)[MeshLang];
+  private readonly text: MeshText;
   /** Appended to prompts whose reply is shown to the person, so it reads in their language. */
   private readonly replyLang: string;
 
@@ -187,8 +111,9 @@ export class AgentMesh {
     this.useSandbox = options.useSandbox ?? false;
     this.onMessage = options.onMessage;
     this.onStatus = options.onStatus;
-    this.text = MESH_TEXT[options.lang ?? 'tr'];
-    this.replyLang = (options.lang ?? 'tr') === 'tr' ? 'Write your reply in Turkish.' : '';
+    const lang = options.lang ?? 'tr';
+    this.text = MESH_TEXT[lang];
+    this.replyLang = lang === 'en' ? '' : `Write your reply in ${LANG_NAMES[lang]}.`;
   }
 
   private status(stage: AgentMeshStatus['stage'], round: number, text: string, agent?: string) {

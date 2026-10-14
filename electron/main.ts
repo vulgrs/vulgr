@@ -17,6 +17,7 @@ import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
 import { AgentMesh } from '../src/engine/agentMesh.js';
 import { Orchestra } from '../src/engine/orchestra.js';
+import { toEngineLang } from '../src/engine/engineLang.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
@@ -458,7 +459,7 @@ function setupIpcHandlers() {
       // The project folder picked in the sidebar, not wherever the app was launched from.
       cwd: cwd || currentCwd,
       useSandbox: useSandbox ?? false,
-      lang: lang === 'tr' ? 'tr' : 'en',
+      lang: toEngineLang(lang),
       onMessage: (message) => {
         mainWindow?.webContents.send('mesh:event', message);
       },
@@ -490,7 +491,7 @@ function setupIpcHandlers() {
       maxParallel,
       maxRounds,
       cwd: cwd || currentCwd,
-      lang: lang === 'tr' ? 'tr' : 'en',
+      lang: toEngineLang(lang),
       autoApply: false,
       onEvent: (event) => mainWindow?.webContents.send('orchestra:event', event),
     });
