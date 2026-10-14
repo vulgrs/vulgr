@@ -296,11 +296,16 @@ export class Orchestra {
   private async runCommand(cmd: string, cwd: string): Promise<{ ok: boolean; output: string }> {
     await this.whilePaused();
     try {
-      const { stdout, stderr } = await execFileAsync(process.platform === 'win32' ? 'cmd.exe' : '/bin/sh', process.platform === 'win32' ? ['/d', '/s', '/c', cmd] : ['-c', cmd], {
+      // On Windows the whole command line goes to cmd.exe verbatim, wrapped in
+      // quotes (what child_process.exec does); escaped as a normal argument,
+      // cmd.exe misreads inner quotes and e.g. node -e "process.exit(1)" "passes".
+      const win = process.platform === 'win32';
+      const { stdout, stderr } = await execFileAsync(win ? 'cmd.exe' : '/bin/sh', win ? ['/d', '/s', '/c', `"${cmd}"`] : ['-c', cmd], {
         cwd,
         timeout: 5 * 60_000,
         maxBuffer: 5 * 1024 * 1024,
         signal: this.abort.signal,
+        windowsVerbatimArguments: win,
       });
       return { ok: true, output: ContextOptimizer.optimizeTerminalLog([stdout, stderr].join('\n'), { maxLines: 60, maxBytes: 8192 }) };
     } catch (err: any) {
