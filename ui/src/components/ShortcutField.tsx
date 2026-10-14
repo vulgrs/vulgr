@@ -48,13 +48,13 @@ export const ShortcutField: React.FC<{
           recording
             ? 'border-[color:var(--primary)] bg-base-app text-zinc-300'
             : invalid
-              ? 'border-amber-500/50 bg-base-app text-amber-200 hover:border-amber-400'
+              ? 'border-amber-500/50 bg-base-app text-amber-200 hover:border-amber-400 [.light_&]:text-amber-700'
               : 'border-zinc-800 bg-base-app text-zinc-200 hover:border-zinc-600'
         }`}
       >
         {recording ? labels.pressKeys : displayCombo(value)}
       </button>
-      {recording && hint && <span className="text-[10.5px] text-amber-300/80">{labels.needsModifier}</span>}
+      {recording && hint && <span className="text-[10.5px] text-amber-300/80 [.light_&]:text-amber-700">{labels.needsModifier}</span>}
     </div>
   );
 };

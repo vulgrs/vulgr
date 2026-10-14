@@ -191,7 +191,8 @@
 }
 
 /* The logo mark is white; show it dark on light surfaces. */
-.light .logo-mark {
+.light .logo-mark,
+.light img[src*='logo-mark'] {
   filter: invert(1);
 }
 

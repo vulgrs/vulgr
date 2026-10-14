@@ -119,7 +119,7 @@ export const UsageView: React.FC<{ cwd?: string }> = ({ cwd }) => {
               </div>
             ))}
           </div>
-          {summary.total.unpricedCalls > 0 && <p className="text-[11px] text-amber-300/80">{h.lowerBound(summary.total.unpricedCalls)}</p>}
+          {summary.total.unpricedCalls > 0 && <p className="text-[11px] text-amber-300/80 [.light_&]:text-amber-700">{h.lowerBound(summary.total.unpricedCalls)}</p>}
 
           {summary.byDay.length > 1 && (
             <div>

@@ -69,7 +69,7 @@ export const BranchMenu: React.FC<{
         aria-expanded={open}
         className={`flex items-center space-x-1 px-1.5 py-0.2 rounded border text-[9px] transition-colors ${
           isDirty
-            ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+            ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 [.light_&]:text-amber-700'
             : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800'
         }`}
       >

@@ -93,14 +93,14 @@ export const RunChangesCard: React.FC<{
                     <span className="min-w-0 flex-1 truncate text-zinc-300" title={f.filename}>
                       {f.filename}
                     </span>
-                    {before.includes(f.filename) && <span className="text-[10px] text-amber-300/80">{c.before}</span>}
+                    {before.includes(f.filename) && <span className="text-[10px] text-amber-300/80 [.light_&]:text-amber-700">{c.before}</span>}
                     <span className="text-emerald-400">+{f.additions}</span>
                     <span className="text-red-400">−{f.deletions}</span>
                   </li>
                 ))}
                 {files.length > SHOWN && <li className="text-zinc-500">{c.more(files.length - SHOWN)}</li>}
               </ul>
-              {earlier.length > 0 && <p className="mt-2 text-[11px] text-amber-300/80">{c.preExisting(earlier.length)}</p>}
+              {earlier.length > 0 && <p className="mt-2 text-[11px] text-amber-300/80 [.light_&]:text-amber-700">{c.preExisting(earlier.length)}</p>}
 
               <button
                 type="button"
