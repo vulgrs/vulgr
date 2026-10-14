@@ -14,6 +14,20 @@ export interface CliExecutionOptions {
   /** Let the agent edit files without asking (builder role). Reviewers run read-only. */
   allowEdits?: boolean;
   extraArgs?: string[];
+  /** What the run was for (e.g. 'orchestra'), kept with its usage. */
+  usageTag?: string;
+}
+
+/** What one agent call really used, as its CLI reported it. */
+export interface AgentUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  /** Set when the CLI reports only one total (e.g. Codex). */
+  totalTokens?: number;
+  /** USD, when the CLI reports a cost (Claude Code). */
+  costUsd?: number;
 }
 
 export interface CliExecutionResult {
@@ -23,6 +37,8 @@ export interface CliExecutionResult {
   executionTimeMs: number;
   timedOut: boolean;
   error?: Error;
+  /** Tokens and cost, for CLIs that report them. */
+  usage?: AgentUsage;
 }
 
 export interface ICliAdapter {

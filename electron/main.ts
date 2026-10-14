@@ -19,6 +19,8 @@ import { AgentMesh } from '../src/engine/agentMesh.js';
 import { Orchestra } from '../src/engine/orchestra.js';
 import { toEngineLang } from '../src/engine/engineLang.js';
 import { RunHistoryStore } from '../src/engine/runHistory.js';
+import { UsageLedger } from '../src/engine/usageLedger.js';
+import { onAgentUsage } from '../src/adapters/usageEvents.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
@@ -68,6 +70,9 @@ const configManager = new ConfigManager(
   join(process.cwd(), '.warp-config.json')
 );
 const runHistory = new RunHistoryStore(join(os.homedir(), '.vulgr', 'runs'));
+// Every agent call whose CLI reports its usage (Claude Code, Codex) is written down.
+const usageLedger = new UsageLedger(join(os.homedir(), '.vulgr', 'usage.jsonl'));
+onAgentUsage((event) => usageLedger.add(event));
 const ptyManager = new PtyManager();
 ptyManager.setConfigManager(configManager);
 const claudeChatManager = new ClaudeChatManager();
@@ -644,6 +649,10 @@ function setupIpcHandlers() {
   ipcMain.handle('runs:save', (_, record) => runHistory.save(record));
   ipcMain.handle('runs:delete', (_, id: string) => runHistory.remove(id));
   ipcMain.handle('runs:clear', (_, cwd?: string) => runHistory.clear(cwd));
+
+  // Real token use and cost of agent calls
+  ipcMain.handle('usage:summary', (_, since?: number, cwd?: string) => usageLedger.summary(since ?? 0, cwd));
+  ipcMain.handle('usage:clear', () => usageLedger.clear());
 
   // Session Timeline & Technical Report Export Handlers
   ipcMain.handle('export:generate', (_, { data, format, options }) => {

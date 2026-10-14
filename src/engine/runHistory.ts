@@ -22,8 +22,11 @@ export interface RunRecord {
   log?: { at?: number; who?: string; text: string }[];
   /** The map as drawn at the end, plus every change of state, for replay. */
   map?: unknown;
-  /** Rough token count of what the agents wrote. */
+  /** Tokens used: as the CLIs reported them when `tokensExact`, otherwise a rough count of what the agents wrote. */
   tokens?: number;
+  tokensExact?: boolean;
+  /** USD reported by the CLIs (Claude Code); a lower bound when some agents report none. */
+  costUsd?: number;
 }
 
 /** What the list shows: a record without its log and map. */

@@ -7,7 +7,8 @@ import { GitUtils } from '../git/gitUtils.js';
 import { ContextOptimizer } from './contextOptimizer.js';
 import { MemoryStore } from './memoryStore.js';
 import { detectTestCommand } from './testPlan.js';
-import type { CliExecutionResult, ICliAdapter } from '../types/index.js';
+import type { AgentUsage, CliExecutionResult, ICliAdapter } from '../types/index.js';
+import { addUsage } from '../adapters/outputParsers.js';
 import { LANG_NAMES, type EngineLang } from './engineLang.js';
 import { ORCHESTRA_TEXT as TEXT, type OrchestraText } from './text/orchestraText.js';
 
@@ -93,6 +94,8 @@ export interface OrchestraResult {
   /** Files in the combined change. */
   files?: string[];
   error?: string;
+  /** What the agents really used, summed over the CLIs that report it. */
+  usage?: AgentUsage;
   durationMs: number;
 }
 
@@ -251,7 +254,25 @@ export class Orchestra {
   }
 
   private adapter(name: string): ICliAdapter {
-    return AdapterFactory.getAdapter(name);
+    return this.tracked(AdapterFactory.getAdapter(name));
+  }
+
+  /** Real tokens and cost of every agent call this run made, when the CLIs report them. */
+  private usage: AgentUsage | undefined;
+
+  /** The adapter, with each call's usage tagged 'orchestra' and added to the run's total. */
+  private tracked(adapter: ICliAdapter): ICliAdapter {
+    return {
+      name: adapter.name,
+      binaryPath: adapter.binaryPath,
+      isAvailable: () => adapter.isAvailable(),
+      getVersion: () => adapter.getVersion(),
+      execute: async (prompt, options) => {
+        const res = await adapter.execute(prompt, { ...options, usageTag: options?.usageTag ?? 'orchestra' });
+        this.usage = addUsage(this.usage, res.usage);
+        return res;
+      },
+    };
   }
 
   /** Runs an agent, streaming its last output lines to the UI for this task. */
@@ -302,7 +323,7 @@ export class Orchestra {
       for (const sb of taskSandboxes.values()) await wm.destroySandbox(sb.worktreePath, sb.branchName, true);
       const keep = partial.sandbox;
       if (integration && !keep) await wm.destroySandbox(integration.worktreePath, integration.branchName, true);
-      const result: OrchestraResult = { success: false, applied: false, tasks, durationMs: Date.now() - start, ...partial };
+      const result: OrchestraResult = { success: false, applied: false, tasks, durationMs: Date.now() - start, usage: this.usage, ...partial };
       if (this.stopped) {
         result.success = false;
         result.stopped = true;
@@ -535,6 +556,7 @@ export class Orchestra {
         applied: false,
         pendingReview: true,
         durationMs: Date.now() - start,
+        usage: this.usage,
       };
     }
     const applied = await this.applyPatch(intCwd, base);

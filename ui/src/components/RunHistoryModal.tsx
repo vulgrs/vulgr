@@ -9,7 +9,8 @@ import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
 import { AgentLogo } from './AgentLogo.js';
 import { FLOW_DIALOG, FlowHeader, MONO, SectionLabel, accentStyle, closeOnlyOnRequest } from './FlowParts.js';
-import { SystemMap, formatDuration } from './SystemMap.js';
+import { SystemMap, ViewToggle, formatDuration } from './SystemMap.js';
+import { UsageView, formatUsd } from './UsageView.js';
 import { useI18n } from '../i18n/index.js';
 import type { RunKind, RunOutcome, RunRecord, RunSummary } from '../runHistory.js';
 
@@ -65,6 +66,7 @@ export const RunHistoryModal: React.FC<RunHistoryModalProps> = ({ isOpen, onClos
   const [runs, setRuns] = useState<RunSummary[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<RunRecord | null>(null);
+  const [tab, setTab] = useState<'list' | 'map'>('list');
 
   const filterCwd = scope === 'project' && cwd ? cwd : undefined;
 
@@ -126,8 +128,34 @@ export const RunHistoryModal: React.FC<RunHistoryModalProps> = ({ isOpen, onClos
   return (
     <Dialog open={isOpen} onOpenChange={closeOnlyOnRequest(onClose)}>
       <DialogContent className={`${FLOW_DIALOG} sm:max-w-[960px]`} style={accentStyle(kind?.accent ?? '#a1a1aa')}>
-        <FlowHeader icon={appLogo} title={h.title} subtitle={h.subtitle} />
+        <FlowHeader
+          icon={appLogo}
+          title={h.title}
+          subtitle={h.subtitle}
+          actions={<ViewToggle value={tab} onChange={setTab} labels={{ list: h.tabRuns, map: h.tabUsage }} />}
+        />
 
+        {tab === 'map' ? (
+          <div className="min-h-0 space-y-4 overflow-y-auto p-5 md:max-h-[72vh]">
+            {cwd && (
+              <div className="flex w-fit rounded-[8px] border border-zinc-800 bg-base-app p-0.5">
+                {(['project', 'all'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setScope(v)}
+                    className={`rounded-[6px] px-2.5 py-1 text-[11px] transition-colors ${
+                      scope === v ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {v === 'project' ? h.thisProject : h.allProjects}
+                  </button>
+                ))}
+              </div>
+            )}
+            <UsageView cwd={filterCwd} />
+          </div>
+        ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[300px_minmax(0,1fr)]">
           {/* List */}
           <div className="flex min-h-0 flex-col border-b border-zinc-900 md:border-b-0 md:border-r">
@@ -199,7 +227,12 @@ export const RunHistoryModal: React.FC<RunHistoryModalProps> = ({ isOpen, onClos
                         </span>
                         <span className="mt-1 line-clamp-2 block text-[12px] leading-snug text-zinc-200">{r.goal}</span>
                         <span className={`mt-1 block truncate text-[10px] text-zinc-500 ${MONO}`}>
-                          {[timeAgo(r.endedAt, lang), formatDuration(r.endedAt - r.startedAt), scope === 'all' && r.cwd ? projectName(r.cwd) : '']
+                          {[
+                            timeAgo(r.endedAt, lang),
+                            formatDuration(r.endedAt - r.startedAt),
+                            r.costUsd !== undefined ? formatUsd(r.costUsd) : '',
+                            scope === 'all' && r.cwd ? projectName(r.cwd) : '',
+                          ]
                             .filter(Boolean)
                             .join(' · ')}
                         </span>
@@ -225,7 +258,13 @@ export const RunHistoryModal: React.FC<RunHistoryModalProps> = ({ isOpen, onClos
                       <span>{kind.label}</span>
                       <span>{new Date(run.startedAt).toLocaleString(lang)}</span>
                       <span>{h.took(formatDuration(run.endedAt - run.startedAt))}</span>
-                      {!!run.tokens && <span>{h.tokens(formatTokens(run.tokens))}</span>}
+                      {run.costUsd !== undefined && <span className="text-zinc-300">{formatUsd(run.costUsd)}</span>}
+                      {!!run.tokens && (
+                        <span>
+                          {h.tokens(formatTokens(run.tokens))}
+                          {!run.tokensExact && ` (${h.estimated})`}
+                        </span>
+                      )}
                     </p>
                     {run.cwd && <p className={`mt-1 truncate text-[10px] text-zinc-600 ${MONO}`}>{run.cwd}</p>}
                   </div>
@@ -295,6 +334,7 @@ export const RunHistoryModal: React.FC<RunHistoryModalProps> = ({ isOpen, onClos
             )}
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

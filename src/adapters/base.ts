@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ICliAdapter, CliExecutionOptions, CliExecutionResult, CliAdapterConfig } from '../types/index.js';
 import { terminateChildProcessSafely } from '../utils/processTree.js';
+import type { OutputParser } from './outputParsers.js';
+import { reportAgentUsage } from './usageEvents.js';
 
 export abstract class BaseCliAdapter implements ICliAdapter {
   abstract readonly name: string;
@@ -26,6 +28,14 @@ export abstract class BaseCliAdapter implements ICliAdapter {
     this.maxBufferBytes = config.maxBufferBytes ?? 10 * 1024 * 1024; // 10MB buffer cap
     this.defaultEnv = config.env ?? {};
     this.extraArgs = config.extraArgs ?? [];
+  }
+
+  /**
+   * For CLIs whose output is machine-readable (e.g. JSON events): turns it back
+   * into plain text and reads the run's usage. None by default.
+   */
+  protected createOutputParser(): OutputParser | null {
+    return null;
   }
 
   /**
@@ -124,6 +134,15 @@ export abstract class BaseCliAdapter implements ICliAdapter {
     const needsShell = process.platform === 'win32' && (!resolved || /\.(cmd|bat)$/i.test(resolved));
     const command = resolved && !needsShell ? resolved : this.binaryPath;
 
+    const parser = this.createOutputParser();
+    // Plain text and usage from the parser; a reported usage is also announced.
+    const finalize = (result: CliExecutionResult): CliExecutionResult => {
+      if (!parser) return result;
+      const { stdout, usage } = parser.finish(result.stdout, result.stderr);
+      if (usage) reportAgentUsage({ agent: this.name, cwd, tag: options.usageTag, usage, at: Date.now() });
+      return { ...result, stdout, usage };
+    };
+
     return new Promise<CliExecutionResult>((resolve) => {
       let stdout = '';
       let stderr = '';
@@ -151,8 +170,9 @@ export abstract class BaseCliAdapter implements ICliAdapter {
 
         const chunk = data.toString('utf-8');
         stdout += chunk;
-        if (options.onStdout) {
-          options.onStdout(chunk);
+        const shown = parser ? parser.push(chunk) : chunk;
+        if (options.onStdout && shown) {
+          options.onStdout(shown);
         }
       });
 
@@ -195,14 +215,14 @@ export abstract class BaseCliAdapter implements ICliAdapter {
         clearTimeout(timeoutTimer);
         options.signal?.removeEventListener('abort', onAbort);
 
-        resolve({
+        resolve(finalize({
           exitCode: 1,
           stdout,
           stderr: `${stderr}\n${err.message}`,
           executionTimeMs: Date.now() - startTime,
           timedOut,
           error: err,
-        });
+        }));
       });
 
       // Handle completion
@@ -212,13 +232,13 @@ export abstract class BaseCliAdapter implements ICliAdapter {
         clearTimeout(timeoutTimer);
         options.signal?.removeEventListener('abort', onAbort);
 
-        resolve({
+        resolve(finalize({
           exitCode: code,
           stdout,
           stderr,
           executionTimeMs: Date.now() - startTime,
           timedOut,
-        });
+        }));
       });
     });
   }

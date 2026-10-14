@@ -9,7 +9,8 @@ import { logger } from '../utils/logger.js';
 import { ContextOptimizer } from './contextOptimizer.js';
 import { MemoryStore } from './memoryStore.js';
 import { buildTestPlanPrompt, parseTestCommand, detectTestCommand } from './testPlan.js';
-import type { ICliAdapter, CliExecutionResult } from '../types/index.js';
+import type { ICliAdapter, CliExecutionResult, AgentUsage } from '../types/index.js';
+import { addUsage } from '../adapters/outputParsers.js';
 import { LANG_NAMES, type EngineLang } from './engineLang.js';
 import { MESH_TEXT, type MeshText } from './text/meshText.js';
 
@@ -54,6 +55,8 @@ export interface AgentMeshResult {
   audit?: 'approved' | 'rejected' | 'skipped';
   auditNotes?: string;
   error?: string;
+  /** What the agents really used, summed over the CLIs that report it. */
+  usage?: AgentUsage;
 }
 
 const AGENT_LABELS: Record<string, string> = {
@@ -122,11 +125,29 @@ export class AgentMesh {
 
   private resolveAdapter(name: string): ICliAdapter {
     try {
-      return AdapterFactory.getAdapter(name);
+      return this.tracked(AdapterFactory.getAdapter(name));
     } catch {
       logger.warn(`CLI "${name}" not found in registry, falling back to mock.`);
       return AdapterFactory.getAdapter('mock');
     }
+  }
+
+  /** Real tokens and cost of every agent call this run made, when the CLIs report them. */
+  private usage: AgentUsage | undefined;
+
+  /** The adapter, with each call's usage tagged 'swarm' and added to the run's total. */
+  private tracked(adapter: ICliAdapter): ICliAdapter {
+    return {
+      name: adapter.name,
+      binaryPath: adapter.binaryPath,
+      isAvailable: () => adapter.isAvailable(),
+      getVersion: () => adapter.getVersion(),
+      execute: async (prompt, options) => {
+        const res = await adapter.execute(prompt, { ...options, usageTag: options?.usageTag ?? 'swarm' });
+        this.usage = addUsage(this.usage, res.usage);
+        return res;
+      },
+    };
   }
 
   private async runVerificationCmd(targetCwd?: string): Promise<{ success: boolean; exitCode: number; output: string }> {
@@ -185,6 +206,7 @@ export class AgentMesh {
         durationMs: Date.now() - startTime,
         sandbox,
         error,
+        usage: this.usage,
       };
     };
 
@@ -463,6 +485,7 @@ export class AgentMesh {
       sandbox: sandboxSession,
       audit,
       auditNotes: auditNotes.slice(-4000),
+      usage: this.usage,
     };
   }
 }

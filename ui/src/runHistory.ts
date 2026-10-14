@@ -25,6 +25,29 @@ export interface RunRecord {
   log?: { at?: number; who?: string; text: string }[];
   map?: SavedMap;
   tokens?: number;
+  tokensExact?: boolean;
+  costUsd?: number;
+}
+
+/** What the CLIs reported for a run (see AgentUsage in src/types). */
+export interface RunUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  totalTokens?: number;
+  costUsd?: number;
+}
+
+/** The token and cost fields of a run record: the reported usage when there is one, else the map's estimate. */
+export function runTokens(usage: RunUsage | undefined, map: SavedMap): Pick<RunRecord, 'tokens' | 'tokensExact' | 'costUsd'> {
+  if (usage) {
+    const tokens =
+      usage.totalTokens ?? usage.inputTokens + usage.outputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
+    if (tokens > 0) return { tokens, tokensExact: true, costUsd: usage.costUsd };
+  }
+  const estimate = map.nodes.reduce((sum, n) => sum + (n.tokens ?? 0), 0);
+  return { tokens: estimate || undefined };
 }
 export type RunSummary = Omit<RunRecord, 'log' | 'map'>;
 

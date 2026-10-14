@@ -31,7 +31,7 @@ import {
 } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
-import { newRunId, saveRun, useRunRecorder } from '../runHistory.js';
+import { newRunId, runTokens, saveRun, useRunRecorder, type RunUsage } from '../runHistory.js';
 
 type TaskState = 'waiting' | 'running' | 'testing' | 'fixing' | 'merging' | 'done' | 'failed' | 'skipped';
 type Phase = 'checking' | 'planning' | 'working' | 'integrating' | 'reviewing' | 'awaiting-review' | 'done' | 'failed' | 'stopped';
@@ -63,6 +63,7 @@ interface Result {
   pendingReview?: boolean;
   files?: string[];
   error?: string;
+  usage?: RunUsage;
 }
 
 interface OrchestraModalProps {
@@ -418,7 +419,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
       agents: [...new Set([planner, ...workers, reviewer])],
       log: runLogRef.current,
       map,
-      tokens: map.nodes.reduce((sum, n) => sum + (n.tokens ?? 0), 0) || undefined,
+      ...runTokens(result.usage, map),
     });
   }, [result, running]);
 

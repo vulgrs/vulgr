@@ -1,6 +1,7 @@
 import { BaseCliAdapter } from './base.js';
 import { ClaudeAdapter } from './claude.js';
 import type { CliAdapterConfig, CliExecutionOptions, CliExecutionResult } from '../types/index.js';
+import { codexTokensParser, type OutputParser } from './outputParsers.js';
 
 export class CodexAdapter extends BaseCliAdapter {
   readonly name = 'codex';
@@ -11,6 +12,11 @@ export class CodexAdapter extends BaseCliAdapter {
 
   protected getDefaultBinary(): string {
     return 'codex';
+  }
+
+  /** Reads the "tokens used" count Codex prints at the end. */
+  protected override createOutputParser(): OutputParser {
+    return codexTokensParser();
   }
 
   /**

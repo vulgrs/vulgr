@@ -147,6 +147,9 @@ export interface WarpApi {
   saveRun: (record: any) => Promise<any | null>;
   deleteRun: (id: string) => Promise<boolean>;
   clearRuns: (cwd?: string) => Promise<number>;
+  /** Real token use and cost of agent calls since `since` (ms), optionally for one project. */
+  getUsageSummary: (since?: number, cwd?: string) => Promise<any>;
+  clearUsage: () => Promise<void>;
 
   // Session Timeline & Technical Report Export
   generateReport: (data: any, format: 'markdown' | 'html' | 'json', options?: any) => Promise<string>;
@@ -312,6 +315,8 @@ const api: WarpApi = {
   saveRun: (record) => ipcRenderer.invoke('runs:save', record),
   deleteRun: (id) => ipcRenderer.invoke('runs:delete', id),
   clearRuns: (cwd) => ipcRenderer.invoke('runs:clear', cwd),
+  getUsageSummary: (since, cwd) => ipcRenderer.invoke('usage:summary', since, cwd),
+  clearUsage: () => ipcRenderer.invoke('usage:clear'),
 
   // Session Timeline & Technical Report Export
   generateReport: (data, format, options) => ipcRenderer.invoke('export:generate', { data, format, options }),

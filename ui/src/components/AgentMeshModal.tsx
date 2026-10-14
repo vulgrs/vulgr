@@ -35,7 +35,7 @@ import {
 } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
-import { newRunId, saveRun, useRunRecorder } from '../runHistory.js';
+import { newRunId, runTokens, saveRun, useRunRecorder, type RunUsage } from '../runHistory.js';
 
 export interface AgentMessage {
   id: string;
@@ -67,6 +67,7 @@ interface MeshResult {
   audit?: 'approved' | 'rejected' | 'skipped';
   error?: string;
   sandbox?: { worktreePath: string; branchName: string };
+  usage?: RunUsage;
 }
 
 interface AgentMeshModalProps {
@@ -319,7 +320,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
       agents: [...new Set([verifier, builder, auditor])],
       log: messages.map((msg) => ({ at: Date.parse(msg.timestamp) || undefined, who: msg.from, text: msg.payload.summary })),
       map,
-      tokens: map.nodes.reduce((sum, n) => sum + (n.tokens ?? 0), 0) || undefined,
+      ...runTokens(result.usage, map),
     });
   }, [result, isRunning]);
 
