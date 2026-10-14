@@ -40,7 +40,18 @@ jobs:
 
       - run: npm run build
 
-      - run: npm test
+      - name: Test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.txt
+
+      # Job logs are only visible to admins; a failing test's details also go
+      # into an annotation, which anyone can read on the run page.
+      - name: Report failing tests
+        if: failure()
+        shell: bash
+        run: node .github/scripts/annotate-test-failures.mjs test-output.txt
 
       # Starts the real app with a throwaway profile and fails on any load or
       # console error: the check that would have caught a blank window.
