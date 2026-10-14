@@ -35,7 +35,11 @@ jobs:
           mkdir -p docs-site/assets
           cp docs/screenshot.png ui/public/favicon.png ui/public/logo.png docs-site/assets/
 
+      # enablement: turns Pages on (source: GitHub Actions) if it isn't yet,
+      # which is why earlier deploys failed at this step.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
