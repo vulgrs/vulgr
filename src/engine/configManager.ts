@@ -48,6 +48,9 @@ export interface WarpConfig {
   // System notifications while the app is in the background
   notifyRuns: boolean;          // a Duo Loop / Agent Swarm / Orchestrator run ended
   notifyCommands: boolean;      // a terminal command that ran for a while ended
+
+  // Commits made from the app end with "Co-authored-by: Vulgr"
+  coAuthorVulgr: boolean;
   defaultVerifyCmd: string;     // Default command to verify builds (e.g. 'npm test')
 
   // OpenRouter API access (used by the deterministic "System 1" JSON compiler)
@@ -96,6 +99,7 @@ export const DEFAULT_CONFIG: WarpConfig = {
   autoSandbox: true,
   notifyRuns: true,
   notifyCommands: true,
+  coAuthorVulgr: true,
   defaultVerifyCmd: 'npm test',
   openRouterApiKey: '',
   systemOneModel: 'poolside/laguna-s-2.1-20260720:free',

@@ -125,7 +125,7 @@ const cursors = (t: Messages): OptionItem[] => [
 const LANGUAGE_ITEMS: OptionItem[] = LANGUAGES.map((l) => ({ value: l.value, label: l.label }));
 
 /** Settings that travel in an export; secrets, per-project entries and timestamps stay behind. */
-const EXPORT_KEYS = ['defaultShell', 'fontSize', 'cursorStyle', 'claude', 'agy', 'codex', 'autoSandbox', 'notifyRuns', 'notifyCommands', 'defaultVerifyCmd', 'shortcuts'] as const;
+const EXPORT_KEYS = ['defaultShell', 'fontSize', 'cursorStyle', 'claude', 'agy', 'codex', 'autoSandbox', 'notifyRuns', 'notifyCommands', 'coAuthorVulgr', 'defaultVerifyCmd', 'shortcuts'] as const;
 const EXPORT_FORMAT = 'vulgr-settings';
 
 /** Takes the known settings from an imported file, keeping each only if its type matches the current one. */
@@ -693,6 +693,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                           <UpdateSettings />
                         </div>
                       )}
+                    </Group>
+                    <Group title={s.gitTitle}>
+                      <Row label={s.coAuthor} hint={s.coAuthorHint}>
+                        <div className="flex justify-end">
+                          <Switch checked={config.coAuthorVulgr !== false} onCheckedChange={(checked) => setConfig({ ...config, coAuthorVulgr: checked })} />
+                        </div>
+                      </Row>
                     </Group>
                     <Group title={s.notifyTitle}>
                       <Row label={s.notifyRuns} hint={s.notifyRunsHint}>

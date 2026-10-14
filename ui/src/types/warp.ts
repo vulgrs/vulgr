@@ -276,6 +276,7 @@ export interface WarpConfig {
   autoSandbox: boolean;
   notifyRuns: boolean;
   notifyCommands: boolean;
+  coAuthorVulgr: boolean;
   defaultVerifyCmd: string;
   /** Keyboard shortcuts the user changed: action id -> combo like 'Ctrl+Shift+T'. */
   shortcuts?: Record<string, string>;

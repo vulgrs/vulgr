@@ -25,6 +25,7 @@ import { onAgentUsage } from '../src/adapters/usageEvents.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { suggestCommitMessage } from '../src/engine/commitMessage.js';
+import { withVulgrCoAuthor } from '../src/git/coAuthor.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
 import { MemoryStore } from '../src/engine/memoryStore.js';
 import { ContextOptimizer } from '../src/engine/contextOptimizer.js';
@@ -459,13 +460,14 @@ function setupIpcHandlers() {
 
   ipcMain.handle('git:commit', (_, { message, cwd = process.cwd() }) => {
     const git = new GitUtils(cwd);
-    return git.commitAll(message);
+    return git.commitAll(configManager.getConfig().coAuthorVulgr === false ? message : withVulgrCoAuthor(message));
   });
 
   // Commit everything with a message, then push when asked; says what happened and why not.
   ipcMain.handle('git:commit-push', (_, { message, push, cwd }: { message: string; push?: boolean; cwd?: string }) => {
     const git = new GitUtils(cwd || currentCwd);
-    const commit = git.commitAllDetailed(String(message || '').trim());
+    const text = String(message || '').trim();
+    const commit = git.commitAllDetailed(configManager.getConfig().coAuthorVulgr === false ? text : withVulgrCoAuthor(text));
     if (!commit.success) return { committed: false, pushed: false, error: commit.error };
     if (!push) return { committed: true, pushed: false };
     const pushed = git.push('origin');
