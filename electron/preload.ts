@@ -147,6 +147,10 @@ export interface WarpApi {
 
   /** Shows a system notification if the window is in the background and that kind is switched on. */
   notify: (notice: { title: string; body?: string; kind: 'run' | 'command' }) => Promise<boolean>;
+  /** Adds a line to the app's error log (vulgr.log). */
+  logWrite: (level: 'error' | 'warn' | 'info', message: string) => Promise<void>;
+  openLogsFolder: () => Promise<string>;
+  reportBug: () => Promise<void>;
   /** Asks where to save a terminal's output and writes it there. */
   saveTerminalOutput: (content: string, defaultName?: string) => Promise<{ success: boolean; canceled?: boolean; filePath?: string; error?: string }>;
 
@@ -332,6 +336,9 @@ const api: WarpApi = {
   resetConfig: () => ipcRenderer.invoke('config:reset'),
 
   notify: (notice) => ipcRenderer.invoke('notify', notice),
+  logWrite: (level, message) => ipcRenderer.invoke('log:write', level, message),
+  openLogsFolder: () => ipcRenderer.invoke('log:open-folder'),
+  reportBug: () => ipcRenderer.invoke('log:report-bug'),
   saveTerminalOutput: (content, defaultName) => ipcRenderer.invoke('terminal:save-output', { content, defaultName }),
   listRuns: (cwd) => ipcRenderer.invoke('runs:list', cwd),
   getRun: (id) => ipcRenderer.invoke('runs:get', id),

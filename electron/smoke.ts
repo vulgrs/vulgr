@@ -1,5 +1,5 @@
 import { app, type BrowserWindow } from 'electron';
-import { writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,9 +11,17 @@ import { join } from 'node:path';
  */
 export const smokeMode = process.env.VULGR_SMOKE === '1' || process.argv.includes('--smoke');
 
-/** A throwaway profile, so a smoke run never touches the user's sessions. */
+/**
+ * A throwaway profile, so a smoke run never touches the user's sessions. The
+ * same folder is emptied at each start, so runs don't pile up.
+ */
 export function prepareSmokeProfile(): void {
-  if (smokeMode) app.setPath('userData', join(tmpdir(), `vulgr-smoke-${process.pid}`));
+  if (!smokeMode) return;
+  const profile = join(tmpdir(), 'vulgr-smoke');
+  try {
+    rmSync(profile, { recursive: true, force: true });
+  } catch {}
+  app.setPath('userData', profile);
 }
 
 export function watchSmoke(win: BrowserWindow): void {
@@ -32,6 +40,7 @@ export function watchSmoke(win: BrowserWindow): void {
   const finish = (code: number) => {
     if (code === 0) console.log('[smoke] OK');
     else console.error(`[smoke] FAILED\n${errors.map((e) => `  - ${e}`).join('\n')}`);
+    if (code !== 0) console.error(`[smoke] Profile and log kept in ${app.getPath('userData')}`);
     app.exit(code);
   };
   // A hung start fails too.

@@ -35,6 +35,7 @@ import { buildTestPlanPrompt, parseTestCommand, detectTestCommand } from '../src
 import { listAgentStatus, installAgent, cancelAgentInstall } from './agentInstaller.js';
 import { setupAutoUpdates } from './updater.js';
 import { smokeMode, prepareSmokeProfile, watchSmoke } from './smoke.js';
+import { setupErrorLog } from './errorLog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,6 +61,7 @@ if (process.platform !== 'win32') {
 }
 
 prepareSmokeProfile();
+setupErrorLog();
 
 let mainWindow: BrowserWindow | null = null;
 let currentCwd = process.cwd();
@@ -275,8 +277,8 @@ async function createWindow() {
     console.error(`[Electron] Preload Error in ${preloadPath}:`, error);
   });
 
-  mainWindow.webContents.on('console-message', (_, level, message, line, sourceId) => {
-    console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+  mainWindow.webContents.on('console-message', (event) => {
+    console.log(`[Renderer] ${event.message} (${event.sourceId}:${event.lineNumber})`);
   });
 
   mainWindow.webContents.on('did-finish-load', () => {

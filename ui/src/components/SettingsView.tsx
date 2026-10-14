@@ -726,6 +726,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                         </Row>
                       )}
                     </Group>
+                    <Group title={s.logsTitle}>
+                      <Row label={s.logsLabel} hint={s.logsHint}>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => void window.warpApi?.openLogsFolder?.()}>
+                            {s.openLogs}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => void window.warpApi?.reportBug?.()}>
+                            {s.reportBug}
+                          </Button>
+                        </div>
+                      </Row>
+                    </Group>
                     <Group title={s.backupTitle}>
                       <Row label={s.exportTitle} hint={s.exportHint}>
                         <div className="flex justify-end">
