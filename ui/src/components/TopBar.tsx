@@ -16,6 +16,7 @@ import {
 import type { DoctorStatus } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
 import { displayCombo, useShortcuts } from '../shortcuts.js';
+import { UpdateButton } from './UpdateButton.js';
 
 interface TopBarProps {
   onToggleDiff: () => void;
@@ -131,6 +132,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Right: Project actions, environment status & window controls */}
       <div className="flex items-center flex-shrink-0" style={noDrag}>
         <div className="flex items-center gap-0.5">
+          <UpdateButton />
           <ToolButton
             onClick={onToggleDiff}
             icon={<GitCompare size={13} />}
