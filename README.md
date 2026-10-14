@@ -28,9 +28,9 @@ Download it from [vulgr.tech](https://vulgr.tech), which picks the right file fo
 - `Vulgr-Setup-<version>.exe` — Windows
 - `Vulgr-<version>-x86_64.AppImage` — Linux (`chmod +x` it, then run it)
 
-Beta builds are not code-signed yet — on macOS, right-click the app and choose **Open** the first time (or **System Settings → Privacy & Security → Open Anyway**); on Windows, choose **More info → Run anyway**.
+Beta builds are not code-signed with an Apple or Microsoft certificate yet, so the system warns the first time. On macOS, move Vulgr to Applications, open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway** (or run `xattr -dr com.apple.quarantine /Applications/Vulgr.app`). On Windows, choose **More info → Run anyway**.
 
-**Updates:** the Windows and Linux (AppImage) apps check for new versions on launch, download them in the background and offer **Restart and update**. On macOS, unsigned apps cannot update themselves, so Vulgr shows a notice that links to the new release instead.
+**Updates:** Vulgr checks for new versions at launch and every few hours and downloads them in the background; a gift icon next to your profile (bottom left) then restarts into the new version. This works on macOS, Windows and Linux (AppImage); on macOS the app must be in a folder it can write to, such as Applications.
 
 Or install it with npm and start it with `vulgr`:
 
