@@ -6,7 +6,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog.js';
 import { Spinner } from '@/components/ui/spinner.js';
 import { Switch } from '@/components/ui/switch.js';
 import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
-import appLogo from '../assets/sidebar/logo.svg';
+import appLogo from '../assets/logo-mark.png';
 import { AgentLogo } from './AgentLogo.js';
 import { SystemMap, ViewToggle, estimateTokens } from './SystemMap.js';
 import { swarmMap } from './flowMaps.js';

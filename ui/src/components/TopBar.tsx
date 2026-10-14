@@ -89,7 +89,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Left: Brand & the three ways to automate work */}
       <div className={`flex items-center gap-1 min-w-0 ${isMac ? 'pl-[70px]' : ''}`} style={noDrag}>
         <div className="flex items-center gap-1.5 pl-1 pr-2 flex-shrink-0">
-          <img src="./logo-mark.svg" alt="Vulgr" className="logo-mark w-5 h-5 object-contain" draggable={false} />
+          <img src="./logo-mark.png" alt="Vulgr" className="logo-mark w-5 h-5 object-contain" draggable={false} />
           <span className="text-[11px] font-semibold text-zinc-300">Vulgr</span>
         </div>
 

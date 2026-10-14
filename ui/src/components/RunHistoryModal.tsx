@@ -3,7 +3,7 @@ import { Copy, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent } from '@/components/ui/dialog.js';
 import { Spinner } from '@/components/ui/spinner.js';
-import appLogo from '../assets/sidebar/logo.svg';
+import appLogo from '../assets/logo-mark.png';
 import duoLoopIcon from '../assets/sidebar/duo-loop.svg';
 import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';

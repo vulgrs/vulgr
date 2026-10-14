@@ -138,14 +138,14 @@ const Visual: React.FC<{
       if (userCode) return <CodeBoxes code={userCode} />;
       return (
         <div className="flex flex-col items-center justify-center gap-4">
-          <img src="./logo-mark.svg" alt="" className="logo-mark w-16 h-16" />
+          <img src="./logo-mark.png" alt="" className="logo-mark w-16 h-16" />
           <div className="font-sans font-black text-[52px] leading-none tracking-tight text-zinc-100">Vulgr.</div>
         </div>
       );
     case 'done':
       return (
         <div className="flex flex-col items-center justify-center gap-4">
-          <img src="./logo-mark.svg" alt="" className="logo-mark w-16 h-16" />
+          <img src="./logo-mark.png" alt="" className="logo-mark w-16 h-16" />
           <div className="font-sans font-black text-[52px] leading-none tracking-tight text-zinc-100">Vulgr.</div>
           <span className="flex items-center gap-1.5 text-[11px] text-emerald-400">
             <Check size={13} /> {t.onboarding.done.title}
