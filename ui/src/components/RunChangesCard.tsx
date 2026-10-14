@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, ChevronRight, GitCommitHorizontal, Upload } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button.js';
 import { Spinner } from '@/components/ui/spinner.js';
 import { DiffViewer, parseGitDiff } from './DiffViewer.js';
+import { CommitBox } from './CommitBox.js';
 import { MONO, SectionLabel } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
 
@@ -38,8 +39,7 @@ export const RunChangesCard: React.FC<{
   const c = t.changes;
   const [diff, setDiff] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState(() => subjectFrom(goal));
-  const [state, setState] = useState<'idle' | 'committing' | 'committed' | 'pushing' | 'pushed'>('idle');
+  const [state, setState] = useState<'idle' | 'committed' | 'pushing' | 'pushed'>('idle');
 
   useEffect(() => {
     let live = true;
@@ -54,18 +54,6 @@ export const RunChangesCard: React.FC<{
 
   const files = useMemo(() => (diff ? parseGitDiff(diff) : []), [diff]);
   const earlier = files.filter((f) => before.includes(f.filename));
-
-  const commit = async () => {
-    setState('committing');
-    const ok = await window.warpApi?.gitCommit?.(message.trim() || subjectFrom(goal), cwd).catch(() => false);
-    if (ok) {
-      setState('committed');
-      toast.success(c.committed);
-    } else {
-      setState('idle');
-      toast.error(c.commitFailed);
-    }
-  };
 
   const push = async () => {
     setState('pushing');
@@ -128,20 +116,16 @@ export const RunChangesCard: React.FC<{
                 </div>
               )}
 
-              <label className="mt-3 block">
-                <span className={`mb-1 block text-[9.5px] uppercase tracking-[0.1em] text-zinc-500 ${MONO}`}>{c.message}</span>
-                <input
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && message.trim() && state === 'idle') void commit();
-                  }}
-                  className="w-full rounded-[8px] border border-zinc-800 bg-base-app px-2.5 py-1.5 text-[12px] text-zinc-100 outline-none focus:border-zinc-600"
+              <div className="mt-3">
+                <CommitBox
+                  cwd={cwd}
+                  initialMessage={subjectFrom(goal)}
+                  onDone={(outcome) => setState(outcome.pushed ? 'pushed' : 'committed')}
                 />
-              </label>
+              </div>
             </>
           )}
-          <div className="mt-3 flex items-center gap-2">
+          <div className={done ? 'mt-3 flex items-center gap-2' : 'hidden'}>
             {done ? (
               <>
                 <span className="flex items-center gap-1.5 text-[12px] text-emerald-300">
@@ -155,12 +139,7 @@ export const RunChangesCard: React.FC<{
                   </Button>
                 )}
               </>
-            ) : (
-              <Button size="sm" className="ml-auto" disabled={!message.trim() || state === 'committing'} onClick={() => void commit()}>
-                {state === 'committing' ? <Spinner data-icon="inline-start" /> : <GitCommitHorizontal data-icon="inline-start" />}
-                {c.commit}
-              </Button>
-            )}
+            ) : null}
           </div>
         </>
       )}

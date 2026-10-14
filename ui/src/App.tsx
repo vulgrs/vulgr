@@ -871,16 +871,6 @@ export const App: React.FC = () => {
     offerUndo(stash, t.dock.discardedFile(file));
   };
 
-  const handleCommitAndPush = async (message: string) => {
-    if (window.warpApi?.gitCommit) {
-      await window.warpApi.gitCommit(message, cwd);
-      if (window.warpApi.gitPush) {
-        await window.warpApi.gitPush('origin', gitBranch || 'master', cwd);
-      }
-      await refreshGitDiff();
-    }
-  };
-
   // Sidebar terminals & groups
   const handleNewTerminal = (groupId?: string) => {
     createShellTab('', undefined, groupId);
@@ -1661,7 +1651,8 @@ export const App: React.FC = () => {
             sandboxes={activeSandboxes}
             onRevert={handleRevertGit}
             onRevertFile={handleRevertFile}
-            onCommitAndPush={handleCommitAndPush}
+            cwd={cwd || undefined}
+            onCommitted={() => void refreshGitDiff()}
             onOpenTerminalInSandbox={handleOpenTerminalInSandbox}
             onSendDiffToAgent={handleSendDiffToAgent}
           />

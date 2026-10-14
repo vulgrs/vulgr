@@ -24,6 +24,7 @@ import { TemplateStore, type TemplateKind } from '../src/engine/templateStore.js
 import { onAgentUsage } from '../src/adapters/usageEvents.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
+import { suggestCommitMessage } from '../src/engine/commitMessage.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
 import { MemoryStore } from '../src/engine/memoryStore.js';
 import { ContextOptimizer } from '../src/engine/contextOptimizer.js';
@@ -460,6 +461,21 @@ function setupIpcHandlers() {
     const git = new GitUtils(cwd);
     return git.commitAll(message);
   });
+
+  // Commit everything with a message, then push when asked; says what happened and why not.
+  ipcMain.handle('git:commit-push', (_, { message, push, cwd }: { message: string; push?: boolean; cwd?: string }) => {
+    const git = new GitUtils(cwd || currentCwd);
+    const commit = git.commitAllDetailed(String(message || '').trim());
+    if (!commit.success) return { committed: false, pushed: false, error: commit.error };
+    if (!push) return { committed: true, pushed: false };
+    const pushed = git.push('origin');
+    return { committed: true, pushed: pushed.success, error: pushed.error };
+  });
+
+  // An agent writes a commit message for the uncommitted changes.
+  ipcMain.handle('git:suggest-commit', (_, { cwd, note }: { cwd?: string; note?: string } = {}) =>
+    suggestCommitMessage(cwd || currentCwd, { note }).catch((err) => ({ error: 'failed', detail: String(err?.message || err) }))
+  );
 
   ipcMain.handle('git:push', (_, { remote = 'origin', branch, cwd = process.cwd() } = {}) => {
     const git = new GitUtils(cwd);

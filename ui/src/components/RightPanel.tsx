@@ -18,6 +18,7 @@ import {
   CornerDownLeft,
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer.js';
+import { CommitBox } from './CommitBox.js';
 import type { SessionType } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
 
@@ -31,7 +32,10 @@ interface RightPanelProps {
   onRevert: () => void;
   /** Discards one file's changes (not the whole working tree). */
   onRevertFile: (file: string) => void;
-  onCommitAndPush: (message: string) => Promise<void> | void;
+  /** Project folder the commit goes to. */
+  cwd?: string;
+  /** After a commit (and push) went through, e.g. to refresh the diff. */
+  onCommitted?: () => void;
   onOpenTerminalInSandbox?: (worktreePath: string, branchName: string) => void;
   onSendDiffToAgent?: (type: SessionType) => void;
 }
@@ -45,34 +49,17 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   sandboxes,
   onRevert,
   onRevertFile,
-  onCommitAndPush,
+  cwd,
+  onCommitted,
   onOpenTerminalInSandbox,
   onSendDiffToAgent,
 }) => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'changes' | 'sandbox'>('changes');
-  const [commitMsg, setCommitMsg] = useState('');
   const [showCommitInput, setShowCommitInput] = useState(false);
-  const [isCommitting, setIsCommitting] = useState(false);
   const [commitSuccess, setCommitSuccess] = useState(false);
 
   if (!isOpen) return null;
-
-  const handleCommitPush = async () => {
-    const msg = commitMsg.trim() || `fix: update ${filesChanged.slice(0, 2).join(', ')}`;
-    setIsCommitting(true);
-    try {
-      await onCommitAndPush(msg);
-      setCommitMsg('');
-      setShowCommitInput(false);
-      setCommitSuccess(true);
-      setTimeout(() => setCommitSuccess(false), 2000);
-    } catch {
-      // error handled upstream
-    } finally {
-      setIsCommitting(false);
-    }
-  };
 
   return (
     <div className="w-[340px] lg:w-[380px] h-full bg-base-elevated border-l border-zinc-800 flex flex-col select-none z-20 flex-shrink-0 animate-slide-in-right shadow-modal">
@@ -156,20 +143,13 @@ export const RightPanel: React.FC<RightPanelProps> = ({
 
             {/* Commit & Push Primary Button (Exact button from screenshot) */}
             <button
-              onClick={() => {
-                if (showCommitInput) {
-                  handleCommitPush();
-                } else {
-                  setShowCommitInput(true);
-                }
-              }}
-              disabled={filesChanged.length === 0 || isCommitting}
+              onClick={() => setShowCommitInput((v) => !v)}
+              aria-expanded={showCommitInput}
+              disabled={filesChanged.length === 0}
               title={t.dock.commitPushHint}
               className="btn-accent flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              {isCommitting ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : commitSuccess ? (
+              {commitSuccess ? (
                 <Check size={12} className="text-emerald-600" />
               ) : (
                 <CornerDownLeft size={12} />
@@ -180,35 +160,28 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         </div>
       )}
 
-      {/* Floating Commit Message Input Drawer */}
+      {/* Commit message (hand-written or by an AI agent), then commit or commit & push */}
       {showCommitInput && (
-        <div className="p-3 bg-zinc-950 border-b border-zinc-800/80 animate-slide-in-up flex-shrink-0">
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
+        <div className="relative p-3 bg-zinc-950 border-b border-zinc-800/80 animate-slide-in-up flex-shrink-0">
+          <button
+            onClick={() => setShowCommitInput(false)}
+            className="absolute right-2 top-2 p-1 text-zinc-500 hover:text-zinc-300"
+            aria-label={t.common.close}
+          >
+            <X size={13} />
+          </button>
+          <div className="pr-5">
+            <CommitBox
+              cwd={cwd}
               autoFocus
-              value={commitMsg}
-              onChange={(e) => setCommitMsg(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCommitPush();
-                if (e.key === 'Escape') setShowCommitInput(false);
+              compact
+              onDone={() => {
+                setShowCommitInput(false);
+                setCommitSuccess(true);
+                setTimeout(() => setCommitSuccess(false), 2000);
+                onCommitted?.();
               }}
-              placeholder={t.dock.commitPlaceholder}
-              className="flex-1 rounded-md border border-zinc-800 bg-black px-2.5 py-1 font-sans text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-ring"
             />
-            <button
-              onClick={handleCommitPush}
-              disabled={isCommitting}
-              className="btn-accent px-2.5 py-1 text-xs font-semibold"
-            >
-              {t.dock.commit}
-            </button>
-            <button
-              onClick={() => setShowCommitInput(false)}
-              className="p-1 text-zinc-500 hover:text-zinc-300"
-            >
-              <X size={13} />
-            </button>
           </div>
         </div>
       )}

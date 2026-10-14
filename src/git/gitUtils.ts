@@ -5,6 +5,12 @@ import { join, dirname, isAbsolute } from 'node:path';
 
 const execFileAsync = promisify(execFile);
 
+/** The useful part of a failed git command: its last lines of output. */
+function gitError(err: any): string {
+  const text = [err?.stderr, err?.stdout].map((v) => (v ? String(v) : '')).join('\n').trim();
+  return (text || err?.message || '').split('\n').filter(Boolean).slice(-4).join('\n');
+}
+
 export interface GitDiffResult {
   hasChanges: boolean;
   diff: string;
@@ -307,10 +313,23 @@ export class GitUtils {
 
     try {
       const b = branch || this.getBranch() || 'master';
-      execSync(`git push ${remote} ${b}`, { cwd: this.cwd, stdio: 'pipe', encoding: 'utf-8' });
+      // -u: a new branch gets its upstream on the first push. No shell, so names are taken literally.
+      execFileSync('git', ['push', '-u', remote, b], { cwd: this.cwd, stdio: 'pipe', encoding: 'utf-8' });
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err?.message || 'Failed to push' };
+      return { success: false, error: gitError(err) || 'Failed to push' };
+    }
+  }
+
+  /** Like commitAll, but says why it failed (nothing to commit, no user name set, a hook refused...). */
+  commitAllDetailed(message: string): { success: boolean; error?: string } {
+    if (!this.isGitRepo()) return { success: false, error: 'Not a git repository' };
+    try {
+      execFileSync('git', ['add', '-A'], { cwd: this.cwd, stdio: 'pipe' });
+      execFileSync('git', ['commit', '-m', message], { cwd: this.cwd, stdio: 'pipe', encoding: 'utf-8' });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: gitError(err) || 'Commit failed' };
     }
   }
 }

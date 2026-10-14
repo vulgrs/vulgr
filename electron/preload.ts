@@ -51,6 +51,10 @@ export interface WarpApi {
   revertFile: (file: string, cwd?: string) => Promise<string | null>;
   getGitBranch: (cwd?: string) => Promise<string | null>;
   gitCommit: (message: string, cwd?: string) => Promise<boolean>;
+  /** Commits everything with `message`, and pushes when `push`; `error` says why a step failed. */
+  commitAndPush: (options: { message: string; push?: boolean; cwd?: string }) => Promise<{ committed: boolean; pushed: boolean; error?: string }>;
+  /** An agent's commit message for the uncommitted changes. */
+  suggestCommitMessage: (options?: { cwd?: string; note?: string }) => Promise<{ message?: string; agent?: string; error?: 'no-changes' | 'no-agent' | 'failed'; detail?: string }>;
   gitPush: (remote?: string, branch?: string, cwd?: string) => Promise<{ success: boolean; error?: string }>;
   getCwd: () => Promise<string>;
   getHostname: () => Promise<string>;
@@ -253,6 +257,8 @@ const api: WarpApi = {
   revertFile: (file: string, cwd?: string) => ipcRenderer.invoke('git:revertFile', { file, cwd }),
   getGitBranch: (cwd?: string) => ipcRenderer.invoke('git:branch', { cwd }),
   gitCommit: (message: string, cwd?: string) => ipcRenderer.invoke('git:commit', { message, cwd }),
+  commitAndPush: (options) => ipcRenderer.invoke('git:commit-push', options),
+  suggestCommitMessage: (options) => ipcRenderer.invoke('git:suggest-commit', options ?? {}),
   gitPush: (remote?: string, branch?: string, cwd?: string) => ipcRenderer.invoke('git:push', { remote, branch, cwd }),
   getCwd: () => ipcRenderer.invoke('system:getCwd'),
   getHostname: () => ipcRenderer.invoke('system:hostname'),
