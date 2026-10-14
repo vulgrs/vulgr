@@ -16,6 +16,7 @@ import type { GuideAction } from './components/GuideModal.js';
 import { AgentSetupModal } from './components/AgentSetupModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
+import { useDuoHistory } from './hooks/useDuoHistory.js';
 import { useI18n } from './i18n/index.js';
 import { describeCommand, titleFromWork } from './utils/workTitle.js';
 import type {
@@ -50,6 +51,7 @@ const LiveSquadModal = lazy(() => import('./components/LiveSquadModal.js').then(
 const SkillsModal = lazy(() => import('./components/SkillsModal.js').then((m) => ({ default: m.SkillsModal })));
 const GuideModal = lazy(() => import('./components/GuideModal.js').then((m) => ({ default: m.GuideModal })));
 const ExportReportModal = lazy(() => import('./components/ExportReportModal.js').then((m) => ({ default: m.ExportReportModal })));
+const RunHistoryModal = lazy(() => import('./components/RunHistoryModal.js').then((m) => ({ default: m.RunHistoryModal })));
 
 /** True from the first time `flag` is true on. */
 function useOpenedOnce(flag: boolean): boolean {
@@ -158,6 +160,7 @@ export const App: React.FC = () => {
   // First launch shows the welcome flow; the guide opens from Help / F1.
   const [onboardingOpen, setOnboardingOpen] = useState(shouldShowOnboarding);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const closeGuide = () => setGuideOpen(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [chatModeOpen, setChatModeOpen] = useState(false);
@@ -173,6 +176,7 @@ export const App: React.FC = () => {
   const liveSquadModalLoaded = useOpenedOnce(squadModalOpen);
   const skillsModalLoaded = useOpenedOnce(skillsModalOpen);
   const guideModalLoaded = useOpenedOnce(guideOpen);
+  const runHistoryModalLoaded = useOpenedOnce(historyOpen);
   const exportReportModalLoaded = useOpenedOnce(exportModalOpen);
 
   // Project Workspace & Memory State
@@ -284,6 +288,7 @@ export const App: React.FC = () => {
   };
 
   const { squad, startSquad, togglePause, stopSquad } = useSquadOrchestrator(squadDeps);
+  useDuoHistory(squad, cwd);
 
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
   const activeSession =
@@ -1183,6 +1188,14 @@ export const App: React.FC = () => {
         run: () => setSkillsModalOpen(true),
       },
       {
+        id: 'open-history',
+        label: t.history.open,
+        group: t.app.groups.skills,
+        shortcut: 'Ctrl+Shift+H',
+        keywords: 'history runs past duo loop swarm orchestrator replay log',
+        run: () => setHistoryOpen(true),
+      },
+      {
         id: 'open-sandbox',
         label: t.app.actions.openSandbox,
         group: t.app.groups.git,
@@ -1332,6 +1345,10 @@ export const App: React.FC = () => {
           e.preventDefault();
           setHudOpen((v) => !v);
           break;
+        case 'h':
+          e.preventDefault();
+          setHistoryOpen((v) => !v);
+          break;
         case 'g':
           e.preventDefault();
           refreshGitDiff();
@@ -1440,6 +1457,7 @@ export const App: React.FC = () => {
             onOpenSquads={() => setSquadModalOpen(true)}
             onOpenMesh={() => setMeshModalOpen(true)}
             onOpenOrchestra={() => setOrchestraOpen(true)}
+            onOpenHistory={() => setHistoryOpen(true)}
             onOpenSkills={() => setSkillsModalOpen(true)}
             onOpenSettings={() => setSettingsModalOpen(true)}
             pastRuns={[]}
@@ -1699,6 +1717,13 @@ export const App: React.FC = () => {
         onClose={() => setAgentSetupOpen(false)}
         onRunInTerminal={(command, title) => createShellTab(title, command)}
       />
+
+      {/* Finished Duo Loop, Agent Swarm and Orchestrator runs */}
+      {runHistoryModalLoaded && (
+        <Suspense fallback={null}>
+          <RunHistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} cwd={cwd || undefined} />
+        </Suspense>
+      )}
 
       {/* First-run / F1 feature guide */}
       {guideModalLoaded && (

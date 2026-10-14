@@ -6,7 +6,8 @@ import { join } from 'node:path';
 /**
  * Smoke test (`npm run smoke`, or start with --smoke): starts the real app, waits for the interface,
  * opens the lazily loaded parts, and exits 0 when nothing went wrong or 1 with
- * the errors. VULGR_SMOKE_SHOT=<file.png> also saves a screenshot.
+ * the errors. VULGR_SMOKE_SHOT=<file.png> also saves a screenshot, after running
+ * VULGR_SMOKE_JS in the page when set (e.g. to open a window first).
  */
 export const smokeMode = process.env.VULGR_SMOKE === '1' || process.argv.includes('--smoke');
 
@@ -19,6 +20,8 @@ export function watchSmoke(win: BrowserWindow): void {
   if (!smokeMode) return;
   const errors: string[] = [];
   const wc = win.webContents;
+  // The smoke window is often behind others; keep it painting so screenshots are current.
+  wc.setBackgroundThrottling(false);
   wc.on('console-message', (event) => {
     if (event.level === 'error') errors.push(`console: ${event.message}`);
   });
@@ -54,8 +57,16 @@ export function watchSmoke(win: BrowserWindow): void {
       // Every lazily loaded window and language must load from the built files.
       const lazy: string[] = await wc.executeJavaScript(`window.__vulgrSmoke ? window.__vulgrSmoke() : Promise.resolve([])`);
       errors.push(...lazy.map((e) => `lazy: ${e}`));
+      if (process.env.VULGR_SMOKE_JS) {
+        await wc.executeJavaScript(process.env.VULGR_SMOKE_JS);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
       const shot = process.env.VULGR_SMOKE_SHOT;
-      if (shot) writeFileSync(shot, (await wc.capturePage()).toPNG());
+      if (shot) {
+        wc.invalidate();
+        await new Promise((r) => setTimeout(r, 300));
+        writeFileSync(shot, (await wc.capturePage()).toPNG());
+      }
     } catch (err: any) {
       errors.push(`check failed: ${err?.message || err}`);
     }

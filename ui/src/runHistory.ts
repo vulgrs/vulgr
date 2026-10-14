@@ -1,0 +1,74 @@
+import { useEffect, useRef } from 'react';
+import { edgeKey, type MapEdge, type MapNode, type Snapshot } from './components/SystemMap.js';
+
+export type RunKind = 'duo' | 'swarm' | 'orchestra';
+export type RunOutcome = 'success' | 'failed' | 'stopped';
+
+/** The map of a run as saved: nodes without their React icons, plus every change of state. */
+export interface SavedMap {
+  nodes: Omit<MapNode, 'icon'>[];
+  edges: MapEdge[];
+  snapshots: Snapshot[];
+}
+
+/** Same shape as RunRecord in src/engine/runHistory.ts. */
+export interface RunRecord {
+  id: string;
+  kind: RunKind;
+  goal: string;
+  cwd: string;
+  startedAt: number;
+  endedAt: number;
+  outcome: RunOutcome;
+  summary?: string;
+  agents?: string[];
+  log?: { at?: number; who?: string; text: string }[];
+  map?: SavedMap;
+  tokens?: number;
+}
+export type RunSummary = Omit<RunRecord, 'log' | 'map'>;
+
+export const newRunId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/** Saves a finished run; failing to save never interrupts the app. */
+export async function saveRun(record: RunRecord): Promise<void> {
+  try {
+    await window.warpApi?.saveRun?.(record);
+    window.dispatchEvent(new Event('vulgr:runs-changed'));
+  } catch (err) {
+    console.warn('Could not save the run to history:', err);
+  }
+}
+
+/**
+ * Remembers every change of a run's map while `running`, whichever view is on
+ * screen, and returns a function that gives the map to save once it is over.
+ * A run that starts again begins a new recording.
+ */
+export function useRunRecorder(graph: { nodes: MapNode[]; edges: MapEdge[] }, running: boolean) {
+  const frames = useRef<Snapshot[]>([]);
+  const wasRunning = useRef(false);
+  // The last map that had nodes: a run that is closed leaves an empty one behind.
+  const latest = useRef(graph);
+  if (graph.nodes.length > 0) latest.current = graph;
+
+  useEffect(() => {
+    if (running && !wasRunning.current) frames.current = [];
+    wasRunning.current = running;
+    if ((!running && frames.current.length === 0) || graph.nodes.length === 0) return;
+    const snap: Snapshot = {
+      at: Date.now(),
+      nodes: Object.fromEntries(graph.nodes.map((n) => [n.id, n.state ?? 'idle'])),
+      edges: Object.fromEntries(graph.edges.map((e, i) => [edgeKey(e, i), e.state ?? 'idle'])),
+    };
+    const last = frames.current[frames.current.length - 1];
+    if (last && JSON.stringify(last.nodes) === JSON.stringify(snap.nodes) && JSON.stringify(last.edges) === JSON.stringify(snap.edges)) return;
+    frames.current.push(snap);
+  });
+
+  return (): SavedMap => ({
+    nodes: latest.current.nodes.map(({ icon: _icon, ...node }) => node),
+    edges: latest.current.edges,
+    snapshots: frames.current.slice(-400),
+  });
+}

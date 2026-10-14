@@ -20,7 +20,7 @@ import { duoMap } from './flowMaps.js';
 import { ACCENT, MONO, accentStyle } from './FlowParts.js';
 import { squadAgentLabel } from '../hooks/useSquadOrchestrator.js';
 
-const MAP_AGENTS = ['claude', 'agy', 'codex', 'opencode', 'cursor', 'shell'].map((id) => ({
+export const MAP_AGENTS = ['claude', 'agy', 'codex', 'opencode', 'cursor', 'shell'].map((id) => ({
   value: id,
   label: squadAgentLabel(id as SquadSession['builderType']),
 }));

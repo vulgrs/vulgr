@@ -141,6 +141,13 @@ export interface WarpApi {
   updateConfig: (updates: any) => Promise<any>;
   resetConfig: () => Promise<any>;
 
+  // History of finished Duo Loop, Agent Swarm and Orchestrator runs
+  listRuns: (cwd?: string) => Promise<any[]>;
+  getRun: (id: string) => Promise<any | null>;
+  saveRun: (record: any) => Promise<any | null>;
+  deleteRun: (id: string) => Promise<boolean>;
+  clearRuns: (cwd?: string) => Promise<number>;
+
   // Session Timeline & Technical Report Export
   generateReport: (data: any, format: 'markdown' | 'html' | 'json', options?: any) => Promise<string>;
   saveReportToFile: (content: string, defaultName?: string, format?: 'markdown' | 'html' | 'json') => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
@@ -299,6 +306,12 @@ const api: WarpApi = {
   setProjectConfig: (projectDir, overrides) => ipcRenderer.invoke('config:project-set', projectDir, overrides),
   updateConfig: (updates) => ipcRenderer.invoke('config:update', updates),
   resetConfig: () => ipcRenderer.invoke('config:reset'),
+
+  listRuns: (cwd) => ipcRenderer.invoke('runs:list', cwd),
+  getRun: (id) => ipcRenderer.invoke('runs:get', id),
+  saveRun: (record) => ipcRenderer.invoke('runs:save', record),
+  deleteRun: (id) => ipcRenderer.invoke('runs:delete', id),
+  clearRuns: (cwd) => ipcRenderer.invoke('runs:clear', cwd),
 
   // Session Timeline & Technical Report Export
   generateReport: (data, format, options) => ipcRenderer.invoke('export:generate', { data, format, options }),

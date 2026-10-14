@@ -35,6 +35,7 @@ import {
 } from './FlowParts.js';
 import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
+import { newRunId, saveRun, useRunRecorder } from '../runHistory.js';
 
 export interface AgentMessage {
   id: string;
@@ -169,6 +170,8 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   const [picked, setPicked] = useState<Role | null>(null);
 
   const feedEndRef = useRef<HTMLDivElement>(null);
+  const runStartRef = useRef(0);
+  const savedResultRef = useRef<MeshResult | null>(null);
   const openRef = useRef(isOpen);
   openRef.current = isOpen;
 
@@ -219,6 +222,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     saveSetting('maxRounds', maxRounds);
 
     setIsRunning(true);
+    runStartRef.current = Date.now();
     setRunGoal(goal.trim());
     setMessages([]);
     setResult(null);
@@ -296,6 +300,28 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   const pickedMessage = picked
     ? [...messages].reverse().find((msg) => ROLE_TYPES[picked].includes(msg.type))
     : undefined;
+
+  // Each finished run goes to the history, with its map for replay.
+  const recordMap = useRunRecorder(graph, isRunning);
+  useEffect(() => {
+    if (!result || isRunning || savedResultRef.current === result || !runStartRef.current) return;
+    savedResultRef.current = result;
+    const map = recordMap();
+    void saveRun({
+      id: newRunId(),
+      kind: 'swarm',
+      goal: runGoal,
+      cwd: cwd || '',
+      startedAt: runStartRef.current,
+      endedAt: Date.now(),
+      outcome: result.success ? 'success' : 'failed',
+      summary: result.error || status?.text,
+      agents: [...new Set([verifier, builder, auditor])],
+      log: messages.map((msg) => ({ at: Date.parse(msg.timestamp) || undefined, who: msg.from, text: msg.payload.summary })),
+      map,
+      tokens: map.nodes.reduce((sum, n) => sum + (n.tokens ?? 0), 0) || undefined,
+    });
+  }, [result, isRunning]);
 
   const summary = [cmd ? f.testCmd(cmd) : f.autoTests, f.rounds(Number(maxRounds)), useSandbox ? f.sandboxOn : '']
     .filter(Boolean)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, FolderPlus, Brain, Trash2, Pencil, X, Terminal } from 'lucide-react';
+import { Plus, FolderPlus, Brain, History, Trash2, Pencil, X, Terminal } from 'lucide-react';
 import type {
   WorkspaceTab,
   TerminalGroup,
@@ -53,6 +53,8 @@ interface SidebarProps {
   onOpenSquads: () => void;
   onOpenMesh?: () => void;
   onOpenOrchestra?: () => void;
+  /** Finished agent runs. */
+  onOpenHistory?: () => void;
   onOpenSkills: () => void;
   onOpenSettings: () => void;
   pastRuns?: any[];
@@ -276,6 +278,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSquads,
   onOpenMesh,
   onOpenOrchestra,
+  onOpenHistory,
   onOpenSettings,
   pastConversations = [],
   onSelectConversation,
@@ -564,6 +567,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Brain size={10} />
             </button>
+            {onOpenHistory && (
+              <button
+                onClick={onOpenHistory}
+                className="p-0.5 rounded text-zinc-500 hover:text-zinc-100 hover:bg-base-elevated transition-colors"
+                title={t.history.openHint}
+                aria-label={t.history.open}
+              >
+                <History size={10} />
+              </button>
+            )}
           </div>
         </div>
 

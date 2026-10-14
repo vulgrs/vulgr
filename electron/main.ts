@@ -18,6 +18,7 @@ import { GeminiAdapter } from '../src/adapters/gemini.js';
 import { AgentMesh } from '../src/engine/agentMesh.js';
 import { Orchestra } from '../src/engine/orchestra.js';
 import { toEngineLang } from '../src/engine/engineLang.js';
+import { RunHistoryStore } from '../src/engine/runHistory.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
@@ -66,6 +67,7 @@ const configManager = new ConfigManager(
   'config.json',
   join(process.cwd(), '.warp-config.json')
 );
+const runHistory = new RunHistoryStore(join(os.homedir(), '.vulgr', 'runs'));
 const ptyManager = new PtyManager();
 ptyManager.setConfigManager(configManager);
 const claudeChatManager = new ClaudeChatManager();
@@ -635,6 +637,13 @@ function setupIpcHandlers() {
   );
   ipcMain.handle('config:update', (_, updates) => configManager.updateConfig(updates));
   ipcMain.handle('config:reset', () => configManager.resetConfig());
+
+  // Run history
+  ipcMain.handle('runs:list', (_, cwd?: string) => runHistory.list(cwd));
+  ipcMain.handle('runs:get', (_, id: string) => runHistory.get(id));
+  ipcMain.handle('runs:save', (_, record) => runHistory.save(record));
+  ipcMain.handle('runs:delete', (_, id: string) => runHistory.remove(id));
+  ipcMain.handle('runs:clear', (_, cwd?: string) => runHistory.clear(cwd));
 
   // Session Timeline & Technical Report Export Handlers
   ipcMain.handle('export:generate', (_, { data, format, options }) => {

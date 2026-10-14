@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, History, Loader2, Pause, Play, TriangleAlert, X } from 'lucide-react';
 import { AgentLogo } from './AgentLogo.js';
 import { MONO } from './FlowParts.js';
@@ -58,13 +58,24 @@ const NODE_FRAME: Record<MapState, string> = {
 };
 
 /** One remembered moment of a run: every node's and edge's state. */
-interface Snapshot {
+export interface Snapshot {
   at: number;
   nodes: Record<string, MapState>;
   edges: Record<string, MapState>;
 }
 
-const edgeKey = (edge: MapEdge, i: number) => `${edge.from}-${edge.to}-${i}`;
+export const edgeKey = (edge: MapEdge, i: number) => `${edge.from}-${edge.to}-${i}`;
+
+/** How long each node was active over a recorded run. */
+function recordedTimes(frames: Snapshot[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (let i = 0; i + 1 < frames.length; i++) {
+    for (const [id, state] of Object.entries(frames[i].nodes)) {
+      if (state === 'active') out[id] = (out[id] ?? 0) + frames[i + 1].at - frames[i].at;
+    }
+  }
+  return out;
+}
 
 /** "12s", "3m 05s", "1h 02m". */
 export function formatDuration(ms: number): string {
@@ -102,7 +113,9 @@ export const SystemMap: React.FC<{
   demo?: boolean;
   /** Hover text for clickable nodes, e.g. "Open its terminal". */
   selectHint?: string;
-}> = ({ nodes: liveNodes, edges: liveEdges, height = 240, selected, onSelect, demo, selectHint }) => {
+  /** A saved run: shown as it ended, and played back from these moments instead of live ones. */
+  recording?: Snapshot[];
+}> = ({ nodes: liveNodes, edges: liveEdges, height = 240, selected, onSelect, demo, selectHint, recording }) => {
   const { t } = useI18n();
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -117,6 +130,7 @@ export const SystemMap: React.FC<{
   const anyActive = liveNodes.some((n) => n.state === 'active');
 
   useEffect(() => {
+    if (recording) return;
     if (demo) {
       timing.current = {};
       history.current = [];
@@ -169,9 +183,9 @@ export const SystemMap: React.FC<{
     const id = window.setInterval(() => {
       setReplayAt((i) => {
         const next = (i ?? -1) + 1;
-        if (next >= history.current.length - 1) {
+        if (next >= framesRef.current.length - 1) {
           setPlaying(false);
-          return history.current.length - 1;
+          return framesRef.current.length - 1;
         }
         return next;
       });
@@ -179,13 +193,18 @@ export const SystemMap: React.FC<{
     return () => window.clearInterval(id);
   }, [playing]);
 
-  const snap = replayAt !== null ? history.current[replayAt] : undefined;
+  const frames = recording ?? history.current;
+  const framesRef = useRef(frames);
+  framesRef.current = frames;
+  const recordedTime = useMemo(() => (recording ? recordedTimes(recording) : null), [recording]);
+  const snap = replayAt !== null ? frames[replayAt] : undefined;
   const nodes = snap ? liveNodes.map((n) => ({ ...n, state: snap.nodes[n.id] ?? 'idle' })) : liveNodes;
   const edges = snap ? liveEdges.map((e, i) => ({ ...e, state: snap.edges[edgeKey(e, i)] ?? 'idle' })) : liveEdges;
-  const canReplay = !demo && !anyActive && history.current.length >= 3;
-  const runStart = history.current[0]?.at ?? 0;
+  const canReplay = !demo && !anyActive && frames.length >= (recording ? 2 : 3);
+  const runStart = frames[0]?.at ?? 0;
 
   const elapsed = (id: string) => {
+    if (recordedTime) return recordedTime[id] ?? 0;
     const entry = timing.current[id];
     if (!entry) return 0;
     return entry.total + (entry.start !== undefined ? now - entry.start : 0);
@@ -368,7 +387,7 @@ export const SystemMap: React.FC<{
               <button
                 type="button"
                 onClick={() => {
-                  if (!playing && replayAt >= history.current.length - 1) setReplayAt(0);
+                  if (!playing && replayAt >= frames.length - 1) setReplayAt(0);
                   setPlaying((p) => !p);
                 }}
                 className="rounded p-0.5 transition-colors hover:text-zinc-100"
@@ -379,13 +398,13 @@ export const SystemMap: React.FC<{
               <input
                 type="range"
                 min={0}
-                max={history.current.length - 1}
+                max={frames.length - 1}
                 value={replayAt}
                 onChange={(e) => {
                   setPlaying(false);
                   setReplayAt(Number(e.target.value));
                 }}
-                aria-label={t.flow.replayStep(replayAt + 1, history.current.length)}
+                aria-label={t.flow.replayStep(replayAt + 1, frames.length)}
                 className="h-1 w-24 cursor-pointer accent-[color:var(--flow-accent,var(--primary))]"
               />
               <span className={`tabular-nums ${MONO}`}>+{formatDuration((snap?.at ?? runStart) - runStart)}</span>
