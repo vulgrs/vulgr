@@ -37,6 +37,9 @@ const en = {
   auditApproved: (agent: string) => `Tests passed and ${agent} approved the changes.`,
   doneRejected: 'Tests passed, but the auditor found problems.',
   done: 'Done: tests passed.',
+  paused: 'Paused.',
+  resumed: 'Resumed.',
+  stopped: 'Stopped.',
 };
 
 export type MeshText = typeof en;
@@ -77,6 +80,9 @@ const tr: MeshText = {
   auditApproved: (agent: string) => `Testler geçti ve ${agent} değişiklikleri onayladı.`,
   doneRejected: 'Testler geçti, ancak denetçi sorun buldu.',
   done: 'Tamamlandı: testler geçti.',
+  paused: 'Duraklatıldı.',
+  resumed: 'Devam ediliyor.',
+  stopped: 'Durduruldu.',
 };
 
 const de: MeshText = {
@@ -115,6 +121,9 @@ const de: MeshText = {
   auditApproved: (agent: string) => `Tests bestanden und ${agent} hat die Änderungen freigegeben.`,
   doneRejected: 'Tests bestanden, aber der Prüfer hat Probleme gefunden.',
   done: 'Fertig: Tests bestanden.',
+  paused: 'Pausiert.',
+  resumed: 'Fortgesetzt.',
+  stopped: 'Gestoppt.',
 };
 
 const es: MeshText = {
@@ -153,6 +162,9 @@ const es: MeshText = {
   auditApproved: (agent: string) => `Las pruebas pasaron y ${agent} aprobó los cambios.`,
   doneRejected: 'Las pruebas pasaron, pero el auditor encontró problemas.',
   done: 'Hecho: las pruebas pasaron.',
+  paused: 'En pausa.',
+  resumed: 'Reanudado.',
+  stopped: 'Detenido.',
 };
 
 const fr: MeshText = {
@@ -191,6 +203,9 @@ const fr: MeshText = {
   auditApproved: (agent: string) => `Les tests ont réussi et ${agent} a approuvé les modifications.`,
   doneRejected: 'Les tests ont réussi, mais l’auditeur a trouvé des problèmes.',
   done: 'Terminé : les tests ont réussi.',
+  paused: 'En pause.',
+  resumed: 'Reprise.',
+  stopped: 'Arrêté.',
 };
 
 const ja: MeshText = {
@@ -229,6 +244,9 @@ const ja: MeshText = {
   auditApproved: (agent: string) => `テストが通り、${agent} が変更を承認しました。`,
   doneRejected: 'テストは通りましたが、監査役が問題を見つけました。',
   done: '完了: テストが通りました。',
+  paused: '一時停止しました。',
+  resumed: '再開しました。',
+  stopped: '停止しました。',
 };
 
 const zh: MeshText = {
@@ -262,6 +280,9 @@ const zh: MeshText = {
   auditApproved: (agent: string) => `测试已通过，${agent} 批准了这些更改。`,
   doneRejected: '测试已通过，但审查者发现了问题。',
   done: '完成：测试已通过。',
+  paused: '已暂停。',
+  resumed: '已继续。',
+  stopped: '已停止。',
 };
 
 const ru: MeshText = {
@@ -300,6 +321,9 @@ const ru: MeshText = {
   auditApproved: (agent: string) => `Тесты прошли, и ${agent} одобрил изменения.`,
   doneRejected: 'Тесты прошли, но проверяющий нашёл проблемы.',
   done: 'Готово: тесты прошли.',
+  paused: 'Пауза.',
+  resumed: 'Продолжаем.',
+  stopped: 'Остановлено.',
 };
 
 export const MESH_TEXT: Record<EngineLang, MeshText> = { en, tr, de, es, fr, ja, zh, ru };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckCircle2, Play, RotateCcw, TriangleAlert, XCircle } from 'lucide-react';
+import { CheckCircle2, Pause, Play, RotateCcw, Square, TriangleAlert, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button.js';
 import { Dialog, DialogContent } from '@/components/ui/dialog.js';
@@ -72,6 +72,7 @@ interface MeshResult {
   error?: string;
   sandbox?: { worktreePath: string; branchName: string };
   usage?: RunUsage;
+  stopped?: boolean;
 }
 
 interface AgentMeshModalProps {
@@ -167,6 +168,8 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   const [useSandbox, setUseSandbox] = useState(false);
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [runGoal, setRunGoal] = useState('');
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [status, setStatus] = useState<MeshStatus | null>(null);
@@ -228,6 +231,8 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     saveSetting('maxRounds', maxRounds);
 
     changesBeforeRef.current = await changedFilesNow(cwd);
+    setPaused(false);
+    setStopping(false);
     setIsRunning(true);
     runStartRef.current = Date.now();
     setRunGoal(goal.trim());
@@ -321,14 +326,14 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
       cwd: cwd || '',
       startedAt: runStartRef.current,
       endedAt: Date.now(),
-      outcome: result.success ? 'success' : 'failed',
+      outcome: result.stopped ? 'stopped' : result.success ? 'success' : 'failed',
       summary: result.error || status?.text,
       agents: [...new Set([verifier, builder, auditor])],
       log: messages.map((msg) => ({ at: Date.parse(msg.timestamp) || undefined, who: msg.from, text: msg.payload.summary })),
       map,
       ...runTokens(result.usage, map),
     };
-    void saveRun(record, runNotice(t, record));
+    void saveRun(record, record.outcome === 'stopped' ? undefined : runNotice(t, record));
   }, [result, isRunning]);
 
   const summary = [cmd ? f.testCmd(cmd) : f.autoTests, f.rounds(Number(maxRounds)), useSandbox ? f.sandboxOn : '']
@@ -336,6 +341,19 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     .join(' · ');
 
   const resultBox = result && (() => {
+    if (result.stopped) {
+      return (
+        <div className="flex gap-2.5 rounded-[11px] border border-zinc-700 bg-zinc-800/30 px-3.5 py-3">
+          <span className="mt-px">
+            <Square size={14} className="text-zinc-400" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[12.5px] text-zinc-100">{m.stoppedTitle}</p>
+            <p className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-400">{m.stoppedBody}</p>
+          </div>
+        </div>
+      );
+    }
     const tone = !result.success
       ? { box: 'border-red-500/30 bg-red-500/[0.06]', icon: <XCircle size={15} className="text-red-400" />, title: m.failedTitle }
       : result.audit === 'rejected'
@@ -561,7 +579,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                   <li className="relative pl-4">
                     <span className="absolute -left-[4.5px] top-[7px] size-2 animate-pulse rounded-full bg-[color:var(--flow-accent)] ring-4 ring-[var(--base-surface)]" />
                     <div className="flex items-center gap-2 text-[12px] text-zinc-300">
-                      <span>{status?.text ?? m.running}</span>
+                      <span>{stopping ? m.stopping : paused ? m.pausedNote : status?.text ?? m.running}</span>
                       {status && status.round > 0 && (
                         <span className={`ml-auto text-[10px] text-zinc-600 ${MONO}`}>
                           {m.round(status.round, status.maxRounds)}
@@ -610,10 +628,29 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
             </>
           )}
           {isRunning && (
-            <Button size="sm" disabled>
-              <Spinner data-icon="inline-start" />
-              {m.running}
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={stopping}
+                onClick={() => void window.warpApi?.pauseMesh?.(!paused).then((p: boolean) => setPaused(!!p))}
+              >
+                {paused ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+                {paused ? m.resume : m.pause}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={stopping}
+                onClick={() => {
+                  setStopping(true);
+                  void window.warpApi?.stopMesh?.();
+                }}
+              >
+                {stopping ? <Spinner data-icon="inline-start" /> : <Square data-icon="inline-start" />}
+                {stopping ? m.stopping : m.stop}
+              </Button>
+            </>
           )}
           {result && (
             <>

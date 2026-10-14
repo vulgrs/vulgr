@@ -213,6 +213,60 @@ describe('Autonomous Agent Mesh & Message Bus Suite', () => {
     assert.match(builderPrompts[0], /goal\.test\.cjs\. Make them pass/);
   });
 
+  test('stop() ends a run as stopped, and pause holds the next agent until resume', async () => {
+    const ok = (stdout: string) => ({ stdout, stderr: '', exitCode: 0, executionTimeMs: 1, timedOut: false });
+    let builderStarted!: () => void;
+    const started = new Promise<void>((r) => (builderStarted = r));
+    AdapterFactory.registerAdapter('stop-builder', () => ({
+      name: 'stop-builder',
+      binaryPath: 'stop-builder',
+      isAvailable: async () => true,
+      getVersion: async () => '1',
+      execute: async (_prompt: string, options: any = {}) => {
+        builderStarted();
+        return new Promise((resolve) =>
+          options.signal?.addEventListener('abort', () => resolve({ ...ok(''), exitCode: null, stderr: '[Stopped.]' }))
+        );
+      },
+    }));
+    AdapterFactory.registerAdapter('stop-checker', () => ({
+      name: 'stop-checker',
+      binaryPath: 'stop-checker',
+      isAvailable: async () => true,
+      getVersion: async () => '1',
+      execute: async () => ok('VERDICT: APPROVED'),
+    }));
+    const mesh = new AgentMesh({ builder: 'stop-builder', verifier: 'stop-checker', auditor: 'stop-checker', verifyCmd: 'node -e "process.exit(0)"', cwd: testWorkspace, lang: 'en' });
+    const pending = mesh.runMesh('Never finishes');
+    await started;
+    mesh.stop();
+    const result = await pending;
+    assert.equal(result.success, false);
+    assert.equal(result.stopped, true);
+    assert.equal(result.error, 'Stopped.');
+
+    // Pause before the run: nothing starts until resume.
+    let calls = 0;
+    AdapterFactory.registerAdapter('pause-agent', () => ({
+      name: 'pause-agent',
+      binaryPath: 'pause-agent',
+      isAvailable: async () => true,
+      getVersion: async () => '1',
+      execute: async () => {
+        calls++;
+        return ok('VERDICT: APPROVED');
+      },
+    }));
+    const paused = new AgentMesh({ builder: 'pause-agent', verifier: 'pause-agent', auditor: 'pause-agent', verifyCmd: 'node -e "process.exit(0)"', cwd: testWorkspace, lang: 'en' });
+    paused.pause();
+    const run = paused.runMesh('Small task');
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(calls, 0);
+    paused.resume();
+    assert.equal((await run).success, true);
+    assert.ok(calls > 0);
+  });
+
   test('parseTestCommand reads the last TEST_COMMAND line', () => {
     assert.equal(parseTestCommand('notes\nTEST_COMMAND: npm test\nTEST_COMMAND: `node --test test/csv.test.js`'), 'node --test test/csv.test.js');
     assert.equal(parseTestCommand('no command here'), null);

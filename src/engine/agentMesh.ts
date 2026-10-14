@@ -57,6 +57,8 @@ export interface AgentMeshResult {
   error?: string;
   /** What the agents really used, summed over the CLIs that report it. */
   usage?: AgentUsage;
+  /** Ended by stop(). */
+  stopped?: boolean;
 }
 
 const AGENT_LABELS: Record<string, string> = {
@@ -134,6 +136,43 @@ export class AgentMesh {
 
   /** Real tokens and cost of every agent call this run made, when the CLIs report them. */
   private usage: AgentUsage | undefined;
+  private readonly abort = new AbortController();
+  /** Set while paused; resolves when the run goes on. */
+  private pauseGate: { promise: Promise<void>; open: () => void } | null = null;
+
+  /** Stops the agent that is working and ends the run as stopped. */
+  stop(): void {
+    this.abort.abort();
+    this.pauseGate?.open();
+    this.pauseGate = null;
+  }
+
+  /** Holds the run: the agent already working finishes its step, nothing new starts until resume(). */
+  pause(): void {
+    if (this.pauseGate || this.stopped) return;
+    let open!: () => void;
+    const promise = new Promise<void>((resolve) => (open = resolve));
+    this.pauseGate = { promise, open };
+  }
+
+  resume(): void {
+    const gate = this.pauseGate;
+    if (!gate) return;
+    this.pauseGate = null;
+    gate.open();
+  }
+
+  get paused(): boolean {
+    return this.pauseGate !== null;
+  }
+
+  private get stopped(): boolean {
+    return this.abort.signal.aborted;
+  }
+
+  private async whilePaused(): Promise<void> {
+    while (this.pauseGate && !this.stopped) await this.pauseGate.promise;
+  }
 
   /** The adapter, with each call's usage tagged 'swarm' and added to the run's total. */
   private tracked(adapter: ICliAdapter): ICliAdapter {
@@ -143,7 +182,10 @@ export class AgentMesh {
       isAvailable: () => adapter.isAvailable(),
       getVersion: () => adapter.getVersion(),
       execute: async (prompt, options) => {
-        const res = await adapter.execute(prompt, { ...options, usageTag: options?.usageTag ?? 'swarm' });
+        await this.whilePaused();
+        // After stop() no new agent starts.
+        if (this.stopped) return { exitCode: null, stdout: '', stderr: this.text.stopped, executionTimeMs: 0, timedOut: false };
+        const res = await adapter.execute(prompt, { ...options, signal: this.abort.signal, usageTag: options?.usageTag ?? 'swarm' });
         this.usage = addUsage(this.usage, res.usage);
         return res;
       },
@@ -151,11 +193,14 @@ export class AgentMesh {
   }
 
   private async runVerificationCmd(targetCwd?: string): Promise<{ success: boolean; exitCode: number; output: string }> {
+    await this.whilePaused();
+    if (this.stopped) return { success: false, exitCode: 1, output: this.text.stopped };
     try {
       const { stdout, stderr } = await execAsync(this.verifyCmd, {
         cwd: targetCwd || this.cwd,
         timeout: 5 * 60_000,
         maxBuffer: 5 * 1024 * 1024,
+        signal: this.abort.signal,
       });
       const raw = [stdout, stderr].filter(Boolean).join('\n');
       return {
@@ -194,15 +239,19 @@ export class AgentMesh {
     const verifierAdapter = this.resolveAdapter(this.verifierName);
     const auditorAdapter = this.resolveAdapter(this.auditorName);
 
-    const fail = (error: string, rounds: number, git: GitUtils, sandbox?: SandboxSession): AgentMeshResult => {
+    const fail = async (error: string, rounds: number, git: GitUtils, sandbox?: SandboxSession): Promise<AgentMeshResult> => {
+      // A run the user stopped ends as "stopped", whatever step it was in.
+      const stopped = this.stopped;
+      if (stopped) error = this.text.stopped;
       this.status('failed', rounds, error);
-      logger.error(error);
+      if (!stopped) logger.error(error);
       return {
         runId,
         success: false,
+        stopped: stopped || undefined,
         rounds,
         messages: allMessages,
-        diff: git.getDiff().diff,
+        diff: (await git.getDiffAsync()).diff,
         durationMs: Date.now() - startTime,
         sandbox,
         error,
@@ -234,7 +283,7 @@ export class AgentMesh {
     let sandboxSession: SandboxSession | undefined;
     let activeGit = this.gitUtils;
 
-    if (this.useSandbox && this.gitUtils.isGitRepo()) {
+    if (this.useSandbox && (await this.gitUtils.isGitRepoAsync())) {
       try {
         const worktreeMgr = new WorktreeManager(this.cwd);
         sandboxSession = await worktreeMgr.createSandbox(runId);
@@ -271,7 +320,7 @@ export class AgentMesh {
         onStdout: (chunk) => logger.streamChunk(chunk),
       });
       const planned = planExec.exitCode === 0 && !planExec.timedOut ? parseTestCommand(planExec.stdout) : null;
-      const testDiff = activeGit.getDiff();
+      const testDiff = (await activeGit.getDiffAsync());
       testFiles = testDiff.filesChanged;
       this.verifyCmd = planned || detectTestCommand(activeCwd) || '';
       if (!this.verifyCmd) {
@@ -305,7 +354,7 @@ export class AgentMesh {
     ].join('\n');
     this.status('building', 1, this.text.building(label(this.builderName)), this.builderName);
     logger.model(this.builderName, 'Writing code autonomously...');
-    const diffBeforeBuild = activeGit.getDiff().diff;
+    const diffBeforeBuild = (await activeGit.getDiffAsync()).diff;
     const buildExec = await builderAdapter.execute(taskDetails, {
       cwd: activeCwd,
       timeoutMs: this.timeoutMs,
@@ -314,7 +363,7 @@ export class AgentMesh {
     });
     // An agent can hang or time out after finishing the edits; if it changed
     // files, the tests decide whether the work is done.
-    const diffInitial = activeGit.getDiff();
+    const diffInitial = (await activeGit.getDiffAsync());
     const buildStopped = buildExec.exitCode !== 0 || buildExec.timedOut;
     if (buildStopped && diffInitial.diff === diffBeforeBuild) {
       return fail(this.text.buildFailed(label(this.builderName), failureTail(buildExec, this.text)), 1, activeGit, sandboxSession);
@@ -336,7 +385,7 @@ export class AgentMesh {
     let currentRound = 1;
     let audit: AgentMeshResult['audit'] = 'skipped';
     let auditNotes = '';
-    let finalDiff = activeGit.getDiff();
+    let finalDiff = (await activeGit.getDiffAsync());
 
     for (; currentRound <= this.maxRounds; currentRound++) {
       this.status('verifying', currentRound, this.text.verifying(this.verifyCmd, currentRound, this.maxRounds));
@@ -348,13 +397,13 @@ export class AgentMesh {
         verificationPassed = true;
         await this.bus.publish(runId, this.verifierName, this.auditorName, 'VERIFICATION_PASSED', {
           summary: this.text.verifyPassed(this.verifyCmd, currentRound),
-          gitDiff: ContextOptimizer.optimizeDiff(activeGit.getDiff().diff),
+          gitDiff: ContextOptimizer.optimizeDiff((await activeGit.getDiffAsync()).diff),
         });
         logger.success(`[${this.verifierName} -> ${this.auditorName}]: VERIFICATION_PASSED!`);
 
         // The auditor reviews the final diff (read-only).
         this.status('auditing', currentRound, this.text.auditing(label(this.auditorName)), this.auditorName);
-        finalDiff = activeGit.getDiff();
+        finalDiff = (await activeGit.getDiffAsync());
         const auditPrompt = [
           `You are ${label(this.auditorName)}, reviewing code written by ${label(this.builderName)} for the goal "${goal}". Tests already pass.`,
           testFiles.length
@@ -412,7 +461,7 @@ export class AgentMesh {
           verifyResult.output,
           '',
           'Current changes (git diff):',
-          ContextOptimizer.optimizeDiff(activeGit.getDiff().diff, REVIEW_DIFF_LINES),
+          ContextOptimizer.optimizeDiff((await activeGit.getDiffAsync()).diff, REVIEW_DIFF_LINES),
           '',
           'Everything you need is included in this message: do not run any commands and do not read or modify any files, answer directly. Explain the root cause in 2-3 sentences, then list the concrete fixes the other agent should make.',
           this.replyLang,
@@ -440,14 +489,14 @@ export class AgentMesh {
 
       this.status('repairing', currentRound + 1, this.text.repairing(label(this.builderName), currentRound + 1, this.maxRounds), this.builderName);
       logger.model(this.builderName, 'Autonomously repairing the reported problems...');
-      const diffBeforeRepair = activeGit.getDiff().diff;
+      const diffBeforeRepair = (await activeGit.getDiffAsync()).diff;
       const repairExec = await builderAdapter.execute(repairPrompt, {
         cwd: activeCwd,
         timeoutMs: this.timeoutMs,
         allowEdits: true,
         onStdout: (chunk) => logger.streamChunk(chunk),
       });
-      const diffAfterPatch = activeGit.getDiff();
+      const diffAfterPatch = (await activeGit.getDiffAsync());
       const repairStopped = repairExec.exitCode !== 0 || repairExec.timedOut;
       if (repairStopped && diffAfterPatch.diff === diffBeforeRepair) {
         return fail(this.text.repairFailed(label(this.builderName), failureTail(repairExec, this.text)), currentRound + 1, activeGit, sandboxSession);
@@ -474,6 +523,9 @@ export class AgentMesh {
       currentRound,
       audit === 'rejected' ? this.text.doneRejected : this.text.done
     );
+
+    // Stopped during the audit: not a finished run.
+    if (this.stopped) return fail('', currentRound, activeGit, sandboxSession);
 
     return {
       runId,

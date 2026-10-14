@@ -494,6 +494,17 @@ function setupIpcHandlers() {
   });
 
   // Autonomous Agent Mesh IPC Handler
+  // The Agent Swarm run in progress, for Stop and Pause.
+  let currentMesh: AgentMesh | null = null;
+  ipcMain.handle('mesh:stop', () => {
+    currentMesh?.stop();
+    return true;
+  });
+  ipcMain.handle('mesh:pause', (_, paused: boolean) => {
+    if (paused) currentMesh?.pause();
+    else currentMesh?.resume();
+    return currentMesh?.paused ?? false;
+  });
   ipcMain.handle('mesh:run', async (_, { goal, builder, verifier, auditor, verifyCmd, maxRounds, cwd, useSandbox, lang }) => {
     const mesh = new AgentMesh({
       builder,
@@ -513,10 +524,13 @@ function setupIpcHandlers() {
       },
     });
 
+    currentMesh = mesh;
     try {
       return await mesh.runMesh(goal);
     } catch (err: any) {
       return { success: false, rounds: 0, messages: [], diff: '', durationMs: 0, error: err?.message || String(err) };
+    } finally {
+      if (currentMesh === mesh) currentMesh = null;
     }
   });
 
