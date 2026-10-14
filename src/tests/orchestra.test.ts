@@ -55,6 +55,11 @@ describe('Orchestra', () => {
       const file = prompt.match(/Your task: Part (\w)/)?.[1].toLowerCase();
       concurrent++;
       peak = Math.max(peak, concurrent);
+      // A and B wait for each other (up to 20 s), so a slow machine still shows them overlapping.
+      if (file === 'a' || file === 'b') {
+        const until = Date.now() + 20_000;
+        while (peak < 2 && Date.now() < until) await sleep(50);
+      }
       await sleep(150);
       if (file === 'c') assert.ok(existsSync(join(options.cwd!, 'a.txt')), 'C starts from a copy that has A merged');
       writeFileSync(join(options.cwd!, `${file}.txt`), `${file}\n`);

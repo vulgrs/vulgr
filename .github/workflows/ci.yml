@@ -34,6 +34,10 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb
 
+      # Tests compare file contents after git operations; keep line endings as written.
+      - name: Keep LF line endings in git
+        run: git config --global core.autocrlf false
+
       - run: npm ci
 
       - run: npm run type-check

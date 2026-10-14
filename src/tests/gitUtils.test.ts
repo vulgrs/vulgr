@@ -38,7 +38,8 @@ describe('GitUtils diff', () => {
 
   test('async discard and restore take any file name literally', async () => {
     execSync('git config user.email t@t && git config user.name t', { cwd: repo });
-    const name = 'a $(touch pwned) "q".txt';
+    // Windows file names can't contain quotes; the shell trick is the point.
+    const name = process.platform === 'win32' ? 'a $(touch pwned) q.txt' : 'a $(touch pwned) "q".txt';
     writeFileSync(join(repo, name), 'one\n');
     const git = new GitUtils(repo);
     assert.equal((await git.commitAllAsync('add file')).success, true);

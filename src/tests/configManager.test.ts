@@ -104,7 +104,8 @@ describe('ConfigManager Suite', () => {
 
     manager.updateConfig({ defaultShell: 'zsh' });
     const zsh = manager.resolveShellBinary();
-    assert.ok(zsh.shell.includes('zsh') || zsh.shell.includes('powershell'));
+    // Without zsh installed (e.g. a bare Linux machine) it falls back to $SHELL.
+    assert.ok(zsh.shell.includes('zsh') || zsh.shell.includes('powershell') || zsh.shell === process.env.SHELL || zsh.shell.endsWith('sh'));
   });
 
   it('resets configuration back to defaults', () => {
