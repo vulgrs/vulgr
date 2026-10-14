@@ -132,9 +132,8 @@ export const ru: Messages = {
     skipPermissionsHint: 'Claude работает в циклах, не запрашивая подтверждения. Флаг: --dangerously-skip-permissions',
     claudeModel: 'Модель',
     maxRetries: 'Попыток исправления',
-    agyDescription: 'Модель для проверки и число попыток самоисправления.',
+    agyDescription: 'Модель для проверки в Antigravity.',
     agyModel: 'Модель',
-    agyBudget: 'Раундов самоисправления',
     codexDescription: 'Работает как локальный процесс, API-ключ не нужен.',
     codexModel: 'Модель',
     codexBinary: 'Команда',
@@ -189,10 +188,12 @@ export const ru: Messages = {
       haiku: 'Haiku (самая быстрая)',
     },
     agyModels: {
+      default: 'По умолчанию (выбирает CLI)',
       pro: 'Gemini 2.5 Pro (глубокий анализ)',
       flash: 'Gemini 2.5 Flash (быстрые проверки)',
     },
     codexModels: {
+      default: 'По умолчанию (выбирает CLI)',
       gpt4o: 'GPT-4o (общая)',
       o3mini: 'o3-mini (быстрые рассуждения)',
       o1: 'o1 (глубокие рассуждения)',

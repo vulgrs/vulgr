@@ -120,9 +120,8 @@ export const ja: Messages = {
     skipPermissionsHint: 'ループ中、Claude が承認を求めずに作業します。フラグ：--dangerously-skip-permissions',
     claudeModel: 'モデル',
     maxRetries: '修復の試行回数',
-    agyDescription: 'チェック用モデルと自己修正の回数。',
+    agyDescription: 'Antigravity が使うチェック用モデル。',
     agyModel: 'モデル',
-    agyBudget: '自己修正のラウンド数',
     codexDescription: 'ローカルプロセスとして動作し、API キーは不要です。',
     codexModel: 'モデル',
     codexBinary: 'コマンド',
@@ -177,10 +176,12 @@ export const ja: Messages = {
       haiku: 'Haiku（最速）',
     },
     agyModels: {
+      default: 'デフォルト（CLI が選択）',
       pro: 'Gemini 2.5 Pro（詳細な分析）',
       flash: 'Gemini 2.5 Flash（高速チェック）',
     },
     codexModels: {
+      default: 'デフォルト（CLI が選択）',
       gpt4o: 'GPT-4o（汎用）',
       o3mini: 'o3-mini（高速な推論）',
       o1: 'o1（深い推論）',

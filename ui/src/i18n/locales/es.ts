@@ -124,9 +124,8 @@ export const es: Messages = {
     skipPermissionsHint: 'Claude trabaja en bucles sin pedir aprobación. Flag: --dangerously-skip-permissions',
     claudeModel: 'Modelo',
     maxRetries: 'Intentos de reparación',
-    agyDescription: 'Modelo de verificación y presupuesto de autocorrección.',
+    agyDescription: 'Modelo de verificación de Antigravity.',
     agyModel: 'Modelo',
-    agyBudget: 'Rondas de autocorrección',
     codexDescription: 'Se ejecuta como proceso local, sin clave de API.',
     codexModel: 'Modelo',
     codexBinary: 'Comando',
@@ -177,10 +176,12 @@ export const es: Messages = {
       haiku: 'Haiku (el más rápido)',
     },
     agyModels: {
+      default: 'Predeterminado (decide la CLI)',
       pro: 'Gemini 2.5 Pro (análisis profundo)',
       flash: 'Gemini 2.5 Flash (verificación rápida)',
     },
     codexModels: {
+      default: 'Predeterminado (decide la CLI)',
       gpt4o: 'GPT-4o (general)',
       o3mini: 'o3-mini (razonamiento rápido)',
       o1: 'o1 (razonamiento profundo)',

@@ -31,7 +31,7 @@ describe('ConfigManager Suite', () => {
     assert.strictEqual(config.autoSandbox, true);
     assert.strictEqual(config.claude.skipPermissions, false);
     assert.strictEqual(config.claude.model, 'default');
-    assert.strictEqual(config.agy.model, 'gemini-2.5-pro');
+    assert.strictEqual(config.agy.model, 'default');
   });
 
   it('updates configuration and persists to disk', () => {
@@ -171,5 +171,12 @@ describe('ConfigManager Suite', () => {
     const { shell } = manager.resolveShellBinary();
     assert.ok(shell.length > 0);
     if (process.platform === 'win32') assert.strictEqual(shell, 'powershell.exe');
+  });
+
+  it('treats the old, never-applied agy and codex default models as the CLI default', () => {
+    writeFileSync(testFilePath, JSON.stringify({ agy: { model: 'gemini-2.5-pro' }, codex: { model: 'o3-mini' } }));
+    const config = new ConfigManager(process.cwd(), testFileName).getConfig();
+    assert.strictEqual(config.agy.model, 'default');
+    assert.strictEqual(config.codex.model, 'o3-mini');
   });
 });

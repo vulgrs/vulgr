@@ -120,9 +120,8 @@ export const zh: Messages = {
     skipPermissionsHint: '让 Claude 在循环中无需请求批准即可工作。参数：--dangerously-skip-permissions',
     claudeModel: '模型',
     maxRetries: '修复尝试次数',
-    agyDescription: '检查模型和自我修正次数。',
+    agyDescription: 'Antigravity 使用的检查模型。',
     agyModel: '模型',
-    agyBudget: '自我修正轮数',
     codexDescription: '作为本地进程运行，无需 API 密钥。',
     codexModel: '模型',
     codexBinary: '命令',
@@ -177,10 +176,12 @@ export const zh: Messages = {
       haiku: 'Haiku（最快）',
     },
     agyModels: {
+      default: '默认（由 CLI 决定）',
       pro: 'Gemini 2.5 Pro（深入分析）',
       flash: 'Gemini 2.5 Flash（快速检查）',
     },
     codexModels: {
+      default: '默认（由 CLI 决定）',
       gpt4o: 'GPT-4o（通用）',
       o3mini: 'o3-mini（快速推理）',
       o1: 'o1（深度推理）',

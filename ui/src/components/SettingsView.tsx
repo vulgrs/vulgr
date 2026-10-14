@@ -78,11 +78,13 @@ const claudeModels = (t: Messages): OptionItem[] => [
 ];
 
 const agyModels = (t: Messages): OptionItem[] => [
+  { value: 'default', label: t.settings.agyModels.default },
   { value: 'gemini-2.5-pro', label: t.settings.agyModels.pro },
   { value: 'gemini-2.5-flash', label: t.settings.agyModels.flash },
 ];
 
 const codexModels = (t: Messages): OptionItem[] => [
+  { value: 'default', label: t.settings.codexModels.default },
   { value: 'gpt-4o', label: t.settings.codexModels.gpt4o },
   { value: 'o3-mini', label: t.settings.codexModels.o3mini },
   { value: 'o1', label: t.settings.codexModels.o1 },
@@ -760,16 +762,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                           value={config.agy.model}
                           items={agyModels(t)}
                           onValueChange={(value) => setConfig({ ...config, agy: { ...config.agy, model: value } })}
-                        />
-                      </Row>
-                      <Row label={s.agyBudget} htmlFor="agy-budget">
-                        <NumberField
-                          id="agy-budget"
-                          min={1}
-                          max={5}
-                          value={config.agy.budget}
-                          labels={stepLabels}
-                          onChange={(n) => setConfig({ ...config, agy: { ...config.agy, budget: n } })}
                         />
                       </Row>
                     </Group>

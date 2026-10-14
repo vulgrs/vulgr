@@ -124,9 +124,8 @@ export const de: Messages = {
     skipPermissionsHint: 'Claude arbeitet in Schleifen ohne Rückfrage. Flag: --dangerously-skip-permissions',
     claudeModel: 'Modell',
     maxRetries: 'Reparaturversuche',
-    agyDescription: 'Prüfmodell und Budget für Selbstkorrektur.',
+    agyDescription: 'Prüfmodell für Antigravity.',
     agyModel: 'Modell',
-    agyBudget: 'Selbstkorrektur-Runden',
     codexDescription: 'Läuft als lokaler Prozess, kein API-Schlüssel nötig.',
     codexModel: 'Modell',
     codexBinary: 'Befehl',
@@ -177,10 +176,12 @@ export const de: Messages = {
       haiku: 'Haiku (am schnellsten)',
     },
     agyModels: {
+      default: 'Standard (die CLI entscheidet)',
       pro: 'Gemini 2.5 Pro (tiefe Analyse)',
       flash: 'Gemini 2.5 Flash (schnelle Prüfung)',
     },
     codexModels: {
+      default: 'Standard (die CLI entscheidet)',
       gpt4o: 'GPT-4o (allgemein)',
       o3mini: 'o3-mini (schnelles Denken)',
       o1: 'o1 (tiefes Denken)',

@@ -12,7 +12,7 @@ export interface ClaudeConfig {
 }
 
 export interface AgyConfig {
-  model: string;            // e.g. 'gemini-2.5-pro', 'gemini-2.5-flash'
+  model: string;            // 'default' (the CLI's own choice) or e.g. 'gemini-2.5-pro'
   budget: number;           // Max self-correction attempts
   temperature: number;
   additionalFlags: string[];
@@ -20,7 +20,7 @@ export interface AgyConfig {
 
 export interface CodexConfig {
   binaryPath: string;       // Local CLI binary command (defaults to 'codex')
-  model: string;            // e.g. 'gpt-4o', 'o3-mini', 'o1'
+  model: string;            // 'default' (the CLI's own choice) or e.g. 'o3-mini'
   additionalFlags: string[];
 }
 
@@ -75,14 +75,14 @@ export const DEFAULT_CONFIG: WarpConfig = {
     additionalFlags: [],
   },
   agy: {
-    model: 'gemini-2.5-pro',
+    model: 'default',
     budget: 3,
     temperature: 0.2,
     additionalFlags: [],
   },
   codex: {
     binaryPath: 'codex',
-    model: 'gpt-4o',
+    model: 'default',
     additionalFlags: [],
   },
 
@@ -93,9 +93,16 @@ export const DEFAULT_CONFIG: WarpConfig = {
   lastUpdated: new Date().toISOString(),
 };
 
-/** True when the model should be passed to `claude --model` ('default' leaves it to the CLI). */
+/** True when the model should be passed to the CLI's `--model` ('default' leaves it to the CLI). */
 export function claudeModelFlag(model: string | undefined): boolean {
   return !!model && model !== 'default';
+}
+
+// Older versions saved 'gemini-2.5-pro' and 'gpt-4o' as defaults without ever
+// passing them on, so those exact values mean "the CLI's own choice".
+const UNUSED_OLD_DEFAULTS = new Set(['gemini-2.5-pro', 'gpt-4o']);
+function migrateModel<T extends { model: string }>(c: T): T {
+  return !c.model || UNUSED_OLD_DEFAULTS.has(c.model) ? { ...c, model: 'default' } : c;
 }
 
 // Configs saved by older versions point at retired Claude 3.x model ids, which
@@ -136,8 +143,8 @@ export class ConfigManager {
           ...DEFAULT_CONFIG,
           ...parsed,
           claude: migrateClaudeConfig({ ...DEFAULT_CONFIG.claude, ...(parsed.claude || {}) }),
-          agy: { ...DEFAULT_CONFIG.agy, ...(parsed.agy || {}) },
-          codex: { ...DEFAULT_CONFIG.codex, ...(parsed.codex || {}) },
+          agy: migrateModel({ ...DEFAULT_CONFIG.agy, ...(parsed.agy || {}) }),
+          codex: migrateModel({ ...DEFAULT_CONFIG.codex, ...(parsed.codex || {}) }),
         };
       } catch {
         // Fall back to defaults if corrupted

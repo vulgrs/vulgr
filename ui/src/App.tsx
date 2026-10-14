@@ -522,6 +522,7 @@ export const App: React.FC = () => {
     // The project's own overrides (e.g. a different Claude model) apply on top of the global settings.
     const config = await window.warpApi?.getConfig?.(cwdRef.current || undefined).catch(() => null);
     const extra = (list: unknown) => (Array.isArray(list) ? (list as string[]) : []);
+    const modelFlag = (model?: string) => (model && model !== 'default' ? ['--model', model] : []);
     switch (type) {
       case 'claude': {
         const claude = config?.claude;
@@ -530,11 +531,11 @@ export const App: React.FC = () => {
         if (claude?.model && claude.model !== 'default') flags.push('--model', claude.model);
         return ['claude', ...flags, ...extra(claude?.additionalFlags)].join(' ');
       }
-      // Model names change too often to pin here; the CLIs pick their own default.
+      // 'default' leaves the model to the CLI itself.
       case 'agy':
-        return ['agy', ...extra(config?.agy?.additionalFlags)].join(' ');
+        return ['agy', ...modelFlag(config?.agy?.model), ...extra(config?.agy?.additionalFlags)].join(' ');
       case 'codex':
-        return [config?.codex?.binaryPath || 'codex', ...extra(config?.codex?.additionalFlags)].join(' ');
+        return [config?.codex?.binaryPath || 'codex', ...modelFlag(config?.codex?.model), ...extra(config?.codex?.additionalFlags)].join(' ');
       case 'opencode':
         return 'opencode';
       case 'cursor':
