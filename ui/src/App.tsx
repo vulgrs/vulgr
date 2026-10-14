@@ -56,6 +56,7 @@ const LiveSquadModal = lazy(() => import('./components/LiveSquadModal.js').then(
 const SkillsModal = lazy(() => import('./components/SkillsModal.js').then((m) => ({ default: m.SkillsModal })));
 const GuideModal = lazy(() => import('./components/GuideModal.js').then((m) => ({ default: m.GuideModal })));
 const ExportReportModal = lazy(() => import('./components/ExportReportModal.js').then((m) => ({ default: m.ExportReportModal })));
+const PullRequestModal = lazy(() => import('./components/PullRequestModal.js').then((m) => ({ default: m.PullRequestModal })));
 const RunHistoryModal = lazy(() => import('./components/RunHistoryModal.js').then((m) => ({ default: m.RunHistoryModal })));
 
 /** True from the first time `flag` is true on. */
@@ -173,6 +174,7 @@ export const App: React.FC = () => {
   const [onboardingOpen, setOnboardingOpen] = useState(shouldShowOnboarding);
   const [guideOpen, setGuideOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [prOpen, setPrOpen] = useState(false);
   // "Run again" from the history: the dialog of that kind opens filled in.
   const [rerun, setRerun] = useState<{ kind: string; goal: string; settings: TemplateSettings; at: number } | null>(null);
   const [squadChangesBefore, setSquadChangesBefore] = useState<string[]>([]);
@@ -192,6 +194,7 @@ export const App: React.FC = () => {
   const skillsModalLoaded = useOpenedOnce(skillsModalOpen);
   const guideModalLoaded = useOpenedOnce(guideOpen);
   const runHistoryModalLoaded = useOpenedOnce(historyOpen);
+  const pullRequestModalLoaded = useOpenedOnce(prOpen);
   const exportReportModalLoaded = useOpenedOnce(exportModalOpen);
 
   // Project Workspace & Memory State
@@ -1321,6 +1324,13 @@ export const App: React.FC = () => {
         run: () => setHudOpen(true),
       },
       {
+        id: 'open-pr',
+        label: t.pr.open,
+        group: t.app.groups.git,
+        keywords: 'pull request pr github review merge branch ai description',
+        run: () => setPrOpen(true),
+      },
+      {
         id: 'open-mesh',
         label: t.app.actions.openMesh,
         group: t.app.groups.autonomous,
@@ -1718,6 +1728,7 @@ export const App: React.FC = () => {
         sandboxCount={activeSandboxes.length}
         onOpenSandbox={() => setSandboxDrawerOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
+        onOpenPullRequest={() => setPrOpen(true)}
         onBranchSwitched={() => {
           void refreshGitBranch();
           void refreshGitDiff();
@@ -1828,6 +1839,13 @@ export const App: React.FC = () => {
         onClose={() => setAgentSetupOpen(false)}
         onRunInTerminal={(command, title) => createShellTab(title, command)}
       />
+
+      {/* Pull request for the current branch */}
+      {pullRequestModalLoaded && (
+        <Suspense fallback={null}>
+          <PullRequestModal isOpen={prOpen} onClose={() => setPrOpen(false)} cwd={cwd || undefined} />
+        </Suspense>
+      )}
 
       {/* Finished Duo Loop, Agent Swarm and Orchestrator runs */}
       {runHistoryModalLoaded && (

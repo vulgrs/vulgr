@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, GitBranch, Loader2, Plus } from 'lucide-react';
+import { Check, GitBranch, GitPullRequest, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useI18n } from '../i18n/index.js';
 
@@ -14,7 +14,8 @@ export const BranchMenu: React.FC<{
   title: string;
   /** After a switch, so the app refreshes branch and changes. */
   onSwitched: () => void;
-}> = ({ cwd, branch, isDirty, title, onSwitched }) => {
+  onOpenPullRequest?: () => void;
+}> = ({ cwd, branch, isDirty, title, onSwitched, onOpenPullRequest }) => {
   const { t } = useI18n();
   const b = t.branches;
   const [open, setOpen] = useState(false);
@@ -137,6 +138,20 @@ export const BranchMenu: React.FC<{
               ))
             )}
           </ul>
+          {onOpenPullRequest && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onOpenPullRequest();
+              }}
+              title={t.pr.openHint}
+              className="flex w-full items-center gap-2 border-t border-zinc-800 px-3 py-2 text-left text-[12px] text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+            >
+              <GitPullRequest size={12} className="text-zinc-400" />
+              {t.pr.open}
+            </button>
+          )}
         </div>
       )}
     </div>

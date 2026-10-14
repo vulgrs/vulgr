@@ -51,6 +51,11 @@ export interface WarpApi {
   revertFile: (file: string, cwd?: string) => Promise<string | null>;
   getGitBranch: (cwd?: string) => Promise<string | null>;
   gitCommit: (message: string, cwd?: string) => Promise<boolean>;
+  /** The branch, its base, the GitHub repo, commits ahead and whether gh is signed in. */
+  pullRequestInfo: (cwd?: string) => Promise<{ branch: string | null; base: string | null; github: { owner: string; repo: string } | null; commits: number; ghReady: boolean }>;
+  suggestPullRequest: (options: { base: string; cwd?: string }) => Promise<{ title?: string; body?: string; agent?: string; error?: string; detail?: string }>;
+  /** Pushes and opens the PR (gh), or opens GitHub's pre-filled page in the browser. */
+  createPullRequest: (options: { base: string; title: string; body: string; cwd?: string }) => Promise<{ url?: string; viaBrowser?: boolean; error?: string }>;
   listBranches: (cwd?: string) => Promise<{ name: string; current: boolean }[]>;
   /** Switches branch, or creates it and switches when `create`. */
   switchBranch: (options: { name: string; create?: boolean; cwd?: string }) => Promise<{ success: boolean; error?: string }>;
@@ -271,6 +276,9 @@ const api: WarpApi = {
   revertFile: (file: string, cwd?: string) => ipcRenderer.invoke('git:revertFile', { file, cwd }),
   getGitBranch: (cwd?: string) => ipcRenderer.invoke('git:branch', { cwd }),
   gitCommit: (message: string, cwd?: string) => ipcRenderer.invoke('git:commit', { message, cwd }),
+  pullRequestInfo: (cwd) => ipcRenderer.invoke('pr:info', { cwd }),
+  suggestPullRequest: (options) => ipcRenderer.invoke('pr:suggest', options),
+  createPullRequest: (options) => ipcRenderer.invoke('pr:create', options),
   listBranches: (cwd) => ipcRenderer.invoke('git:branches', { cwd }),
   switchBranch: (options) => ipcRenderer.invoke('git:switch', options),
   commitAndPush: (options) => ipcRenderer.invoke('git:commit-push', options),

@@ -16,6 +16,7 @@ interface StatusBarProps {
   onOpenPalette: () => void;
   /** After the branch menu switched or created a branch. */
   onBranchSwitched?: () => void;
+  onOpenPullRequest?: () => void;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -29,6 +30,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   onOpenSandbox,
   onOpenPalette,
   onBranchSwitched,
+  onOpenPullRequest,
 }) => {
   const { t } = useI18n();
   const shortCwd = cwd ? cwd.split(/[\\/]/).slice(-2).join('/') : 'workspace';
@@ -48,6 +50,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
             isDirty={isDirty}
             title={isDirty ? t.workspace.branchDirty(gitBranch) : t.workspace.branchClean(gitBranch)}
             onSwitched={() => onBranchSwitched?.()}
+            onOpenPullRequest={onOpenPullRequest}
           />
         )}
 

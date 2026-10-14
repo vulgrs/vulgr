@@ -15,6 +15,7 @@ const LAZY_PARTS: Record<string, () => Promise<unknown>> = {
   GuideModal: () => import('./components/GuideModal.js'),
   ExportReportModal: () => import('./components/ExportReportModal.js'),
   RunHistoryModal: () => import('./components/RunHistoryModal.js'),
+  PullRequestModal: () => import('./components/PullRequestModal.js'),
 };
 
 async function checkLazyParts(): Promise<string[]> {

@@ -25,6 +25,7 @@ import { onAgentUsage } from '../src/adapters/usageEvents.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
 import { suggestCommitMessage } from '../src/engine/commitMessage.js';
+import { createPullRequest, pullRequestInfo, suggestPullRequest } from '../src/engine/pullRequest.js';
 import { withVulgrCoAuthor } from '../src/git/coAuthor.js';
 import { SharedSkillsRegistry, interpolateSkillCommand } from '../src/engine/sharedSkills.js';
 import { MemoryStore } from '../src/engine/memoryStore.js';
@@ -487,6 +488,17 @@ function setupIpcHandlers() {
     if (!push) return { committed: true, pushed: false };
     const pushed = await git.pushAsync('origin');
     return { committed: true, pushed: pushed.success, error: pushed.error };
+  });
+
+  // Pull requests: what the branch is, an agent-written title and description, and opening it.
+  ipcMain.handle('pr:info', (_, { cwd }: { cwd?: string } = {}) => pullRequestInfo(cwd || currentCwd));
+  ipcMain.handle('pr:suggest', (_, { cwd, base }: { cwd?: string; base: string }) =>
+    suggestPullRequest(cwd || currentCwd, String(base)).catch((err) => ({ error: 'failed', detail: String(err?.message || err) }))
+  );
+  ipcMain.handle('pr:create', async (_, { cwd, base, title, body }: { cwd?: string; base: string; title: string; body: string }) => {
+    const res = await createPullRequest(cwd || currentCwd, { base: String(base), title: String(title), body: String(body ?? '') });
+    if (res.url && res.viaBrowser) await shell.openExternal(res.url);
+    return res;
   });
 
   // An agent writes a commit message for the uncommitted changes.
