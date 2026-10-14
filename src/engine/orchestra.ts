@@ -76,6 +76,8 @@ export interface OrchestraOptions {
    */
   autoApply?: boolean;
   onEvent?: (event: OrchestraEvent) => void;
+  /** Stop once the agents' reported cost (USD) reaches this. */
+  budgetUsd?: number;
 }
 
 export interface OrchestraResult {
@@ -98,6 +100,8 @@ export interface OrchestraResult {
   error?: string;
   /** What the agents really used, summed over the CLIs that report it. */
   usage?: AgentUsage;
+  /** Stopped because the cost limit was reached. */
+  budgetExceeded?: boolean;
   durationMs: number;
 }
 
@@ -189,6 +193,8 @@ export class Orchestra {
   private readonly taskSandboxes = new Map<string, SandboxSession>();
   /** The combined change waiting for the developer (autoApply: false). */
   private pending: { goal: string; base: string; integration: SandboxSession; cmd: string } | null = null;
+  private readonly budgetUsd?: number;
+  private budgetHit = false;
   /** Set while paused; resolves when the run goes on. */
   private pauseGate: { promise: Promise<void>; open: () => void } | null = null;
   /** Each task agent's own stop switch, so one agent can be restarted. */
@@ -208,6 +214,7 @@ export class Orchestra {
     this.text = TEXT[this.lang];
     this.onEvent = options.onEvent;
     this.autoApply = options.autoApply ?? true;
+    this.budgetUsd = options.budgetUsd && options.budgetUsd > 0 ? options.budgetUsd : undefined;
     this.wm = new WorktreeManager(this.cwd);
   }
 
@@ -319,6 +326,12 @@ export class Orchestra {
       execute: async (prompt, options) => {
         const res = await adapter.execute(prompt, { ...options, usageTag: options?.usageTag ?? 'orchestra' });
         this.usage = addUsage(this.usage, res.usage);
+        // Over the cost limit: stop every agent, as if the user pressed Stop.
+        if (this.budgetUsd && (this.usage?.costUsd ?? 0) >= this.budgetUsd && !this.stopped) {
+          this.budgetHit = true;
+          this.log('orchestrator', this.text.budgetHit(this.budgetUsd.toFixed(2), (this.usage?.costUsd ?? 0).toFixed(2)));
+          this.stop();
+        }
         return res;
       },
     };
@@ -378,7 +391,11 @@ export class Orchestra {
       if (this.stopped) {
         result.success = false;
         result.stopped = true;
-        this.status('stopped', this.text.stopped);
+        if (this.budgetHit) {
+          result.budgetExceeded = true;
+          result.error = this.text.budgetHit(this.budgetUsd!.toFixed(2), (this.usage?.costUsd ?? 0).toFixed(2));
+        }
+        this.status('stopped', result.error && this.budgetHit ? result.error : this.text.stopped);
       } else this.status(result.success ? 'done' : 'failed', result.success ? this.text.done : result.error || '');
       return result;
     };

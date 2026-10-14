@@ -70,6 +70,8 @@ export interface WarpApi {
     cwd?: string;
     useSandbox?: boolean;
     lang?: string;
+    /** Stop once the agents' reported cost reaches this (USD). */
+    budgetUsd?: number;
   }) => Promise<any>;
   onMeshEvent: (callback: (message: any) => void) => () => void;
   onMeshStatus: (callback: (status: any) => void) => () => void;
@@ -85,6 +87,8 @@ export interface WarpApi {
     maxRounds?: number;
     cwd?: string;
     lang?: string;
+    /** Stop once the agents' reported cost reaches this (USD). */
+    budgetUsd?: number;
   }) => Promise<any>;
   stopOrchestra: () => Promise<boolean>;
   stopMesh: () => Promise<boolean>;

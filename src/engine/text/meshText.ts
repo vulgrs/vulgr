@@ -40,6 +40,7 @@ const en = {
   paused: 'Paused.',
   resumed: 'Resumed.',
   stopped: 'Stopped.',
+  budgetHit: (limit: string, spent: string) => `Stopped: the cost limit of $${limit} was reached ($${spent} spent).`,
 };
 
 export type MeshText = typeof en;
@@ -83,6 +84,7 @@ const tr: MeshText = {
   paused: 'Duraklatıldı.',
   resumed: 'Devam ediliyor.',
   stopped: 'Durduruldu.',
+  budgetHit: (limit: string, spent: string) => `Durduruldu: $${limit} maliyet sınırına ulaşıldı ($${spent} harcandı).`,
 };
 
 const de: MeshText = {
@@ -124,6 +126,7 @@ const de: MeshText = {
   paused: 'Pausiert.',
   resumed: 'Fortgesetzt.',
   stopped: 'Gestoppt.',
+  budgetHit: (limit: string, spent: string) => `Gestoppt: Das Kostenlimit von $${limit} wurde erreicht ($${spent} ausgegeben).`,
 };
 
 const es: MeshText = {
@@ -165,6 +168,7 @@ const es: MeshText = {
   paused: 'En pausa.',
   resumed: 'Reanudado.',
   stopped: 'Detenido.',
+  budgetHit: (limit: string, spent: string) => `Detenido: se alcanzó el límite de coste de $${limit} ($${spent} gastados).`,
 };
 
 const fr: MeshText = {
@@ -206,6 +210,7 @@ const fr: MeshText = {
   paused: 'En pause.',
   resumed: 'Reprise.',
   stopped: 'Arrêté.',
+  budgetHit: (limit: string, spent: string) => `Arrêté : la limite de coût de $${limit} a été atteinte ($${spent} dépensés).`,
 };
 
 const ja: MeshText = {
@@ -247,6 +252,7 @@ const ja: MeshText = {
   paused: '一時停止しました。',
   resumed: '再開しました。',
   stopped: '停止しました。',
+  budgetHit: (limit: string, spent: string) => `停止: コスト上限 $${limit} に達しました（$${spent} 使用）。`,
 };
 
 const zh: MeshText = {
@@ -283,6 +289,7 @@ const zh: MeshText = {
   paused: '已暂停。',
   resumed: '已继续。',
   stopped: '已停止。',
+  budgetHit: (limit: string, spent: string) => `已停止：已达到 $${limit} 的费用上限（已花费 $${spent}）。`,
 };
 
 const ru: MeshText = {
@@ -324,6 +331,7 @@ const ru: MeshText = {
   paused: 'Пауза.',
   resumed: 'Продолжаем.',
   stopped: 'Остановлено.',
+  budgetHit: (limit: string, spent: string) => `Остановлено: достигнут лимит стоимости $${limit} (потрачено $${spent}).`,
 };
 
 export const MESH_TEXT: Record<EngineLang, MeshText> = { en, tr, de, es, fr, ja, zh, ru };

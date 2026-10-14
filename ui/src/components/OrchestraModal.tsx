@@ -57,6 +57,7 @@ interface Task {
 interface Result {
   success: boolean;
   stopped?: boolean;
+  budgetExceeded?: boolean;
   tasks: Task[];
   testsPassed?: boolean;
   testCommand?: string;
@@ -169,6 +170,8 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   useProjectTestCommand(isOpen, cwd, verifyCmd, setVerifyCmd);
   const [parallel, setParallel] = useState(() => load('parallel', '3'));
   const [rounds, setRounds] = useState(() => load('rounds', '2'));
+  // Optional cost limit in USD; empty means none.
+  const [budget, setBudget] = useState(() => load('budget', ''));
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
   const [view, setView] = useState<'list' | 'map'>(() => (load('view', 'list') === 'map' ? 'map' : 'list'));
 
@@ -287,6 +290,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     save('testCommand', verifyCmd.trim());
     save('parallel', parallel);
     save('rounds', rounds);
+    save('budget', budget.trim());
     changesBeforeRef.current = await changedFilesNow(cwd);
     setRunning(true);
     setPaused(false);
@@ -316,6 +320,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
         maxRounds: Number(rounds) || 2,
         cwd,
         lang,
+        budgetUsd: Number(budget) > 0 ? Number(budget) : undefined,
       });
       setResult(res);
       if (res.tasks?.length)
@@ -444,14 +449,14 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   }, [result, running]);
 
 
-  const settingsSummary = [verifyCmd.trim() ? f.testCmd(verifyCmd.trim()) : '', o.parallel(Number(parallel)), f.rounds(Number(rounds))]
+  const settingsSummary = [verifyCmd.trim() ? f.testCmd(verifyCmd.trim()) : '', o.parallel(Number(parallel)), f.rounds(Number(rounds)), Number(budget) > 0 ? f.budgetSummary(budget) : '']
     .filter(Boolean)
     .join(' · ');
 
   const resultBox = (() => {
     if (!result) return null;
     if (result.stopped) {
-      return { tone: 'border-zinc-700 bg-zinc-800/30', icon: <Square size={14} className="text-zinc-400" />, title: o.stoppedTitle, body: o.stoppedBody };
+      return { tone: 'border-zinc-700 bg-zinc-800/30', icon: <Square size={14} className="text-zinc-400" />, title: o.stoppedTitle, body: result.budgetExceeded && result.error ? result.error : o.stoppedBody };
     }
     if (!result.success) {
       return { tone: 'border-red-500/30 bg-red-500/[0.06]', icon: <XCircle size={15} className="text-red-400" />, title: o.failedTitle, body: result.error ?? '' };
@@ -522,7 +527,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                 <TemplateBar
                   kind="orchestra"
                   goal={goal}
-                  settings={{ planner, workers, reviewer, verifyCmd, parallel, rounds }}
+                  settings={{ planner, workers, reviewer, verifyCmd, parallel, rounds, budget }}
                   onApply={(g, s) => {
                     setGoal(g);
                     setPlanner(str(s.planner, planner));
@@ -531,6 +536,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                     setVerifyCmd(str(s.verifyCmd, verifyCmd));
                     setParallel(str(s.parallel, parallel));
                     setRounds(str(s.rounds, rounds));
+                    setBudget(str(s.budget, budget));
                   }}
                 />
               </div>
@@ -574,6 +580,26 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
               </div>
 
               <SettingsDisclosure label={f.settings} summary={settingsSummary}>
+                <SettingRow
+                  htmlFor="orchestra-budget"
+                  label={f.budgetLabel}
+                  hint={f.budgetHint}
+                  control={
+                    <div className="flex w-28 items-center gap-1">
+                      <span className="text-[12px] text-zinc-500">$</span>
+                      <FlowInput
+                        id="orchestra-budget"
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        inputMode="decimal"
+                        value={budget}
+                        placeholder={f.budgetNone}
+                        onChange={(e) => setBudget(e.target.value)}
+                      />
+                    </div>
+                  }
+                />
                 <SettingRow
                   stacked
                   htmlFor="orchestra-verify"

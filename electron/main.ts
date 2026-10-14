@@ -505,7 +505,7 @@ function setupIpcHandlers() {
     else currentMesh?.resume();
     return currentMesh?.paused ?? false;
   });
-  ipcMain.handle('mesh:run', async (_, { goal, builder, verifier, auditor, verifyCmd, maxRounds, cwd, useSandbox, lang }) => {
+  ipcMain.handle('mesh:run', async (_, { goal, builder, verifier, auditor, verifyCmd, maxRounds, cwd, useSandbox, lang, budgetUsd }) => {
     const mesh = new AgentMesh({
       builder,
       verifier,
@@ -515,6 +515,7 @@ function setupIpcHandlers() {
       // The project folder picked in the sidebar, not wherever the app was launched from.
       cwd: cwd || currentCwd,
       useSandbox: useSandbox ?? false,
+      budgetUsd: Number(budgetUsd) || undefined,
       lang: toEngineLang(lang),
       onMessage: (message) => {
         mainWindow?.webContents.send('mesh:event', message);
@@ -538,7 +539,7 @@ function setupIpcHandlers() {
   // app the result waits for the developer (apply / revise / discard).
   let orchestra: Orchestra | null = null;
   let orchestraRunning = false;
-  ipcMain.handle('orchestra:run', async (_, { goal, planner, workers, reviewer, verifyCmd, maxParallel, maxRounds, cwd, lang }) => {
+  ipcMain.handle('orchestra:run', async (_, { goal, planner, workers, reviewer, verifyCmd, maxParallel, maxRounds, cwd, lang, budgetUsd }) => {
     if (orchestraRunning) return { success: false, applied: false, tasks: [], durationMs: 0, error: 'Another orchestra run is in progress.' };
     await orchestra?.discardReviewed();
     orchestraRunning = true;
@@ -552,6 +553,7 @@ function setupIpcHandlers() {
       cwd: cwd || currentCwd,
       lang: toEngineLang(lang),
       autoApply: false,
+      budgetUsd: Number(budgetUsd) || undefined,
       onEvent: (event) => mainWindow?.webContents.send('orchestra:event', event),
     });
     try {

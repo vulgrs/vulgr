@@ -41,6 +41,8 @@ export interface AgentMeshOptions {
   lang?: MeshLang;      // language of the status lines and message summaries shown in the UI
   onMessage?: (message: AgentMessage) => void;
   onStatus?: (status: AgentMeshStatus) => void;
+  /** Stop once the agents' reported cost (USD) reaches this. */
+  budgetUsd?: number;
 }
 
 export interface AgentMeshResult {
@@ -59,6 +61,8 @@ export interface AgentMeshResult {
   usage?: AgentUsage;
   /** Ended by stop(). */
   stopped?: boolean;
+  /** Stopped because the cost limit was reached. */
+  budgetExceeded?: boolean;
 }
 
 const AGENT_LABELS: Record<string, string> = {
@@ -116,6 +120,7 @@ export class AgentMesh {
     this.useSandbox = options.useSandbox ?? false;
     this.onMessage = options.onMessage;
     this.onStatus = options.onStatus;
+    this.budgetUsd = options.budgetUsd && options.budgetUsd > 0 ? options.budgetUsd : undefined;
     const lang = options.lang ?? 'tr';
     this.text = MESH_TEXT[lang];
     this.replyLang = lang === 'en' ? '' : `Write your reply in ${LANG_NAMES[lang]}.`;
@@ -137,6 +142,8 @@ export class AgentMesh {
   /** Real tokens and cost of every agent call this run made, when the CLIs report them. */
   private usage: AgentUsage | undefined;
   private readonly abort = new AbortController();
+  private readonly budgetUsd?: number;
+  private budgetHit = false;
   /** Set while paused; resolves when the run goes on. */
   private pauseGate: { promise: Promise<void>; open: () => void } | null = null;
 
@@ -187,6 +194,11 @@ export class AgentMesh {
         if (this.stopped) return { exitCode: null, stdout: '', stderr: this.text.stopped, executionTimeMs: 0, timedOut: false };
         const res = await adapter.execute(prompt, { ...options, signal: this.abort.signal, usageTag: options?.usageTag ?? 'swarm' });
         this.usage = addUsage(this.usage, res.usage);
+        // Over the cost limit: stop here, as if the user pressed Stop.
+        if (this.budgetUsd && (this.usage?.costUsd ?? 0) >= this.budgetUsd && !this.stopped) {
+          this.budgetHit = true;
+          this.stop();
+        }
         return res;
       },
     };
@@ -242,13 +254,18 @@ export class AgentMesh {
     const fail = async (error: string, rounds: number, git: GitUtils, sandbox?: SandboxSession): Promise<AgentMeshResult> => {
       // A run the user stopped ends as "stopped", whatever step it was in.
       const stopped = this.stopped;
-      if (stopped) error = this.text.stopped;
+      if (stopped) {
+        error = this.budgetHit
+          ? this.text.budgetHit(this.budgetUsd!.toFixed(2), (this.usage?.costUsd ?? 0).toFixed(2))
+          : this.text.stopped;
+      }
       this.status('failed', rounds, error);
       if (!stopped) logger.error(error);
       return {
         runId,
         success: false,
         stopped: stopped || undefined,
+        budgetExceeded: this.budgetHit || undefined,
         rounds,
         messages: allMessages,
         diff: (await git.getDiffAsync()).diff,

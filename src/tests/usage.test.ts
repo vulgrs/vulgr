@@ -5,6 +5,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { claudeStreamJsonParser, codexTokensParser, addUsage, usageTokens } from '../adapters/outputParsers.js';
 import { UsageLedger } from '../engine/usageLedger.js';
+import { AdapterFactory } from '../adapters/factory.js';
+import { AgentMesh } from '../engine/agentMesh.js';
+import { Orchestra } from '../engine/orchestra.js';
+import { execSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 
 // Shortened from a real `claude -p --output-format stream-json --verbose` run.
 const CLAUDE_EVENTS = [
@@ -83,6 +88,65 @@ describe('UsageLedger', () => {
       assert.equal(new UsageLedger(join(dir, 'usage.jsonl'), 30).entries().length, 1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('cost limit', () => {
+  /** An agent whose every call reports $0.30. */
+  const pricey = (name: string, reply: (prompt: string, cwd?: string) => string) =>
+    AdapterFactory.registerAdapter(name, () => ({
+      name,
+      binaryPath: name,
+      isAvailable: async () => true,
+      getVersion: async () => '1',
+      execute: async (prompt: string, options: any = {}) => ({
+        stdout: reply(prompt, options.cwd),
+        stderr: '',
+        exitCode: 0,
+        executionTimeMs: 1,
+        timedOut: false,
+        usage: { inputTokens: 10, outputTokens: 10, costUsd: 0.3 },
+      }),
+    }));
+
+  it('stops Agent Swarm once the reported cost reaches the limit', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vulgr-budget-'));
+    try {
+      let repairs = 0;
+      pricey('budget-agent', (prompt) => {
+        if (/fix|repair/i.test(prompt)) repairs++;
+        return 'VERDICT: APPROVED';
+      });
+      // Tests always fail, so without a limit the run would use every round.
+      const mesh = new AgentMesh({ builder: 'budget-agent', verifier: 'budget-agent', auditor: 'budget-agent', verifyCmd: 'node -e "process.exit(1)"', maxRounds: 5, cwd: dir, lang: 'en', budgetUsd: 0.5 });
+      const result = await mesh.runMesh('Anything');
+      assert.equal(result.stopped, true);
+      assert.equal(result.budgetExceeded, true);
+      assert.match(result.error ?? '', /cost limit of \$0\.50/);
+      assert.ok((result.usage?.costUsd ?? 0) < 1, 'stopped early');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('stops Orchestrator once the reported cost reaches the limit', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'vulgr-budget-o-'));
+    try {
+      writeFileSync(join(repo, 'README.md'), '# x\n');
+      execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -q -m init', { cwd: repo });
+      pricey('budget-lead', (prompt) =>
+        prompt.includes('Reply with only this JSON')
+          ? JSON.stringify({ tasks: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }, { id: 'c', title: 'C' }] })
+          : 'VERDICT: APPROVED'
+      );
+      const orchestra = new Orchestra({ planner: 'budget-lead', workers: ['budget-lead'], cwd: repo, lang: 'en', maxParallel: 1, budgetUsd: 0.5 });
+      const result = await orchestra.run('Three parts');
+      assert.equal(result.stopped, true);
+      assert.equal(result.budgetExceeded, true);
+      assert.match(result.error ?? '', /cost limit/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
     }
   });
 });

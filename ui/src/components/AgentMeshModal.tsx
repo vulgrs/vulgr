@@ -73,6 +73,7 @@ interface MeshResult {
   sandbox?: { worktreePath: string; branchName: string };
   usage?: RunUsage;
   stopped?: boolean;
+  budgetExceeded?: boolean;
 }
 
 interface AgentMeshModalProps {
@@ -165,6 +166,8 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   const [verifyCmd, setVerifyCmd] = useState(() => loadSetting('testCommand', ''));
   useProjectTestCommand(isOpen, cwd, verifyCmd, setVerifyCmd);
   const [maxRounds, setMaxRounds] = useState(() => loadSetting('maxRounds', '3'));
+  // Optional cost limit in USD; empty means none.
+  const [budget, setBudget] = useState(() => loadSetting('budget', ''));
   const [useSandbox, setUseSandbox] = useState(false);
   const [available, setAvailable] = useState<Record<string, boolean> | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -229,6 +232,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     saveSetting('auditor', auditor);
     saveSetting('testCommand', cmd);
     saveSetting('maxRounds', maxRounds);
+    saveSetting('budget', budget.trim());
 
     changesBeforeRef.current = await changedFilesNow(cwd);
     setPaused(false);
@@ -251,6 +255,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
         useSandbox,
         cwd,
         lang,
+        budgetUsd: Number(budget) > 0 ? Number(budget) : undefined,
       });
       setResult(res);
       // The dialog shows the result itself; the toast is for when it was closed meanwhile.
@@ -336,7 +341,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     void saveRun(record, record.outcome === 'stopped' ? undefined : runNotice(t, record));
   }, [result, isRunning]);
 
-  const summary = [cmd ? f.testCmd(cmd) : f.autoTests, f.rounds(Number(maxRounds)), useSandbox ? f.sandboxOn : '']
+  const summary = [cmd ? f.testCmd(cmd) : f.autoTests, f.rounds(Number(maxRounds)), useSandbox ? f.sandboxOn : '', Number(budget) > 0 ? f.budgetSummary(budget) : '']
     .filter(Boolean)
     .join(' · ');
 
@@ -349,7 +354,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
           </span>
           <div className="min-w-0">
             <p className="text-[12.5px] text-zinc-100">{m.stoppedTitle}</p>
-            <p className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-400">{m.stoppedBody}</p>
+            <p className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-400">{result.budgetExceeded && result.error ? `${result.error} ${m.stoppedBody}` : m.stoppedBody}</p>
           </div>
         </div>
       );
@@ -406,7 +411,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                 <TemplateBar
                   kind="swarm"
                   goal={goal}
-                  settings={{ builder, verifier, auditor, verifyCmd, maxRounds, useSandbox }}
+                  settings={{ builder, verifier, auditor, verifyCmd, maxRounds, useSandbox, budget }}
                   onApply={(g, s) => {
                     setGoal(g);
                     setBuilder(str(s.builder, builder));
@@ -415,6 +420,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                     setVerifyCmd(str(s.verifyCmd, verifyCmd));
                     setMaxRounds(str(s.maxRounds, maxRounds));
                     if (typeof s.useSandbox === 'boolean') setUseSandbox(s.useSandbox);
+                    setBudget(str(s.budget, budget));
                   }}
                 />
               </div>
@@ -530,6 +536,26 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                     items={ROUND_VALUES.map((v) => ({ value: v, label: v }))}
                     onChange={setMaxRounds}
                   />
+                }
+              />
+              <SettingRow
+                htmlFor="mesh-budget"
+                label={f.budgetLabel}
+                hint={f.budgetHint}
+                control={
+                  <div className="flex w-28 items-center gap-1">
+                    <span className="text-[12px] text-zinc-500">$</span>
+                    <FlowInput
+                      id="mesh-budget"
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      inputMode="decimal"
+                      value={budget}
+                      placeholder={f.budgetNone}
+                      onChange={(e) => setBudget(e.target.value)}
+                    />
+                  </div>
                 }
               />
               <SettingRow
