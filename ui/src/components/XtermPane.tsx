@@ -3,7 +3,13 @@ import { Terminal, type IMarker, type IDecoration, type ITheme } from '@xterm/xt
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { SearchAddon } from '@xterm/addon-search';
+import { toast } from 'sonner';
 import {
+  Search,
+  ChevronUp,
+  ChevronDown,
+  Download,
   Sparkles,
   Shield,
   Bot,
@@ -100,6 +106,14 @@ const STARTERS: Array<{ id: string; name: string; command: string }> = [
 let installedAgents: Promise<Record<string, boolean>> | null = null;
 let projectTestCommand: Promise<string | null> | null = null;
 
+/** How search matches are painted in the terminal and its scrollbar. */
+const SEARCH_DECORATIONS = {
+  matchBackground: '#3f3f46',
+  matchOverviewRuler: '#71717a',
+  activeMatchBackground: '#a16207',
+  activeMatchColorOverviewRuler: '#f59e0b',
+};
+
 const HOME_PATH = /^((?:[A-Za-z]:)?[\\/](?:Users|home)[\\/][^\\/]+)(.*)$/;
 
 export function formatCwdLabel(cwd: string): string {
@@ -139,6 +153,11 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
+  const searchAddon = useRef<SearchAddon | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matches, setMatches] = useState<{ index: number; count: number } | null>(null);
   const [detectedError, setDetectedError] = useState<string | null>(null);
   const isShellSession = session.type === 'shell';
   // A shell pane hides its prompt (commands become blocks), so until the first
@@ -218,6 +237,10 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());
+    const search = new SearchAddon();
+    term.loadAddon(search);
+    searchAddon.current = search;
+    search.onDidChangeResults(({ resultIndex, resultCount }) => setMatches({ index: resultIndex, count: resultCount }));
 
     term.open(terminalRef.current);
 
@@ -683,6 +706,89 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
     }
   }, [isActive]);
 
+  const find = (direction: 'next' | 'prev', query = searchQuery) => {
+    const search = searchAddon.current;
+    if (!search) return;
+    if (!query) {
+      search.clearDecorations();
+      setMatches(null);
+      return;
+    }
+    const options = { decorations: SEARCH_DECORATIONS, incremental: direction === 'next' };
+    if (direction === 'next') search.findNext(query, options);
+    else search.findPrevious(query, options);
+  };
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    requestAnimationFrame(() => searchInputRef.current?.select());
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    searchAddon.current?.clearDecorations();
+    setMatches(null);
+    xtermInstance.current?.focus();
+  };
+
+  // Ctrl+Shift+F (Cmd+F on macOS) searches the active pane, wherever the keyboard focus is.
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isActiveRef.current || e.key.toLowerCase() !== 'f' || e.altKey) return;
+      const mac = /Mac/i.test(navigator.platform);
+      if ((mac && e.metaKey && !e.shiftKey) || (e.ctrlKey && e.shiftKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openSearch();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+
+  /** Everything in the terminal's scrollback and screen, as plain text. */
+  const saveOutput = async () => {
+    const term = xtermInstance.current;
+    if (!term) return;
+    const buffer = term.buffer.normal;
+    const lines: string[] = [];
+    for (let i = 0; i < buffer.length; i++) lines.push(buffer.getLine(i)?.translateToString(true) ?? '');
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    const name = (session.title || session.type).replace(/[^\w.-]+/g, '-').slice(0, 40);
+    const res = await window.warpApi?.saveTerminalOutput?.(lines.join('\n') + '\n', `${name}-${new Date().toISOString().slice(0, 10)}.txt`);
+    if (res?.success && res.filePath) toast.success(t.terminal.outputSaved(res.filePath));
+    else if (res && !res.canceled) toast.error(t.terminal.saveOutputFailed);
+  };
+
+  const toolButtons = (
+    <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openSearch();
+            }}
+            className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+            title={t.terminal.search}
+            aria-label={t.terminal.search}
+          >
+            <Search size={12} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              void saveOutput();
+            }}
+            className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+            title={t.terminal.saveOutput}
+            aria-label={t.terminal.saveOutput}
+          >
+            <Download size={12} />
+          </button>
+    </>
+  );
+
   return (
     <div
       onClick={() => {
@@ -698,7 +804,10 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
            are injected straight into the terminal's own scrollback instead
            (see the OSC 633 block manager), so the pane stays full-bleed. Controls float
            in the corner on hover only. */
-        isSplitView && <div className="absolute top-2 right-2 z-20 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity bg-black/70 backdrop-blur-sm rounded-md border border-zinc-800/70 p-0.5">
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity bg-black/70 backdrop-blur-sm rounded-md border border-zinc-800/70 p-0.5">
+          {toolButtons}
+          {isSplitView && (
+          <>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -729,6 +838,8 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
           >
             <X size={12} />
           </button>
+          </>
+          )}
         </div>
       ) : (
         /* Thin header for standalone agent panes (squads): bold command, no counter.
@@ -742,6 +853,7 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
           {/* Pane controls — hidden by default, appear on hover, anchored to the header
               so they don't float over live terminal content below */}
           <div className="absolute top-1.5 right-3 z-20 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity bg-black/70 backdrop-blur-sm rounded-md border border-zinc-800/70 p-0.5">
+            {toolButtons}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -809,6 +921,42 @@ export const XtermPane: React.FC<XtermPaneProps> = ({
               <X size={12} />
             </button>
           </div>
+        </div>
+      )}
+
+      {searchOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-3 top-10 z-30 flex items-center gap-1 rounded-[9px] border border-zinc-700 bg-base-elevated/95 p-1 shadow-lg backdrop-blur"
+        >
+          <Search size={12} className="ml-1.5 text-zinc-500" />
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              find('next', e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') find(e.shiftKey ? 'prev' : 'next');
+              if (e.key === 'Escape') closeSearch();
+            }}
+            placeholder={t.terminal.searchPlaceholder}
+            aria-label={t.terminal.searchPlaceholder}
+            className="w-44 bg-transparent px-1 text-[12px] text-zinc-100 outline-none placeholder:text-zinc-600"
+          />
+          <span className="min-w-[46px] text-right font-mono text-[10.5px] tabular-nums text-zinc-500">
+            {searchQuery && matches ? (matches.count ? `${matches.index + 1}/${matches.count}` : t.terminal.noMatches) : ''}
+          </span>
+          <button type="button" onClick={() => find('prev')} title={t.terminal.prevMatch} aria-label={t.terminal.prevMatch} className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">
+            <ChevronUp size={12} />
+          </button>
+          <button type="button" onClick={() => find('next')} title={t.terminal.nextMatch} aria-label={t.terminal.nextMatch} className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">
+            <ChevronDown size={12} />
+          </button>
+          <button type="button" onClick={closeSearch} title={t.terminal.closeSearch} aria-label={t.terminal.closeSearch} className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">
+            <X size={12} />
+          </button>
         </div>
       )}
 

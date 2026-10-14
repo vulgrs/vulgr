@@ -728,6 +728,22 @@ function setupIpcHandlers() {
     }
   });
 
+  // A terminal's whole output, saved where the user picks.
+  ipcMain.handle('terminal:save-output', async (_, { content, defaultName }: { content: string; defaultName?: string }) => {
+    if (!mainWindow) return { success: false };
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultName || `terminal-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.txt`,
+      filters: [{ name: 'Text', extensions: ['txt', 'log'] }],
+    });
+    if (result.canceled || !result.filePath) return { success: false, canceled: true };
+    try {
+      writeFileSync(result.filePath, content, 'utf-8');
+      return { success: true, filePath: result.filePath };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
   // Project Workspace & File Explorer Handlers
   ipcMain.handle('workspace:open-folder', async () => {
     if (!mainWindow) return null;
