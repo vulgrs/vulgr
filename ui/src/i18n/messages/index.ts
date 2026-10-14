@@ -19,3 +19,4 @@ export { flow } from './flow.js';
 export { orchestra } from './orchestra.js';
 export { update } from './update.js';
 export { history } from './history.js';
+export { changes } from './changes.js';

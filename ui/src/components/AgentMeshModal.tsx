@@ -36,6 +36,7 @@ import {
 import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 import { newRunId, runTokens, saveRun, useRunRecorder, type RunUsage } from '../runHistory.js';
+import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
 
 export interface AgentMessage {
   id: string;
@@ -172,6 +173,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
 
   const feedEndRef = useRef<HTMLDivElement>(null);
   const runStartRef = useRef(0);
+  const changesBeforeRef = useRef<string[]>([]);
   const savedResultRef = useRef<MeshResult | null>(null);
   const openRef = useRef(isOpen);
   openRef.current = isOpen;
@@ -222,6 +224,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
     saveSetting('testCommand', cmd);
     saveSetting('maxRounds', maxRounds);
 
+    changesBeforeRef.current = await changedFilesNow(cwd);
     setIsRunning(true);
     runStartRef.current = Date.now();
     setRunGoal(goal.trim());
@@ -552,6 +555,12 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
           )}
 
           {resultBox}
+          {/* Work done in a sandbox is merged from the Sandbox panel instead. */}
+          {result && !isRunning && !result.sandbox && (
+            <div className="mt-3">
+              <RunChangesCard cwd={cwd} goal={runGoal} before={changesBeforeRef.current} />
+            </div>
+          )}
           <div ref={feedEndRef} />
         </div>
 

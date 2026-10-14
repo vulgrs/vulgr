@@ -32,6 +32,7 @@ import {
 import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 import { newRunId, runTokens, saveRun, useRunRecorder, type RunUsage } from '../runHistory.js';
+import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
 
 type TaskState = 'waiting' | 'running' | 'testing' | 'fixing' | 'merging' | 'done' | 'failed' | 'skipped';
 type Phase = 'checking' | 'planning' | 'working' | 'integrating' | 'reviewing' | 'awaiting-review' | 'done' | 'failed' | 'stopped';
@@ -182,6 +183,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   const runStartRef = useRef(0);
   const runLogRef = useRef<{ at: number; text: string }[]>([]);
   const savedResultRef = useRef<Result | null>(null);
+  const changesBeforeRef = useRef<string[]>([]);
 
   // Live view: the task whose code is shown, and what its agent has written so far.
   const [watching, setWatching] = useState<string | null>(null);
@@ -282,6 +284,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     save('testCommand', verifyCmd.trim());
     save('parallel', parallel);
     save('rounds', rounds);
+    changesBeforeRef.current = await changedFilesNow(cwd);
     setRunning(true);
     setPaused(false);
     runStartRef.current = Date.now();
@@ -768,6 +771,10 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                     </div>
                   )}
                 </div>
+              )}
+
+              {!running && result?.success && (result.applied || decision === 'applied') && (
+                <RunChangesCard cwd={cwd} goal={runGoal} before={changesBeforeRef.current} />
               )}
 
               <div ref={endRef} />

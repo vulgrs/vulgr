@@ -14,11 +14,13 @@ import {
   XCircle,
   GitCompare,
   Network,
+  GitCommitHorizontal,
 } from 'lucide-react';
 import { SystemMap } from './SystemMap.js';
 import { duoMap } from './flowMaps.js';
 import { ACCENT, MONO, accentStyle } from './FlowParts.js';
 import { squadAgentLabel } from '../hooks/useSquadOrchestrator.js';
+import { RunChangesCard } from './RunChangesCard.js';
 
 export const MAP_AGENTS = ['claude', 'agy', 'codex', 'opencode', 'cursor', 'shell'].map((id) => ({
   value: id,
@@ -34,6 +36,10 @@ interface SquadBarProps {
   onOpenChanges?: () => void;
   /** Bring one of the squad's terminal panes to the front. */
   onFocusPane?: (sessionId: string) => void;
+  /** Project folder, for committing the result. */
+  cwd?: string;
+  /** Files that already had changes when the loop started. */
+  changesBefore?: string[];
 }
 
 /** Which pane each node of the Duo Loop map stands for. */
@@ -50,9 +56,10 @@ const PHASE_STYLE: Record<string, { color: string; icon: React.ReactNode }> = {
   failed: { color: 'bg-red-500/15 border-red-500/40 text-red-200', icon: <XCircle size={13} className="text-red-400" /> },
 };
 
-export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStopSquad, onOpenChanges, onFocusPane }) => {
+export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStopSquad, onOpenChanges, onFocusPane, cwd, changesBefore }) => {
   const { t } = useI18n();
   const [showMap, setShowMap] = useState(false);
+  const [showCommit, setShowCommit] = useState(false);
   if (!squad.active) return null;
 
   const finished = squad.phase === 'consensus' || squad.phase === 'failed';
@@ -134,6 +141,19 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
           <span>{t.flow.showSystem}</span>
         </button>
 
+        {finished && (
+          <button
+            onClick={() => setShowCommit((v) => !v)}
+            className={`flex flex-shrink-0 items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-md border text-xs font-medium transition-colors ${
+              showCommit ? 'border-zinc-500 text-zinc-100 bg-zinc-800/60' : 'btn-ghost'
+            }`}
+            aria-expanded={showCommit}
+          >
+            <GitCommitHorizontal size={11} />
+            <span>{t.changes.reviewCommit}</span>
+          </button>
+        )}
+
         {finished ? (
           onOpenChanges && (
             <button
@@ -169,6 +189,12 @@ export const SquadBar: React.FC<SquadBarProps> = ({ squad, onPauseToggle, onStop
         </button>
       </div>
     </div>
+
+    {finished && showCommit && (
+      <div className="border-t border-zinc-900 p-3">
+        <RunChangesCard cwd={cwd} goal={squad.goal} before={changesBefore} />
+      </div>
+    )}
 
     {showMap && (
       <div className="grid gap-3 border-t border-zinc-900 p-3 lg:grid-cols-[minmax(0,1fr)_260px]">

@@ -23,7 +23,7 @@ interface DiffLine {
   newNum?: number;
 }
 
-interface DiffFile {
+export interface DiffFile {
   filename: string;
   oldPath: string;
   newPath: string;
@@ -36,7 +36,7 @@ interface DiffFile {
   }>;
 }
 
-function parseGitDiff(diffText: string): DiffFile[] {
+export function parseGitDiff(diffText: string): DiffFile[] {
   if (!diffText || !diffText.trim()) return [];
 
   const rawLines = diffText.split('\n');

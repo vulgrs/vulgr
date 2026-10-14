@@ -1,0 +1,40 @@
+import { ns } from '../ns.js';
+
+export const changes = ns(
+  {
+    title: 'Changes from this run',
+    files: (n: number) => `${n} file${n === 1 ? '' : 's'} changed`,
+    noChanges: 'The run left no uncommitted changes.',
+    showDiff: 'Show diff',
+    hideDiff: 'Hide diff',
+    message: 'Commit message',
+    commit: 'Commit',
+    committed: 'Committed',
+    commitFailed: 'Could not commit. Is this folder a git repository with a user name and email set?',
+    push: 'Push',
+    pushed: 'Pushed',
+    pushFailed: (error: string) => `Push failed: ${error}`,
+    preExisting: (n: number) => `${n} of these file${n === 1 ? '' : 's'} already had changes before the run; the commit includes them too.`,
+    before: 'changed before',
+    reviewCommit: 'Review & commit',
+    more: (n: number) => `+${n} more`,
+  },
+  {
+    title: 'Bu çalışmanın değişiklikleri',
+    files: (n: number) => `${n} dosya değişti`,
+    noChanges: 'Çalışma commit edilmemiş bir değişiklik bırakmadı.',
+    showDiff: 'Farkı göster',
+    hideDiff: 'Farkı gizle',
+    message: 'Commit mesajı',
+    commit: 'Commit et',
+    committed: 'Commit edildi',
+    commitFailed: 'Commit edilemedi. Bu klasör, kullanıcı adı ve e-postası ayarlı bir git deposu mu?',
+    push: 'Gönder',
+    pushed: 'Gönderildi',
+    pushFailed: (error: string) => `Gönderilemedi: ${error}`,
+    preExisting: (n: number) => `Bu dosyaların ${n} tanesinde çalışmadan önce de değişiklik vardı; commit onları da içerir.`,
+    before: 'önceden değişmişti',
+    reviewCommit: 'İncele ve commit et',
+    more: (n: number) => `+${n} tane daha`,
+  }
+);

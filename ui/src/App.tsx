@@ -17,6 +17,7 @@ import { AgentSetupModal } from './components/AgentSetupModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
 import { useDuoHistory } from './hooks/useDuoHistory.js';
+import { changedFilesNow } from './components/RunChangesCard.js';
 import { useI18n } from './i18n/index.js';
 import { describeCommand, titleFromWork } from './utils/workTitle.js';
 import type {
@@ -161,6 +162,7 @@ export const App: React.FC = () => {
   const [onboardingOpen, setOnboardingOpen] = useState(shouldShowOnboarding);
   const [guideOpen, setGuideOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [squadChangesBefore, setSquadChangesBefore] = useState<string[]>([]);
   const closeGuide = () => setGuideOpen(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [chatModeOpen, setChatModeOpen] = useState(false);
@@ -623,6 +625,9 @@ export const App: React.FC = () => {
     maxRounds: number;
   }) => {
     if (squad) stopSquad();
+    // What was already changed, so the end of the loop can tell its own changes apart.
+    setSquadChangesBefore([]);
+    void changedFilesNow(cwd || undefined).then(setSquadChangesBefore);
     const newTabId = `tab-squad-${Date.now()}`;
     const builderSessionId = `sess-b-${Date.now()}`;
     const verifierSessionId = `sess-v-${Date.now()}`;
@@ -1537,6 +1542,8 @@ export const App: React.FC = () => {
           {squad && squad.tabId === activeTabId && squad.active && (
             <SquadBar
               squad={squad}
+              cwd={cwd || undefined}
+              changesBefore={squadChangesBefore}
               onPauseToggle={togglePause}
               onStopSquad={stopSquad}
               onFocusPane={(sessionId) => handleSelectPane(squad.tabId, sessionId)}
