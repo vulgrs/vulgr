@@ -1118,4 +1118,13 @@ export const ru: Messages = {
     pushFailed: (error: string) => `Закоммичено, но отправка не удалась: ${error}`,
     shortcut: (key: string) => `${key} — коммит`,
   },
+  branches: {
+    hint: 'Сменить ветку',
+    search: 'Найти или создать ветку',
+    create: (name: string) => `Создать ветку «${name}»`,
+    switched: (name: string) => `Переключено на ${name}`,
+    created: (name: string) => `Ветка ${name} создана, переключено на неё`,
+    failed: (error: string) => `Не удалось переключиться: ${error}`,
+    empty: 'Других веток нет',
+  },
 };

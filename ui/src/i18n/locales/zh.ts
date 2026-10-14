@@ -1105,4 +1105,13 @@ export const zh: Messages = {
     pushFailed: (error: string) => `已提交，但推送失败：${error}`,
     shortcut: (key: string) => `${key} 提交`,
   },
+  branches: {
+    hint: '切换分支',
+    search: '查找或创建分支',
+    create: (name: string) => `创建分支“${name}”`,
+    switched: (name: string) => `已切换到 ${name}`,
+    created: (name: string) => `已创建并切换到 ${name}`,
+    failed: (error: string) => `无法切换：${error}`,
+    empty: '没有其他分支',
+  },
 };

@@ -1085,4 +1085,13 @@ export const de: Messages = {
     pushFailed: (error: string) => `Committet, aber der Push ist fehlgeschlagen: ${error}`,
     shortcut: (key: string) => `${key} committet`,
   },
+  branches: {
+    hint: 'Branch wechseln',
+    search: 'Branch suchen oder erstellen',
+    create: (name: string) => `Branch „${name}“ erstellen`,
+    switched: (name: string) => `Zu ${name} gewechselt`,
+    created: (name: string) => `${name} erstellt und dorthin gewechselt`,
+    failed: (error: string) => `Wechsel fehlgeschlagen: ${error}`,
+    empty: 'Keine anderen Branches',
+  },
 };

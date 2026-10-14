@@ -1105,4 +1105,13 @@ export const ja: Messages = {
     pushFailed: (error: string) => `コミットしましたが、プッシュに失敗しました: ${error}`,
     shortcut: (key: string) => `${key} でコミット`,
   },
+  branches: {
+    hint: 'ブランチを切り替え',
+    search: 'ブランチを検索または作成',
+    create: (name: string) => `ブランチ「${name}」を作成`,
+    switched: (name: string) => `${name} に切り替えました`,
+    created: (name: string) => `${name} を作成して切り替えました`,
+    failed: (error: string) => `切り替えられませんでした: ${error}`,
+    empty: '他のブランチはありません',
+  },
 };

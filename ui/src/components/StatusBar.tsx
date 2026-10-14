@@ -2,6 +2,7 @@ import React from 'react';
 import { GitBranch, FolderGit2, Cpu, LayoutPanelLeft, Command } from 'lucide-react';
 import type { DoctorStatus, TerminalSession } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
+import { BranchMenu } from './BranchMenu.js';
 
 interface StatusBarProps {
   cwd: string;
@@ -13,6 +14,8 @@ interface StatusBarProps {
   sandboxCount?: number;
   onOpenSandbox?: () => void;
   onOpenPalette: () => void;
+  /** After the branch menu switched or created a branch. */
+  onBranchSwitched?: () => void;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -25,6 +28,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   sandboxCount = 0,
   onOpenSandbox,
   onOpenPalette,
+  onBranchSwitched,
 }) => {
   const { t } = useI18n();
   const shortCwd = cwd ? cwd.split(/[\\/]/).slice(-2).join('/') : 'workspace';
@@ -38,26 +42,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         </span>
 
         {gitBranch && (
-          <span
-            className={`flex items-center space-x-1 px-1.5 py-0.2 rounded border text-[9px] ${
- isDirty
- ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
- : 'border-zinc-800 bg-zinc-900/60 text-zinc-300'
- }`}
-            title={
-              isDirty
-                ? t.workspace.branchDirty(gitBranch)
-                : t.workspace.branchClean(gitBranch)
-            }
-          >
-            <GitBranch size={10} />
-            <span className="font-semibold">{gitBranch}</span>
-            <span
-              className={`w-1 h-1 rounded-full ${
- isDirty ? 'bg-amber-400 ' : 'bg-emerald-400'
- }`}
-            />
-          </span>
+          <BranchMenu
+            cwd={cwd || undefined}
+            branch={gitBranch}
+            isDirty={isDirty}
+            title={isDirty ? t.workspace.branchDirty(gitBranch) : t.workspace.branchClean(gitBranch)}
+            onSwitched={() => onBranchSwitched?.()}
+          />
         )}
 
         {sandboxCount > 0 && onOpenSandbox && (

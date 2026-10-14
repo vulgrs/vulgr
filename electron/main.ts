@@ -472,6 +472,12 @@ function setupIpcHandlers() {
     return res.success;
   });
 
+  // Branches: the list for the status bar's branch menu, and switching / creating.
+  ipcMain.handle('git:branches', (_, { cwd }: { cwd?: string } = {}) => new GitUtils(cwd || currentCwd).listBranchesAsync());
+  ipcMain.handle('git:switch', (_, { cwd, name, create }: { cwd?: string; name: string; create?: boolean }) =>
+    new GitUtils(cwd || currentCwd).switchBranchAsync(String(name || '').trim(), !!create)
+  );
+
   // Commit everything with a message, then push when asked; says what happened and why not.
   ipcMain.handle('git:commit-push', async (_, { message, push, cwd }: { message: string; push?: boolean; cwd?: string }) => {
     const git = new GitUtils(cwd || currentCwd);

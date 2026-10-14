@@ -1080,4 +1080,13 @@ export const es: Messages = {
     pushFailed: (error: string) => `Commit hecho, pero falló el push: ${error}`,
     shortcut: (key: string) => `${key} hace commit`,
   },
+  branches: {
+    hint: 'Cambiar de rama',
+    search: 'Buscar o crear una rama',
+    create: (name: string) => `Crear la rama «${name}»`,
+    switched: (name: string) => `Cambiado a ${name}`,
+    created: (name: string) => `${name} creada y activa`,
+    failed: (error: string) => `No se pudo cambiar: ${error}`,
+    empty: 'No hay otras ramas',
+  },
 };

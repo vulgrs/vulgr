@@ -1684,6 +1684,10 @@ export const App: React.FC = () => {
         sandboxCount={activeSandboxes.length}
         onOpenSandbox={() => setSandboxDrawerOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
+        onBranchSwitched={() => {
+          void refreshGitBranch();
+          void refreshGitDiff();
+        }}
       />
 
       {/* Token & Context Optimizer HUD Modal */}

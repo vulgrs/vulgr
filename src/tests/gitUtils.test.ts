@@ -52,6 +52,21 @@ describe('GitUtils diff', () => {
     assert.equal((await git.commitAllAsync('')).success, false);
   });
 
+  test('lists, creates and switches branches, and refuses a bad name', async () => {
+    execSync('git config user.email t@t && git config user.name t && git branch -M main', { cwd: repo });
+    const git = new GitUtils(repo);
+    assert.equal((await git.switchBranchAsync('feature/x', true)).success, true);
+    let branches = await git.listBranchesAsync();
+    assert.deepEqual(branches.find((b) => b.current)?.name, 'feature/x');
+    assert.ok(branches.some((b) => b.name === 'main'));
+    assert.equal((await git.switchBranchAsync('main')).success, true);
+    branches = await git.listBranchesAsync();
+    assert.equal(branches.find((b) => b.current)?.name, 'main');
+    const bad = await git.switchBranchAsync('bad name..x', true);
+    assert.equal(bad.success, false);
+    assert.ok(bad.error);
+  });
+
   test('excludeFromGit hides Vulgr folders without touching .gitignore', () => {
     mkdirSync(join(repo, '.ai-bridge'));
     writeFileSync(join(repo, '.ai-bridge', 'log.json'), '{}');

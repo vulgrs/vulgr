@@ -392,6 +392,36 @@ export class GitUtils {
     }
   }
 
+  /** Local branches, most recently committed first, with the current one marked. */
+  async listBranchesAsync(): Promise<{ name: string; current: boolean }[]> {
+    try {
+      const out = await this.git(['for-each-ref', '--sort=-committerdate', '--format=%(HEAD)%09%(refname:short)', 'refs/heads']);
+      return out
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [head, name] = line.split('\t');
+          return { name, current: head.trim() === '*' };
+        });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Switches to `name`, or creates it from the current commit and switches
+   * when `create`. Says why it failed (e.g. changes that would be overwritten).
+   */
+  async switchBranchAsync(name: string, create = false): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (create) await this.git(['check-ref-format', '--branch', name]);
+      await this.git(create ? ['switch', '-c', name] : ['switch', name]);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: gitError(err) || 'Could not switch branch' };
+    }
+  }
+
   /** Like commitAll, but says why it failed (nothing to commit, no user name set, a hook refused...). */
   commitAllDetailed(message: string): { success: boolean; error?: string } {
     if (!this.isGitRepo()) return { success: false, error: 'Not a git repository' };

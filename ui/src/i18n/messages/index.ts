@@ -23,3 +23,4 @@ export { changes } from './changes.js';
 export { templates } from './templates.js';
 export { notify } from './notify.js';
 export { commit } from './commit.js';
+export { branches } from './branches.js';
