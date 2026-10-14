@@ -36,6 +36,10 @@ export function watchSmoke(win: BrowserWindow): void {
   wc.on('preload-error', (_e, path, error) => errors.push(`preload ${path}: ${error.message}`));
   wc.on('render-process-gone', (_e, details) => errors.push(`renderer gone: ${details.reason}`));
   wc.on('did-fail-load', (_e, code, description, url) => errors.push(`load ${url}: [${code}] ${description}`));
+  // When a step fails with "Object has been destroyed", these say why the window went away.
+  wc.on('destroyed', () => console.error('[smoke] web contents destroyed'));
+  win.on('closed', () => console.error('[smoke] window closed'));
+  wc.on('unresponsive', () => errors.push('window became unresponsive'));
 
   const finish = (code: number) => {
     if (code === 0) console.log('[smoke] OK');
@@ -59,13 +63,17 @@ export function watchSmoke(win: BrowserWindow): void {
       wc.reload();
       return;
     }
+    let step = 'waiting for the interface';
     try {
       await new Promise((r) => setTimeout(r, 3000));
+      step = 'checking that React rendered';
       const mounted = await wc.executeJavaScript(`document.getElementById('root')?.childElementCount ?? 0`);
       if (!mounted) errors.push('React did not render anything into #root');
       // Every lazily loaded window and language must load from the built files.
+      step = 'loading the on-demand windows and languages';
       const lazy: string[] = await wc.executeJavaScript(`window.__vulgrSmoke ? window.__vulgrSmoke() : Promise.resolve([])`);
       errors.push(...lazy.map((e) => `lazy: ${e}`));
+      step = 'running VULGR_SMOKE_JS';
       if (process.env.VULGR_SMOKE_JS) {
         await wc.executeJavaScript(process.env.VULGR_SMOKE_JS);
         await new Promise((r) => setTimeout(r, 1500));
@@ -77,7 +85,7 @@ export function watchSmoke(win: BrowserWindow): void {
         writeFileSync(shot, (await wc.capturePage()).toPNG());
       }
     } catch (err: any) {
-      errors.push(`check failed: ${err?.message || err}`);
+      errors.push(`check failed (${step}): ${err?.message || err}${wc.isDestroyed() ? ' — the window was already gone' : ''}`);
     }
     clearTimeout(timer);
     finish(errors.length ? 1 : 0);
