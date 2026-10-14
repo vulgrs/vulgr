@@ -14,6 +14,7 @@ import {
   stagingDirFor,
   startSwap,
 } from '../src/engine/macSelfUpdate.js';
+import { releaseHighlights } from '../src/engine/releaseNotes.js';
 
 const { autoUpdater } = electronUpdater;
 
@@ -52,6 +53,8 @@ export interface UpdateStatus {
   error?: string;
   /** When the last check finished (ms). */
   checkedAt?: number;
+  /** A few lines from the new version's release notes. */
+  notes?: string[];
 }
 
 /**
@@ -147,7 +150,13 @@ export function setupAutoUpdates(getWindow: () => BrowserWindow | null): void {
   autoUpdater.autoInstallOnAppQuit = !isMac;
 
   autoUpdater.on('update-available', (info) => {
-    setStatus({ state: canInstall ? 'downloading' : 'available', version: info.version, percent: 0, checkedAt: Date.now() });
+    setStatus({
+      state: canInstall ? 'downloading' : 'available',
+      version: info.version,
+      percent: 0,
+      checkedAt: Date.now(),
+      notes: releaseHighlights(info.releaseNotes),
+    });
     if (macSelfUpdate) void downloadForMac(info.version, info.files ?? []);
     else if (!canInstall) notify({ kind: 'available', version: info.version, url: `${RELEASES_URL}/tag/v${info.version}` });
   });

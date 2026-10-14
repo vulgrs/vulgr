@@ -76,6 +76,11 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Only for .github/release-notes.md.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+
       - uses: actions/download-artifact@v4
         with:
           path: release
@@ -90,6 +95,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Vulgr ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-') }}
+          # Our own notes first (the update card shows their bullet points), then GitHub's list.
+          body_path: .github/release-notes.md
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: release/*

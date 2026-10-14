@@ -7,6 +7,7 @@ interface UpdateStatus {
   state: 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'error' | 'unsupported';
   version?: string;
   percent?: number;
+  notes?: string[];
 }
 
 /**
@@ -71,6 +72,16 @@ export const UpdateButton: React.FC = () => {
             </span>
             <p className="min-w-0 text-[10px] leading-snug text-zinc-100">{u.giftTitle(version)}</p>
           </div>
+          {!!status.notes?.length && (
+            <ul className="mt-1.5 space-y-0.5 text-[9px] leading-snug text-zinc-300">
+              {status.notes.slice(0, 4).map((note) => (
+                <li key={note} className="flex gap-1.5">
+                  <span className="text-zinc-600">•</span>
+                  <span className="min-w-0">{note}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <p className="mt-1.5 text-[9px] leading-relaxed text-zinc-500">
             {ready ? u.giftReady : downloading ? u.giftDownloading(percent) : u.giftManual}
           </p>
