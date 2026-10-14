@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip.js';
 import { I18nProvider } from './i18n/index.js';
 import { ThemeProvider } from './theme.js';
 import './styles/index.css';
+import './smoke.js';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

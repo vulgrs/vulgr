@@ -30,6 +30,7 @@ import { SessionExporter } from '../src/engine/sessionExporter.js';
 import { buildTestPlanPrompt, parseTestCommand, detectTestCommand } from '../src/engine/testPlan.js';
 import { listAgentStatus, installAgent, cancelAgentInstall } from './agentInstaller.js';
 import { setupAutoUpdates } from './updater.js';
+import { smokeMode, prepareSmokeProfile, watchSmoke } from './smoke.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -53,6 +54,8 @@ if (process.platform !== 'win32') {
   process.env[pathKey] = updatedPath;
   process.env.PATH = updatedPath;
 }
+
+prepareSmokeProfile();
 
 let mainWindow: BrowserWindow | null = null;
 let currentCwd = process.cwd();
@@ -273,7 +276,10 @@ async function createWindow() {
     mainWindow?.focus();
   });
 
-  const devServerActive = !app.isPackaged && (await canConnectToDevServer());
+  watchSmoke(mainWindow);
+
+  // The smoke test checks the built files, never a running dev server.
+  const devServerActive = !app.isPackaged && !smokeMode && (await canConnectToDevServer());
   const builtUiPath = join(__dirname, '../ui/index.html');
 
   if (devServerActive) {

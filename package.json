@@ -19,6 +19,7 @@
     "dev:app": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron dist/electron/main.js\"",
     "dev:ui": "vite",
     "test": "node --test dist/src/tests/**/*.test.js",
+    "smoke": "npm run build && electron dist/electron/main.js --smoke",
     "postinstall": "node -e \"if (process.platform !== 'win32') { const fs = require('fs'), glob = ['prebuilds/darwin-arm64/spawn-helper', 'prebuilds/darwin-x64/spawn-helper']; glob.forEach(p => { const full = 'node_modules/node-pty/' + p; if (fs.existsSync(full)) { try { fs.chmodSync(full, 0o755); } catch {} } }); }\"",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
