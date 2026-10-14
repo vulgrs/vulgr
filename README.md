@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="Vulgr with a split tab, groups and per-pane command boxes" />
+  <img src="docs/screenshot.png" alt="Vulgr starting a Duo Loop: one agent writes the code, another checks it" />
 </p>
 
 ## Download
