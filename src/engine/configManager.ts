@@ -54,6 +54,9 @@ export interface WarpConfig {
   openRouterApiKey: string;     // sk-or-... ; empty falls back to OPENROUTER_API_KEY env
   systemOneModel: string;       // OpenRouter model id for System 1
 
+  // Keyboard shortcuts the user changed: action id -> combo like 'Ctrl+Shift+T'
+  shortcuts?: Record<string, string>;
+
   // Per-project overrides, keyed by the project folder's absolute path
   projects?: Record<string, ProjectOverrides>;
 

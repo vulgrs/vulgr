@@ -12,6 +12,7 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  Keyboard,
   TerminalSquare,
   TriangleAlert,
   Undo2,
@@ -28,6 +29,8 @@ import type { WarpConfig, ShellType, CursorStyleType, ProjectOverrides } from '.
 import { useI18n, LANGUAGES, type Lang, type Messages } from '../i18n/index.js';
 import { useTheme, type ThemePreference } from '../theme.js';
 import { setTerminalPrefs, terminalPrefsFrom } from '../terminalPrefs.js';
+import { SHORTCUT_DEFAULTS, SHORTCUT_IDS, keymapFrom, setKeymap, type ShortcutId } from '../shortcuts.js';
+import { ShortcutField } from './ShortcutField.js';
 
 interface SettingsViewProps {
   isOpen: boolean;
@@ -43,10 +46,10 @@ interface SettingsViewProps {
   requestedSection?: { section: Section; at: number } | null;
 }
 
-export type Section = 'general' | 'agents' | 'terminal' | 'safety' | 'project';
+export type Section = 'general' | 'agents' | 'terminal' | 'safety' | 'keyboard' | 'project';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-const SECTIONS: Section[] = ['general', 'agents', 'terminal', 'safety', 'project'];
+const SECTIONS: Section[] = ['general', 'agents', 'terminal', 'safety', 'keyboard', 'project'];
 const SECTION_KEY = 'vulgr.settingsSection';
 /** How long typing may pause before a change is written to disk. */
 const SAVE_DELAY = 400;
@@ -121,7 +124,7 @@ const cursors = (t: Messages): OptionItem[] => [
 const LANGUAGE_ITEMS: OptionItem[] = LANGUAGES.map((l) => ({ value: l.value, label: l.label }));
 
 /** Settings that travel in an export; secrets, per-project entries and timestamps stay behind. */
-const EXPORT_KEYS = ['defaultShell', 'fontSize', 'cursorStyle', 'claude', 'agy', 'codex', 'autoSandbox', 'notifyRuns', 'notifyCommands', 'defaultVerifyCmd'] as const;
+const EXPORT_KEYS = ['defaultShell', 'fontSize', 'cursorStyle', 'claude', 'agy', 'codex', 'autoSandbox', 'notifyRuns', 'notifyCommands', 'defaultVerifyCmd', 'shortcuts'] as const;
 const EXPORT_FORMAT = 'vulgr-settings';
 
 /** Takes the known settings from an imported file, keeping each only if its type matches the current one. */
@@ -398,6 +401,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
   const setConfig = (next: WarpConfig) => {
     setConfigState(next);
     setTerminalPrefs(terminalPrefsFrom(next));
+    setKeymap(keymapFrom(next));
     persistConfig.schedule(next);
   };
 
@@ -467,6 +471,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
       const reset: WarpConfig = await window.warpApi.resetConfig();
       setConfigState(reset);
       setTerminalPrefs(terminalPrefsFrom(reset));
+      setKeymap(keymapFrom(reset));
       onConfigChanged?.(reset);
       toast.success(s.resetDone);
     } catch (err) {
@@ -553,6 +558,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
     { id: 'agents', label: s.tabPermissions, icon: <Bot size={14} /> },
     { id: 'terminal', label: s.tabTerminal, icon: <TerminalSquare size={14} /> },
     { id: 'safety', label: s.tabSafety, icon: <ShieldCheck size={14} /> },
+    { id: 'keyboard', label: s.tabKeyboard, icon: <Keyboard size={14} /> },
     ...(hasProject ? [{ id: 'project' as const, label: s.tabProject, icon: <FolderGit2 size={14} /> }] : []),
   ];
   const themeItems = [
@@ -857,6 +863,81 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                     </Row>
                   </Group>
                 )}
+
+                {show('keyboard') && (() => {
+                  const keymap = keymapFrom(config);
+                  const names: Record<ShortcutId, string> = {
+                    palette: t.workspace.paletteTitle,
+                    newTab: t.app.actions.newTab,
+                    closePane: t.app.actions.closePane,
+                    splitH: t.app.actions.splitH,
+                    splitV: t.app.actions.splitV,
+                    toggleSidebar: t.app.actions.toggleSidebar,
+                    changes: t.app.actions.toggleDiff,
+                    skills: t.app.actions.openSkills,
+                    sandbox: t.app.actions.openSandbox,
+                    duoLoop: t.app.actions.liveSquad,
+                    history: t.history.open,
+                    exportReport: t.app.actions.exportReport,
+                    tokenHud: t.app.actions.tokenHud,
+                    settings: t.app.actions.openSettings,
+                    guide: t.app.actions.guide,
+                  };
+                  const setShortcut = (id: ShortcutId, combo: string) => {
+                    const changed = { ...(config.shortcuts ?? {}) };
+                    if (combo === SHORTCUT_DEFAULTS[id]) delete changed[id];
+                    else changed[id] = combo;
+                    setConfig({ ...config, shortcuts: changed });
+                  };
+                  const customized = Object.keys(config.shortcuts ?? {}).length > 0;
+                  return (
+                    <Group title={s.keyboardTitle} hint={s.keyboardDescription}>
+                      {SHORTCUT_IDS.map((id) => {
+                        const clash = SHORTCUT_IDS.find((other) => other !== id && keymap[other] === keymap[id]);
+                        return (
+                          <Row key={id} label={names[id]} hint={clash ? s.shortcutConflict(names[clash]) : undefined}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {keymap[id] !== SHORTCUT_DEFAULTS[id] && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShortcut(id, SHORTCUT_DEFAULTS[id])}
+                                  title={s.resetShortcut}
+                                  aria-label={`${s.resetShortcut}: ${names[id]}`}
+                                  className="rounded-md p-1 text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
+                                >
+                                  <RotateCcw size={12} />
+                                </button>
+                              )}
+                              <ShortcutField
+                                value={keymap[id]}
+                                invalid={!!clash}
+                                ariaLabel={names[id]}
+                                labels={{ pressKeys: s.pressKeys, needsModifier: s.shortcutNeedsModifier }}
+                                onChange={(combo) => setShortcut(id, combo)}
+                              />
+                            </div>
+                          </Row>
+                        );
+                      })}
+                      {customized && (
+                        <Row label="">
+                          <div className="flex justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setConfig({ ...config, shortcuts: {} });
+                                toast.success(s.shortcutsReset);
+                              }}
+                            >
+                              {s.resetAllShortcuts}
+                            </Button>
+                          </div>
+                        </Row>
+                      )}
+                    </Group>
+                  );
+                })()}
 
                 {hasProject && project && show('project') && (
                   <Group title={s.projectTitle(baseName(cwd!))} hint={s.projectDescription}>

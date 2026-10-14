@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { DoctorStatus } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
+import { displayCombo, useShortcuts } from '../shortcuts.js';
 
 interface TopBarProps {
   onToggleDiff: () => void;
@@ -66,6 +67,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenGuide,
 }) => {
   const { t } = useI18n();
+  const keymap = useShortcuts();
   const [isMaximized, setIsMaximized] = useState(false);
   const isMac =
     (typeof window !== 'undefined' && window.warpApi?.platform === 'darwin') ||
@@ -122,7 +124,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="text-[11px] text-zinc-400">{t.topbar.palettePlaceholder}</span>
         </div>
         <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[9px] font-mono text-zinc-400">
-          Ctrl+Shift+P
+          {displayCombo(keymap.palette)}
         </kbd>
       </button>
 

@@ -17,6 +17,7 @@ import { AgentSetupModal } from './components/AgentSetupModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
 import { useDuoHistory } from './hooks/useDuoHistory.js';
+import { comboFromEvent, displayCombo, shortcutFor, useShortcuts, type ShortcutId } from './shortcuts.js';
 import type { Section as SettingsSection } from './components/SettingsView.js';
 import { changedFilesNow } from './components/RunChangesCard.js';
 import { useI18n } from './i18n/index.js';
@@ -1321,6 +1322,7 @@ export const App: React.FC = () => {
           ['agents', t.settings.tabPermissions],
           ['terminal', t.settings.tabTerminal],
           ['safety', t.settings.tabSafety],
+          ['keyboard', t.settings.tabKeyboard],
           ...(cwd ? [['project', t.settings.tabProject]] : []),
         ] as [SettingsSection, string][]
       ).map(([section, name]) => ({
@@ -1337,24 +1339,72 @@ export const App: React.FC = () => {
     [activeSession, tabs, activeTabId, cwd, handleOpenExportModal, t]
   );
 
-  // Global keyboard shortcuts. Everything uses Ctrl/Cmd+Shift+<key> (VSCode/Warp
-  // convention) so it never collides with shell/readline bindings like
-  // Ctrl+W (delete word), Ctrl+K (kill line), or Ctrl+D (EOF) inside a pane.
+  // The palette shows each action's shortcut as currently set.
+  const PALETTE_SHORTCUTS: Record<string, ShortcutId> = {
+    guide: 'guide',
+    'new-tab': 'newTab',
+    'close-pane': 'closePane',
+    'split-h': 'splitH',
+    'split-v': 'splitV',
+    'toggle-sidebar': 'toggleSidebar',
+    'toggle-diff': 'changes',
+    'open-skills': 'skills',
+    'open-sandbox': 'sandbox',
+    'launch-live-squad': 'duoLoop',
+    'open-history': 'history',
+    'export-report': 'exportReport',
+    'open-token-hud': 'tokenHud',
+    'open-settings': 'settings',
+  };
+  const paletteKeymap = useShortcuts();
+  const paletteWithKeys = useMemo(
+    () =>
+      paletteActions.map((a) => {
+        const id = PALETTE_SHORTCUTS[a.id];
+        return id ? { ...a, shortcut: displayCombo(paletteKeymap[id]) } : a;
+      }),
+    [paletteActions, paletteKeymap]
+  );
+
+  // Global keyboard shortcuts. The defaults use Ctrl/Cmd+Shift+<key> (VSCode/Warp
+  // convention) so they never collide with shell/readline bindings like
+  // Ctrl+W (delete word), Ctrl+K (kill line), or Ctrl+D (EOF) inside a pane;
+  // Settings > Keyboard can change them.
+  const keymap = useShortcuts();
+  const keymapRef = useRef(keymap);
+  keymapRef.current = keymap;
+  const shortcutActions: Record<ShortcutId, () => void> = {
+    palette: () => setPaletteOpen((v) => !v),
+    newTab: () => handleAddTab(),
+    closePane: () => activeSession && handleCloseSession(activeSession.id),
+    splitH: () => activeSession && handleSplitSession(activeSession.id, 'h'),
+    splitV: () => activeSession && handleSplitSession(activeSession.id, 'v'),
+    toggleSidebar: () => setSidebarOpen((v) => !v),
+    changes: () => {
+      refreshGitDiff();
+      setRightPanelOpen((v) => !v);
+    },
+    skills: () => setSkillsModalOpen((v) => !v),
+    sandbox: () => setSandboxDrawerOpen((v) => !v),
+    duoLoop: () => setSquadModalOpen((v) => !v),
+    history: () => setHistoryOpen((v) => !v),
+    exportReport: () => handleOpenExportModal(),
+    tokenHud: () => setHudOpen((v) => !v),
+    // The settings page closes itself, so unsaved changes aren't lost.
+    settings: () => setSettingsModalOpen(true),
+    guide: () => setGuideOpen((v) => !v),
+  };
+  const shortcutActionsRef = useRef(shortcutActions);
+  shortcutActionsRef.current = shortcutActions;
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'F1') {
-        e.preventDefault();
-        setGuideOpen((v) => !v);
-        return;
-      }
       const mod = e.ctrlKey || e.metaKey;
-      if (!mod) return;
-
       const key = e.key.toLowerCase();
 
       // Ctrl/Cmd+K also opens the palette, except inside a terminal, where
       // Ctrl+K is the shell's "kill line" (Cmd+K on macOS is always safe).
-      if (key === 'k' && !e.shiftKey && !e.altKey) {
+      if (mod && key === 'k' && !e.shiftKey && !e.altKey) {
         const inTerminal = (document.activeElement as HTMLElement | null)?.closest?.('.xterm');
         if (e.metaKey || !inTerminal) {
           e.preventDefault();
@@ -1363,75 +1413,20 @@ export const App: React.FC = () => {
         }
       }
 
-      if (key === 'tab') {
+      if (mod && key === 'tab') {
         e.preventDefault();
         cycleTab(e.shiftKey ? -1 : 1);
         return;
       }
 
-      // Ctrl+, opens settings; the settings page closes itself, so unsaved changes aren't lost.
-      if (key === ',' && !e.shiftKey) {
+      // Recording a new shortcut in Settings: the keys are for the recorder.
+      if ((document.activeElement as HTMLElement | null)?.closest?.('[data-shortcut-recorder]')) return;
+
+      const combo = comboFromEvent(e);
+      const id = combo && shortcutFor(keymapRef.current, combo);
+      if (id) {
         e.preventDefault();
-        setSettingsModalOpen(true);
-        return;
-      }
-
-      if (!e.shiftKey) return;
-
-      switch (key) {
-        case 'x':
-          e.preventDefault();
-          handleOpenExportModal();
-          break;
-        case 'p':
-          e.preventDefault();
-          setPaletteOpen((v) => !v);
-          break;
-        case 'k':
-          e.preventDefault();
-          setSkillsModalOpen((v) => !v);
-          break;
-        case 'u':
-          e.preventDefault();
-          setSandboxDrawerOpen((v) => !v);
-          break;
-        case 's':
-          e.preventDefault();
-          setSquadModalOpen((v) => !v);
-          break;
-        case 't':
-          e.preventDefault();
-          handleAddTab();
-          break;
-        case 'w':
-          e.preventDefault();
-          if (activeSession) handleCloseSession(activeSession.id);
-          break;
-        case 'd':
-          e.preventDefault();
-          if (activeSession) handleSplitSession(activeSession.id, 'h');
-          break;
-        case 'e':
-          e.preventDefault();
-          if (activeSession) handleSplitSession(activeSession.id, 'v');
-          break;
-        case 'b':
-          e.preventDefault();
-          setSidebarOpen((v) => !v);
-          break;
-        case 'o':
-          e.preventDefault();
-          setHudOpen((v) => !v);
-          break;
-        case 'h':
-          e.preventDefault();
-          setHistoryOpen((v) => !v);
-          break;
-        case 'g':
-          e.preventDefault();
-          refreshGitDiff();
-          setRightPanelOpen((v) => !v);
-          break;
+        shortcutActionsRef.current[id]();
       }
     };
 
@@ -1725,7 +1720,7 @@ export const App: React.FC = () => {
       <CommandPalette
         isOpen={paletteOpen}
         onClose={() => setPaletteOpen(false)}
-        actions={paletteActions}
+        actions={paletteWithKeys}
       />
 
       {/* Autonomous Agent Mesh Modal */}

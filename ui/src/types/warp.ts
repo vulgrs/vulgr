@@ -277,6 +277,8 @@ export interface WarpConfig {
   notifyRuns: boolean;
   notifyCommands: boolean;
   defaultVerifyCmd: string;
+  /** Keyboard shortcuts the user changed: action id -> combo like 'Ctrl+Shift+T'. */
+  shortcuts?: Record<string, string>;
   /** Per-project overrides, keyed by project folder; changed only through setProjectConfig. */
   projects?: Record<string, ProjectOverrides>;
   lastUpdated: string;

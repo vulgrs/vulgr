@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.js';
 import { useI18n } from '../i18n/index.js';
+import { displayCombo, useShortcuts, type ShortcutId } from '../shortcuts.js';
 
 export type GuideAction =
   | 'focusDock'
@@ -41,7 +42,9 @@ interface GuideModalProps {
 
 interface GuideItem {
   icon: React.ReactNode;
+  /** A fixed key combo, or the id of one the user can change in Settings. */
   shortcut?: string;
+  keymapId?: ShortcutId;
   action: GuideAction;
 }
 
@@ -52,20 +55,21 @@ const STEPS: GuideItem[][] = [
     { icon: <Sparkles size={16} />, shortcut: 'Ctrl+Shift+Enter', action: 'launchClaude' },
   ],
   [
-    { icon: <GitCompare size={16} />, shortcut: 'Ctrl+Shift+G', action: 'openChanges' },
-    { icon: <Sliders size={16} />, shortcut: 'Ctrl+Shift+K', action: 'openSkills' },
-    { icon: <FileDown size={16} />, shortcut: 'Ctrl+Shift+X', action: 'openReport' },
+    { icon: <GitCompare size={16} />, keymapId: 'changes', action: 'openChanges' },
+    { icon: <Sliders size={16} />, keymapId: 'skills', action: 'openSkills' },
+    { icon: <FileDown size={16} />, keymapId: 'exportReport', action: 'openReport' },
   ],
   [
-    { icon: <Users size={16} />, shortcut: 'Ctrl+Shift+S', action: 'openSquad' },
+    { icon: <Users size={16} />, keymapId: 'duoLoop', action: 'openSquad' },
     { icon: <Zap size={16} />, action: 'openMesh' },
-    { icon: <Search size={16} />, shortcut: 'Ctrl+Shift+P', action: 'openPalette' },
-    { icon: <Settings size={16} />, shortcut: 'Ctrl+,', action: 'openSettings' },
+    { icon: <Search size={16} />, keymapId: 'palette', action: 'openPalette' },
+    { icon: <Settings size={16} />, keymapId: 'settings', action: 'openSettings' },
   ],
 ];
 
 export const GuideModal: React.FC<GuideModalProps> = ({ isOpen, onClose, onAction }) => {
   const { t } = useI18n();
+  const keymap = useShortcuts();
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
@@ -96,9 +100,9 @@ export const GuideModal: React.FC<GuideModalProps> = ({ isOpen, onClose, onActio
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-semibold text-zinc-100">{text.title}</span>
-                          {item.shortcut && (
+                          {(item.keymapId || item.shortcut) && (
                             <kbd className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-px font-mono text-[10px] text-zinc-400">
-                              {item.shortcut}
+                              {item.keymapId ? displayCombo(keymap[item.keymapId]) : item.shortcut}
                             </kbd>
                           )}
                         </div>
