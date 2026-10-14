@@ -259,6 +259,10 @@ export class Orchestra {
     let buffer = '';
     let chars = 0;
     let last = 0;
+    // After stop() no new agent starts; one that ignored an already-aborted signal would never return.
+    if (this.stopped) {
+      return Promise.resolve<CliExecutionResult>({ exitCode: null, stdout: '', stderr: 'stopped', executionTimeMs: 0, timedOut: false });
+    }
     const flush = () => {
       if (!taskId) return;
       const lines = stripAnsi(buffer).trim().split('\n').filter(Boolean).slice(-4).join('\n');

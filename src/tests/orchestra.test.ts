@@ -147,10 +147,16 @@ describe('Orchestra', () => {
       if (prompt.includes('Reply with only this JSON')) return JSON.stringify({ tasks: [{ id: 'a', title: 'A' }] });
       return 'VERDICT: APPROVED';
     });
-    fakeAgent('s-worker', (_prompt, options) => new Promise((resolve) => options.signal?.addEventListener('abort', () => resolve('stopped'))));
+    let workerStarted!: () => void;
+    const started = new Promise<void>((r) => (workerStarted = r));
+    fakeAgent('s-worker', (_prompt, options) => {
+      workerStarted();
+      return new Promise((resolve) => options.signal?.addEventListener('abort', () => resolve('stopped')));
+    });
     const orchestra = new Orchestra({ planner: 's-lead', workers: ['s-worker'], cwd: repo, lang: 'en' });
     const pending = orchestra.run('Long task');
-    await sleep(400);
+    // Stop once the worker is really running; a fixed wait raced the git setup on slow machines.
+    await started;
     orchestra.stop();
     const result = await pending;
     assert.equal(result.stopped, true);
