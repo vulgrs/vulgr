@@ -54,7 +54,7 @@ function resolveBinary(binaryName: string, extraPaths: string[]): string {
 }
 
 function getManagedZshDir(): string {
-  const zshDir = path.join(os.homedir(), '.vulgaris', 'shell', 'zsh');
+  const zshDir = path.join(os.homedir(), '.vulgr', 'shell', 'zsh');
   if (!fs.existsSync(zshDir)) {
     fs.mkdirSync(zshDir, { recursive: true });
   }
@@ -88,7 +88,7 @@ function getManagedZshDir(): string {
 }
 
 function getManagedBashrcPath(): string {
-  const bashDir = path.join(os.homedir(), '.vulgaris', 'shell', 'bash');
+  const bashDir = path.join(os.homedir(), '.vulgr', 'shell', 'bash');
   if (!fs.existsSync(bashDir)) {
     fs.mkdirSync(bashDir, { recursive: true });
   }

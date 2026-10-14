@@ -151,7 +151,7 @@ export const es: Messages = {
     sandboxTitle: 'Sandbox de agentes',
     sandboxDescription: 'Los worktrees temporales de git protegen tu rama activa.',
     autoSandbox: 'Ejecutar el trabajo autónomo en un sandbox',
-    autoSandboxHint: 'Agent Swarm y Duo Loop trabajan en .warp-worktrees/, así que tus archivos sin commit no se tocan.',
+    autoSandboxHint: 'Agent Swarm y Duo Loop trabajan en .vulgr-worktrees/, así que tus archivos sin commit no se tocan.',
     gitTitle: 'Commits',
     coAuthor: 'Añadir Vulgr como coautor',
     coAuthorHint: 'Los commits hechos desde Vulgr terminan con «Co-authored-by: Vulgr», y GitHub muestra Vulgr junto a tu nombre.',

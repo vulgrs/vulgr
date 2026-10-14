@@ -27,7 +27,7 @@ describe('WorktreeManager Suite', () => {
 
     assert.ok(createdSandbox);
     assert.strictEqual(createdSandbox.id, runId);
-    assert.strictEqual(createdSandbox.branchName, `warp-agent/${runId}`);
+    assert.strictEqual(createdSandbox.branchName, `vulgr-agent/${runId}`);
     assert.ok(existsSync(createdSandbox.worktreePath));
     assert.strictEqual(createdSandbox.active, true);
   });

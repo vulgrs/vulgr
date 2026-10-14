@@ -427,7 +427,7 @@ export const TokenOptimizerHUD: React.FC<TokenOptimizerHUDProps> = ({
                   <div>
                     <h3 className="text-xs font-semibold text-zinc-200">{h.memoryTitle}</h3>
                     <p className="text-[11px] text-zinc-300/80">
-                      {h.memoryStoresIn} <code className="text-white">.warp-memory.json</code> {h.memoryWhy}
+                      {h.memoryStoresIn} <code className="text-white">~/.vulgr/memory/</code> {h.memoryWhy}
                     </p>
                   </div>
                 </div>

@@ -85,7 +85,8 @@ const claudeChatManager = new ClaudeChatManager();
 claudeChatManager.setConfigManager(configManager);
 const systemOneCompiler = new SystemOneCompiler();
 systemOneCompiler.setConfigManager(configManager);
-const skillsRegistry = new SharedSkillsRegistry();
+// Custom skills live with the user (~/.vulgr), not in whatever folder the app started in.
+const skillsRegistry = new SharedSkillsRegistry(join(os.homedir(), '.vulgr'), 'skills.json', join(process.cwd(), '.warp-skills.json'));
 // Created once the app is ready: safeStorage cannot decrypt the saved token before that.
 let githubAuth: GitHubAuth;
 let memoryStore = new MemoryStore(currentCwd);
@@ -130,12 +131,15 @@ function resolveAppIcon(): string | undefined {
   return candidates.find((p) => existsSync(p));
 }
 
-const RECENT_PROJECTS_PATH = join(os.homedir(), '.vulgaris-recent-projects.json');
+const RECENT_PROJECTS_PATH = join(os.homedir(), '.vulgr', 'recent-projects.json');
+/** Where versions before the rename kept the list; read once if the new file isn't there yet. */
+const LEGACY_RECENT_PROJECTS_PATH = join(os.homedir(), '.vulgaris-recent-projects.json');
 
 function getRecentProjects(): string[] {
   try {
-    if (existsSync(RECENT_PROJECTS_PATH)) {
-      const parsed = JSON.parse(readFileSync(RECENT_PROJECTS_PATH, 'utf-8'));
+    const source = existsSync(RECENT_PROJECTS_PATH) ? RECENT_PROJECTS_PATH : LEGACY_RECENT_PROJECTS_PATH;
+    if (existsSync(source)) {
+      const parsed = JSON.parse(readFileSync(source, 'utf-8'));
       if (Array.isArray(parsed)) {
         return parsed.filter((p) => typeof p === 'string' && existsSync(p));
       }
@@ -148,6 +152,7 @@ function addRecentProject(dir: string): void {
   try {
     const list = getRecentProjects().filter((p) => p !== dir);
     list.unshift(dir);
+    mkdirSync(dirname(RECENT_PROJECTS_PATH), { recursive: true });
     writeFileSync(RECENT_PROJECTS_PATH, JSON.stringify(list.slice(0, 15), null, 2), 'utf-8');
   } catch {}
 }
@@ -190,7 +195,7 @@ function scanProjectDirectory(baseDir: string, currentPath: string, maxDepth = 3
     });
 
     for (const entry of sorted) {
-      if (entry.name.startsWith('.') && entry.name !== '.env.example' && entry.name !== '.gitignore' && entry.name !== '.vulgaris-memory.json') {
+      if (entry.name.startsWith('.') && entry.name !== '.env.example' && entry.name !== '.gitignore' && entry.name !== '.vulgaris-memory.json' && entry.name !== '.vulgr-memory.json') {
         if (entry.isDirectory()) continue;
       }
       if (entry.isDirectory() && IGNORED_DIRS.has(entry.name)) {
@@ -592,7 +597,7 @@ function setupIpcHandlers() {
   // Squad: prompts are written to a temp file and piped into the agent CLI, so
   // multi-line text with quotes never has to survive shell quoting.
   ipcMain.handle('squad:write-prompt', (_, text: string) => {
-    const dir = join(os.tmpdir(), 'vulgaris-squad');
+    const dir = join(os.tmpdir(), 'vulgr-squad');
     mkdirSync(dir, { recursive: true });
     const file = join(dir, `prompt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
     writeFileSync(file, text, 'utf-8');
@@ -735,7 +740,7 @@ function setupIpcHandlers() {
 
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Save Vulgr Technical Report',
-      defaultPath: defaultName || `vulgaris-report-${Date.now()}.${ext}`,
+      defaultPath: defaultName || `vulgr-report-${Date.now()}.${ext}`,
       filters,
     });
 

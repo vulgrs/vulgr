@@ -45,7 +45,7 @@ interface BottomCommandDockProps {
 
 // Commands submitted from the dock, newest last. Module-level so the history
 // survives the dock being unmounted while a program owns the terminal.
-const HISTORY_KEY = 'vulgaris.dockHistory';
+const HISTORY_KEY = 'vulgr.dockHistory';
 const HISTORY_MAX = 200;
 const history: string[] = (() => {
   try {

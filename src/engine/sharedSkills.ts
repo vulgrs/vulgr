@@ -272,15 +272,17 @@ export class SharedSkillsRegistry {
   private readonly customSkillsFile: string;
   private customSkills: SharedSkill[] = [];
 
-  constructor(workspaceDir: string = process.cwd(), skillsFileName = '.warp-skills.json') {
+  /** `legacyFile` is read when the skills file doesn't exist yet, so skills saved by older versions carry over. */
+  constructor(workspaceDir: string = process.cwd(), skillsFileName = '.warp-skills.json', private readonly legacyFile?: string) {
     this.customSkillsFile = join(workspaceDir, skillsFileName);
     this.loadCustomSkills();
   }
 
   private loadCustomSkills(): void {
-    if (existsSync(this.customSkillsFile)) {
+    const source = existsSync(this.customSkillsFile) ? this.customSkillsFile : this.legacyFile;
+    if (source && existsSync(source)) {
       try {
-        const raw = readFileSync(this.customSkillsFile, 'utf-8');
+        const raw = readFileSync(source, 'utf-8');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           this.customSkills = parsed.map((s) => ({ ...s, isCustom: true, category: s.category || 'custom' }));

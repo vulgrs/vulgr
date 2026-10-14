@@ -518,7 +518,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                   <span>{k.memoryTitle}</span>
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  {k.memorySavedIn} <code className="text-zinc-300">.warp-memory.json</code>. {k.memoryInjected}
+                  {k.memorySavedIn} <code className="text-zinc-300">~/.vulgr/memory/</code>. {k.memoryInjected}
                 </p>
               </div>
 

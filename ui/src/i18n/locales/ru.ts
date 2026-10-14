@@ -159,7 +159,7 @@ export const ru: Messages = {
     sandboxTitle: 'Песочница агентов',
     sandboxDescription: 'Временные git worktree защищают вашу текущую ветку.',
     autoSandbox: 'Запускать автономную работу в песочнице',
-    autoSandboxHint: 'Agent Swarm и Duo Loop работают в .warp-worktrees/, поэтому незакоммиченные файлы не затрагиваются.',
+    autoSandboxHint: 'Agent Swarm и Duo Loop работают в .vulgr-worktrees/, поэтому незакоммиченные файлы не затрагиваются.',
     gitTitle: 'Коммиты',
     coAuthor: 'Добавлять Vulgr как соавтора',
     coAuthorHint: 'Коммиты из Vulgr заканчиваются строкой «Co-authored-by: Vulgr», и GitHub показывает Vulgr рядом с вашим именем.',

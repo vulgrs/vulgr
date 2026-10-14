@@ -32,12 +32,12 @@ export class WorktreeManager {
   constructor(mainCwd: string = process.cwd()) {
     this.mainCwd = resolve(mainCwd);
     this.git = new GitUtils(this.mainCwd);
-    this.worktreesDir = join(this.mainCwd, '.warp-worktrees');
+    this.worktreesDir = join(this.mainCwd, '.vulgr-worktrees');
   }
 
-  /** Keeps .warp-worktrees out of `git status` without editing the user's .gitignore. */
+  /** Keeps .vulgr-worktrees out of `git status` without editing the user's .gitignore. */
   private ensureGitignored(): void {
-    excludeFromGit(this.mainCwd, '.warp-worktrees/');
+    excludeFromGit(this.mainCwd, '.vulgr-worktrees/');
   }
 
   /**
@@ -56,7 +56,7 @@ export class WorktreeManager {
     const currentBranch = this.git.getBranch() || 'master';
     const base = baseBranch || currentBranch;
     const id = runId || `sandbox-${Date.now()}-${randomBytes(3).toString('hex')}`;
-    const branchName = `warp-agent/${id}`;
+    const branchName = `vulgr-agent/${id}`;
     const worktreePath = join(this.worktreesDir, id);
 
     // If an old worktree exists at this path, remove it first
@@ -236,7 +236,8 @@ export class WorktreeManager {
   }
 
   /**
-   * Lists all currently active worktrees created under .warp-worktrees
+   * Lists all currently active worktrees created under .vulgr-worktrees
+   * (or .warp-worktrees, by versions before the rename)
    */
   listSandboxes(): SandboxSession[] {
     if (!this.git.isGitRepo()) return [];
@@ -278,7 +279,12 @@ export class WorktreeManager {
       } else if (line.startsWith('branch ')) {
         currentBranch = line.substring(7).replace('refs/heads/', '').trim();
       } else if (line.trim().length === 0 && currentPath) {
-        if (currentPath.includes('.warp-worktrees') || currentBranch.startsWith('warp-agent/')) {
+        if (
+          currentPath.includes('.vulgr-worktrees') ||
+          currentBranch.startsWith('vulgr-agent/') ||
+          currentPath.includes('.warp-worktrees') ||
+          currentBranch.startsWith('warp-agent/')
+        ) {
           const id = currentPath.split(/[/\\]/).pop() || currentBranch;
           sessions.push({
             id,

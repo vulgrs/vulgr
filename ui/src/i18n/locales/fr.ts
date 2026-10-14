@@ -151,7 +151,7 @@ export const fr: Messages = {
     sandboxTitle: 'Bac à sable des agents',
     sandboxDescription: 'Des worktrees git temporaires protègent votre branche active.',
     autoSandbox: 'Lancer le travail autonome dans un bac à sable',
-    autoSandboxHint: 'Agent Swarm et Duo Loop travaillent dans .warp-worktrees/ : vos fichiers non commités restent intacts.',
+    autoSandboxHint: 'Agent Swarm et Duo Loop travaillent dans .vulgr-worktrees/ : vos fichiers non commités restent intacts.',
     gitTitle: 'Commits',
     coAuthor: 'Ajouter Vulgr comme co-auteur',
     coAuthorHint: 'Les commits faits depuis Vulgr se terminent par « Co-authored-by: Vulgr », et GitHub affiche Vulgr à côté de ton nom.',

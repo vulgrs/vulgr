@@ -17,7 +17,7 @@ export const LANGUAGES: { value: Lang; label: string }[] = [
 type Namespaces = typeof namespaces;
 export type Messages = { [K in keyof Namespaces]: Namespaces[K]['en'] };
 
-const STORAGE_KEY = 'vulgaris.lang';
+const STORAGE_KEY = 'vulgr.lang';
 
 const isLang = (value: unknown): value is Lang => LANGUAGES.some((l) => l.value === value);
 

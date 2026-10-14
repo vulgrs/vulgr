@@ -140,7 +140,7 @@ export const App: React.FC = () => {
   const [groups, setGroups] = useState<TerminalGroup[]>(() => savedSessions?.groups ?? []);
   const [doctor, setDoctor] = useState<DoctorStatus | null>(null);
   const [diffOpen, setDiffOpen] = useState(false);
-  const [rightPanelOpen, setRightPanelOpen] = useState(() => loadPersisted('warp.rightPanelOpen', true));
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => loadPersisted('vulgr.rightPanelOpen', true));
   const [gitDiff, setGitDiff] = useState('');
   const [gitFiles, setGitFiles] = useState<string[]>([]);
   const [gitBranch, setGitBranch] = useState<string | null>(null);
@@ -149,7 +149,7 @@ export const App: React.FC = () => {
   const cwdRef = useRef(cwd);
   cwdRef.current = cwd;
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(() => loadPersisted('warp.sidebarOpen', true));
+  const [sidebarOpen, setSidebarOpen] = useState(() => loadPersisted('vulgr.sidebarOpen', true));
   const [sidebarWidth, setSidebarWidth] = useState(() => clampSidebarWidth(loadPersisted('vulgr.sidebarWidth', SIDEBAR_WIDTH)));
   const [resizingSidebar, setResizingSidebar] = useState(false);
   // While the sidebar is closed, resting the pointer on the window's left edge shows it
@@ -194,9 +194,9 @@ export const App: React.FC = () => {
   const [pastConversations, setPastConversations] = useState<PastProjectConversation[]>([]);
   const [projectMemory, setProjectMemory] = useState<MemoryData | null>(null);
 
-  const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('warp.primaryModel', 'claude'));
-  const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('warp.reviewerModel', 'gemini'));
-  const [verifyCmd, setVerifyCmd] = useState(() => loadPersisted('warp.verifyCmd', 'npm test'));
+  const [primaryModel, setPrimaryModel] = useState(() => loadPersisted('vulgr.primaryModel', 'claude'));
+  const [reviewerModel, setReviewerModel] = useState(() => loadPersisted('vulgr.reviewerModel', 'gemini'));
+  const [verifyCmd, setVerifyCmd] = useState(() => loadPersisted('vulgr.verifyCmd', 'npm test'));
 
   // ---- Squad (İkili Ajan) plumbing --------------------------------------
   // A squad step runs a command in a pane and waits for XtermPane to report
@@ -325,7 +325,7 @@ export const App: React.FC = () => {
     saveSessions(tabs, activeTabId, groups);
   }, [tabs, activeTabId, groups]);
   useEffect(() => {
-    localStorage.setItem('warp.sidebarOpen', JSON.stringify(sidebarOpen));
+    localStorage.setItem('vulgr.sidebarOpen', JSON.stringify(sidebarOpen));
     if (sidebarOpen) {
       setSidebarPeek(false);
       setSidebarOverlay(false);
@@ -338,16 +338,16 @@ export const App: React.FC = () => {
     } catch {}
   }, [sidebarWidth, resizingSidebar]);
   useEffect(() => {
-    localStorage.setItem('warp.rightPanelOpen', JSON.stringify(rightPanelOpen));
+    localStorage.setItem('vulgr.rightPanelOpen', JSON.stringify(rightPanelOpen));
   }, [rightPanelOpen]);
   useEffect(() => {
-    localStorage.setItem('warp.primaryModel', JSON.stringify(primaryModel));
+    localStorage.setItem('vulgr.primaryModel', JSON.stringify(primaryModel));
   }, [primaryModel]);
   useEffect(() => {
-    localStorage.setItem('warp.reviewerModel', JSON.stringify(reviewerModel));
+    localStorage.setItem('vulgr.reviewerModel', JSON.stringify(reviewerModel));
   }, [reviewerModel]);
   useEffect(() => {
-    localStorage.setItem('warp.verifyCmd', JSON.stringify(verifyCmd));
+    localStorage.setItem('vulgr.verifyCmd', JSON.stringify(verifyCmd));
   }, [verifyCmd]);
 
   const fetchContextTelemetry = useCallback(async () => {

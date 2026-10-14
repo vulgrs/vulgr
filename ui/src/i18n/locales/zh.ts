@@ -147,7 +147,7 @@ export const zh: Messages = {
     sandboxTitle: '智能体沙盒',
     sandboxDescription: '临时 git worktree 保护你当前的分支。',
     autoSandbox: '在沙盒中运行自主任务',
-    autoSandboxHint: 'Agent Swarm 和 Duo Loop 在 .warp-worktrees/ 中工作，不会动你未提交的文件。',
+    autoSandboxHint: 'Agent Swarm 和 Duo Loop 在 .vulgr-worktrees/ 中工作，不会动你未提交的文件。',
     gitTitle: '提交',
     coAuthor: '将 Vulgr 添加为共同作者',
     coAuthorHint: '从 Vulgr 创建的提交末尾会加上“Co-authored-by: Vulgr”，GitHub 会在你的名字旁显示 Vulgr。',

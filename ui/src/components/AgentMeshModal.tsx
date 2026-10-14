@@ -116,14 +116,14 @@ const STAGE_ROLE: Partial<Record<MeshStatus['stage'], Role>> = {
 
 const loadSetting = (key: string, fallback: string) => {
   try {
-    return localStorage.getItem(`vulgaris.mesh.${key}`) || fallback;
+    return localStorage.getItem(`vulgr.mesh.${key}`) || fallback;
   } catch {
     return fallback;
   }
 };
 const saveSetting = (key: string, value: string) => {
   try {
-    localStorage.setItem(`vulgaris.mesh.${key}`, value);
+    localStorage.setItem(`vulgr.mesh.${key}`, value);
   } catch {}
 };
 

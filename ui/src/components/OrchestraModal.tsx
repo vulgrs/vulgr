@@ -93,14 +93,14 @@ const ACTIVE_STATES: TaskState[] = ['running', 'testing', 'fixing', 'merging'];
 
 const load = (key: string, fallback: string) => {
   try {
-    return localStorage.getItem(`vulgaris.orchestra.${key}`) || fallback;
+    return localStorage.getItem(`vulgr.orchestra.${key}`) || fallback;
   } catch {
     return fallback;
   }
 };
 const save = (key: string, value: string) => {
   try {
-    localStorage.setItem(`vulgaris.orchestra.${key}`, value);
+    localStorage.setItem(`vulgr.orchestra.${key}`, value);
   } catch {}
 };
 

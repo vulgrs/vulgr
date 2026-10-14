@@ -62,14 +62,14 @@ const ROUND_VALUES = ['2', '3', '5'];
 
 const load = (key: string, fallback: string) => {
   try {
-    return localStorage.getItem(`vulgaris.squad.${key}`) || fallback;
+    return localStorage.getItem(`vulgr.squad.${key}`) || fallback;
   } catch {
     return fallback;
   }
 };
 const save = (key: string, value: string) => {
   try {
-    localStorage.setItem(`vulgaris.squad.${key}`, value);
+    localStorage.setItem(`vulgr.squad.${key}`, value);
   } catch {}
 };
 

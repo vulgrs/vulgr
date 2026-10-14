@@ -101,7 +101,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
     setSaveStatus(null);
     try {
       const ext = format === 'html' ? 'html' : format === 'json' ? 'json' : 'md';
-      const defaultFilename = `vulgaris-report-${new Date().toISOString().slice(0, 10)}.${ext}`;
+      const defaultFilename = `vulgr-report-${new Date().toISOString().slice(0, 10)}.${ext}`;
       const res = await window.warpApi.saveReportToFile(generatedContent, defaultFilename, format);
       if (res.success && res.filePath) {
         setSaveStatus(t.modals.report.saved(res.filePath.split(/[\\/]/).pop() ?? ''));

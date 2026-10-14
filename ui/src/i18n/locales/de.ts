@@ -151,7 +151,7 @@ export const de: Messages = {
     sandboxTitle: 'Agenten-Sandbox',
     sandboxDescription: 'Temporäre Git-Worktrees schützen deinen aktiven Branch.',
     autoSandbox: 'Autonome Arbeit in einer Sandbox ausführen',
-    autoSandboxHint: 'Agent Swarm und Duo Loop arbeiten in .warp-worktrees/, deine nicht committeten Dateien bleiben unberührt.',
+    autoSandboxHint: 'Agent Swarm und Duo Loop arbeiten in .vulgr-worktrees/, deine nicht committeten Dateien bleiben unberührt.',
     gitTitle: 'Commits',
     coAuthor: 'Vulgr als Mitautor eintragen',
     coAuthorHint: 'Commits aus Vulgr enden mit „Co-authored-by: Vulgr“, damit GitHub Vulgr neben deinem Namen zeigt.',

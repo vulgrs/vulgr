@@ -147,7 +147,7 @@ export const ja: Messages = {
     sandboxTitle: 'エージェントのサンドボックス',
     sandboxDescription: '一時的な git worktree が作業中のブランチを守ります。',
     autoSandbox: '自律作業をサンドボックスで実行',
-    autoSandboxHint: 'Agent Swarm と Duo Loop は .warp-worktrees/ で作業するため、コミットしていないファイルには触れません。',
+    autoSandboxHint: 'Agent Swarm と Duo Loop は .vulgr-worktrees/ で作業するため、コミットしていないファイルには触れません。',
     gitTitle: 'コミット',
     coAuthor: 'Vulgr を共同作成者に追加',
     coAuthorHint: 'Vulgr から作成したコミットの末尾に「Co-authored-by: Vulgr」が付き、GitHub であなたの名前の横に Vulgr が表示されます。',
