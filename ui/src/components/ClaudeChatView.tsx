@@ -96,8 +96,8 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   if (message.kind === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-indigo-600/90 text-white px-4 py-2.5 text-[13px] leading-relaxed shadow-sm">
-          <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-200">
+        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-zinc-800 text-zinc-100 px-4 py-2.5 text-[13px] leading-relaxed shadow-sm">
+          <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
             <User size={11} /> You
           </div>
           <div className="whitespace-pre-wrap break-words">{message.text}</div>
@@ -124,8 +124,8 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
     return (
       <div className="flex justify-start">
         <div className="max-w-[85%] w-full rounded-xl bg-zinc-950 border border-zinc-800/80 px-3 py-2 text-[12px] font-mono text-zinc-300">
-          <div className="flex items-center gap-2 text-sky-300">
-            <span className="text-sky-400">{toolIcon(message.toolName)}</span>
+          <div className="flex items-center gap-2 text-zinc-300">
+            <span className="text-zinc-400">{toolIcon(message.toolName)}</span>
             <span className="font-semibold">{message.toolName || 'tool'}</span>
           </div>
           {message.toolInput && (

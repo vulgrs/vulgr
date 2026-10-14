@@ -34,7 +34,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ children }) => {
               href={href}
               target="_blank"
               rel="noreferrer"
-              className="text-sky-400 hover:text-sky-300 underline underline-offset-2 break-words"
+              className="text-zinc-100 underline decoration-zinc-500 underline-offset-2 break-words hover:decoration-zinc-200"
             >
               {children}
             </a>

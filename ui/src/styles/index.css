@@ -107,8 +107,9 @@
   --card-foreground: #f4f4f5;
   --popover: #131316;
   --popover-foreground: #f4f4f5;
-  --primary: #4d8dff;
-  --primary-foreground: #ffffff;
+  /* The app is monochrome: the main action is near-white on the dark theme, no blue. */
+  --primary: #f4f4f5;
+  --primary-foreground: #09090b;
   --secondary: #1c1c21;
   --secondary-foreground: #f4f4f5;
   --muted: #16161a;
@@ -118,7 +119,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: rgba(255, 255, 255, 0.1);
   --input: rgba(255, 255, 255, 0.14);
-  --ring: rgba(77, 141, 255, 0.55);
+  --ring: rgba(255, 255, 255, 0.28);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -126,12 +127,12 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: #0c0c0f;
   --sidebar-foreground: #f4f4f5;
-  --sidebar-primary: #4d8dff;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: #f4f4f5;
+  --sidebar-primary-foreground: #09090b;
   --sidebar-accent: #1a1a22;
   --sidebar-accent-foreground: #f4f4f5;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: rgba(77, 141, 255, 0.55);
+  --sidebar-ring: rgba(255, 255, 255, 0.28);
 }
 
 /*
@@ -158,9 +159,9 @@
   --color-zinc-950: oklch(98.5% 0 0);
   /* Inset panels (bg-black/40 …) and dark chips read as light gray. */
   --color-black: #e4e4e7;
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
-  --ring: rgba(37, 99, 235, 0.45);
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --ring: rgba(0, 0, 0, 0.25);
 }
 
 /* Thin scrollbars that blend into either theme (xterm keeps its own). */
@@ -395,7 +396,7 @@
 }
 
 .btn-accent:hover {
-  background: color-mix(in srgb, var(--primary) 85%, white);
+  background: color-mix(in srgb, var(--primary) 86%, var(--background));
 }
 
 .btn-ghost {

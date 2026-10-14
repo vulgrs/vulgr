@@ -39,7 +39,7 @@ export const ACCENT_BUTTON =
 
 /** Each flow has its own colour, set on the dialog as --flow-accent. */
 export const ACCENT = {
-  duo: '#22d3ee',
+  duo: '#f472b6',
   swarm: '#a78bfa',
   orchestra: '#f59e0b',
 } as const;

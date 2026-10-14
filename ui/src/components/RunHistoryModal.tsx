@@ -15,7 +15,7 @@ import { useI18n } from '../i18n/index.js';
 import type { RunKind, RunOutcome, RunRecord, RunSummary } from '../runHistory.js';
 
 const KIND: Record<RunKind, { label: string; icon: string; accent: string }> = {
-  duo: { label: 'Duo Loop', icon: duoLoopIcon, accent: '#22d3ee' },
+  duo: { label: 'Duo Loop', icon: duoLoopIcon, accent: '#f472b6' },
   swarm: { label: 'Agent Swarm', icon: agentSwarmIcon, accent: '#a78bfa' },
   orchestra: { label: 'Orchestrator', icon: orchestratorIcon, accent: '#f59e0b' },
 };
