@@ -321,6 +321,77 @@ export class GitUtils {
     }
   }
 
+  // ---- Non-blocking versions, for the Electron main process (the window stays responsive). ----
+
+  async isGitRepoAsync(): Promise<boolean> {
+    try {
+      return (await this.git(['rev-parse', '--is-inside-work-tree'])).trim() === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  /** Commits everything; says why it failed (nothing to commit, no user name set, a hook refused...). */
+  async commitAllAsync(message: string): Promise<{ success: boolean; error?: string }> {
+    if (!(await this.isGitRepoAsync())) return { success: false, error: 'Not a git repository' };
+    try {
+      await this.git(['add', '-A']);
+      // No shell: a message with quotes, backticks or $(...) is taken literally.
+      await this.git(['commit', '-m', message]);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: gitError(err) || 'Commit failed' };
+    }
+  }
+
+  /** Pushes the current branch (or `branch`), setting its upstream the first time. */
+  async pushAsync(remote: string = 'origin', branch?: string): Promise<{ success: boolean; error?: string }> {
+    if (!(await this.isGitRepoAsync())) return { success: false, error: 'Not a git repository' };
+    try {
+      const b = branch || (await this.getBranchAsync()) || 'master';
+      await this.git(['push', '-u', remote, b]);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: gitError(err) || 'Failed to push' };
+    }
+  }
+
+  /** revertAllChanges() without blocking: everything goes into a stash; returns its commit. */
+  async revertAllChangesAsync(): Promise<string | null> {
+    if (!(await this.isGitRepoAsync())) return null;
+    try {
+      const out = await this.git(['stash', 'push', '--include-untracked', '-m', `vulgr: discarded ${new Date().toISOString()}`]);
+      if (/No local changes/i.test(out)) return null;
+      return (await this.git(['rev-parse', 'stash@{0}'])).trim();
+    } catch {
+      return null;
+    }
+  }
+
+  /** revertFile() without blocking, and without a shell (any file name is safe). */
+  async revertFileAsync(file: string): Promise<string | null> {
+    if (!(await this.isGitRepoAsync())) return null;
+    try {
+      const label = `vulgr: discarded ${file} ${new Date().toISOString()}`;
+      await this.git(['stash', 'push', '--include-untracked', '-m', label, '--', file]);
+      const [sha, subject] = (await this.git(['stash', 'list', '-1', '--format=%H%x09%s'])).trim().split('\t');
+      return subject?.includes(label) ? sha : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async restoreDiscardedAsync(stashCommit: string): Promise<boolean> {
+    try {
+      const index = (await this.git(['stash', 'list', '--format=%H'])).split('\n').indexOf(stashCommit);
+      if (index < 0) return false;
+      await this.git(['stash', 'pop', `stash@{${index}}`]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** Like commitAll, but says why it failed (nothing to commit, no user name set, a hook refused...). */
   commitAllDetailed(message: string): { success: boolean; error?: string } {
     if (!this.isGitRepo()) return { success: false, error: 'Not a git repository' };

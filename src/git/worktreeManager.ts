@@ -40,11 +40,17 @@ export class WorktreeManager {
     excludeFromGit(this.mainCwd, '.vulgr-worktrees/');
   }
 
+  /** Runs git without a shell and without blocking (names with quotes or spaces are safe). */
+  private async run(args: string[], cwd: string = this.mainCwd): Promise<string> {
+    const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 20 * 1024 * 1024, windowsHide: true });
+    return stdout;
+  }
+
   /**
    * Creates an isolated git worktree branch for autonomous agents.
    */
   async createSandbox(runId?: string, baseBranch?: string): Promise<SandboxSession> {
-    if (!this.git.isGitRepo()) {
+    if (!(await this.git.isGitRepoAsync())) {
       throw new Error('Cannot create worktree sandbox outside of a Git repository');
     }
 
@@ -53,7 +59,7 @@ export class WorktreeManager {
       mkdirSync(this.worktreesDir, { recursive: true });
     }
 
-    const currentBranch = this.git.getBranch() || 'master';
+    const currentBranch = (await this.git.getBranchAsync()) || 'master';
     const base = baseBranch || currentBranch;
     const id = runId || `sandbox-${Date.now()}-${randomBytes(3).toString('hex')}`;
     const branchName = `vulgr-agent/${id}`;
@@ -61,16 +67,12 @@ export class WorktreeManager {
 
     // If an old worktree exists at this path, remove it first
     if (existsSync(worktreePath)) {
-      this.destroySandbox(worktreePath, branchName, true);
+      await this.destroySandbox(worktreePath, branchName, true);
     }
 
     try {
       // 1. Create worktree on a new branch branched from HEAD
-      execSync(`git worktree add -b "${branchName}" "${worktreePath}" "${base}"`, {
-        cwd: this.mainCwd,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        encoding: 'utf-8',
-      });
+      await this.run(['worktree', 'add', '-b', branchName, worktreePath, base]);
 
       // 2. Copy essential local config files if present (.env, .npmrc, etc.)
       const envFile = join(this.mainCwd, '.env');
@@ -107,14 +109,14 @@ export class WorktreeManager {
   /**
    * Returns a unified diff of all changes made inside the sandbox relative to baseBranch.
    */
-  getSandboxDiff(worktreePath: string, baseBranch?: string): GitDiffResult {
+  async getSandboxDiff(worktreePath: string, baseBranch?: string): Promise<GitDiffResult> {
     if (!existsSync(worktreePath)) {
       return { hasChanges: false, diff: '', filesChanged: [] };
     }
 
     const sandboxGit = new GitUtils(worktreePath);
     // Unstaged + staged changes in the worktree
-    const localDiff = sandboxGit.getDiff();
+    const localDiff = await sandboxGit.getDiffAsync();
 
     if (!baseBranch) {
       return localDiff;
@@ -122,11 +124,7 @@ export class WorktreeManager {
 
     try {
       // Also diff committed changes between baseBranch and sandbox HEAD
-      const branchDiff = execSync(`git diff "${baseBranch}"...HEAD`, {
-        cwd: worktreePath,
-        encoding: 'utf-8',
-        maxBuffer: 10 * 1024 * 1024,
-      });
+      const branchDiff = await this.run(['diff', `${baseBranch}...HEAD`], worktreePath);
 
       const combined = [branchDiff, localDiff.diff].filter(Boolean).join('\n');
       return {
@@ -149,25 +147,21 @@ export class WorktreeManager {
     commitMsg?: string
   ): Promise<SandboxMergeResult> {
     const sandboxGit = new GitUtils(worktreePath);
-    const target = targetBranch || this.git.getBranch() || 'master';
+    const target = targetBranch || (await this.git.getBranchAsync()) || 'master';
     const message = commitMsg || `feat(agent): merge autonomous solution from ${branchName}`;
 
     // 1. Commit any remaining uncommitted work in the worktree
     if (existsSync(worktreePath)) {
       try {
-        sandboxGit.commitAll(message);
+        await sandboxGit.commitAllAsync(message);
       } catch {}
     }
 
     // 2. In primary workspace, merge the agent branch
     try {
-      const mergeOutput = execSync(`git merge --no-ff "${branchName}" -m "${message.replace(/"/g, '\\"')}"`, {
-        cwd: this.mainCwd,
-        encoding: 'utf-8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+      await this.run(['merge', '--no-ff', branchName, '-m', message]);
 
-      const commitHash = execSync('git rev-parse HEAD', { cwd: this.mainCwd, encoding: 'utf-8' }).trim();
+      const commitHash = (await this.run(['rev-parse', 'HEAD'])).trim();
 
       // Clean up sandbox post-merge
       await this.destroySandbox(worktreePath, branchName, true);
@@ -183,7 +177,7 @@ export class WorktreeManager {
       let conflictFiles: string[] = [];
       if (isConflict) {
         try {
-          const status = execSync('git status --porcelain', { cwd: this.mainCwd, encoding: 'utf-8' });
+          const status = await this.run(['status', '--porcelain']);
           conflictFiles = status
             .split('\n')
             .filter((l) => l.startsWith('UU ') || l.startsWith('AA '))
@@ -207,21 +201,18 @@ export class WorktreeManager {
     try {
       if (existsSync(worktreePath)) {
         try {
-          execSync(`git worktree remove ${force ? '--force' : ''} "${worktreePath}"`, {
-            cwd: this.mainCwd,
-            stdio: 'ignore',
-          });
+          await this.run(['worktree', 'remove', ...(force ? ['--force'] : []), worktreePath]);
         } catch {}
       }
 
       // Prune dead worktree refs
       try {
-        execSync('git worktree prune', { cwd: this.mainCwd, stdio: 'ignore' });
+        await this.run(['worktree', 'prune']);
       } catch {}
 
       // Delete the temporary branch
       try {
-        execSync(`git branch -D "${branchName}"`, { cwd: this.mainCwd, stdio: 'ignore' });
+        await this.run(['branch', '-D', branchName]);
       } catch {}
 
       // Clean filesystem leftovers if any remain

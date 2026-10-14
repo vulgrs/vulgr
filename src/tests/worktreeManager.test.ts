@@ -49,7 +49,7 @@ describe('WorktreeManager Suite', () => {
     assert.ok(!mainDiff.filesChanged.includes('sandbox-test-sample.txt'));
 
     // Sandbox diff MUST have this file
-    const sandboxDiff = manager.getSandboxDiff(createdSandbox.worktreePath);
+    const sandboxDiff = await manager.getSandboxDiff(createdSandbox.worktreePath);
     assert.strictEqual(sandboxDiff.hasChanges, true);
     assert.ok(sandboxDiff.filesChanged.some((f) => f.includes('sandbox-test-sample.txt')));
   });

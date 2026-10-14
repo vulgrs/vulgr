@@ -437,7 +437,7 @@ function setupIpcHandlers() {
 
     const claudeAvail = await claudeAdapter.isAvailable();
     const geminiAvail = await geminiAdapter.isAvailable();
-    const gitAvail = gitUtils.isGitRepo();
+    const gitAvail = await gitUtils.isGitRepoAsync();
 
     return {
       node: { ok: true, version: process.version },
@@ -457,28 +457,29 @@ function setupIpcHandlers() {
   ipcMain.handle('git:status', (_, { cwd = process.cwd() } = {}) => new GitUtils(cwd).getChangedFilesAsync());
 
   // Discarding stashes the changes (recoverable), always in the open project.
-  ipcMain.handle('git:revert', (_, { cwd } = {}) => new GitUtils(cwd || currentCwd).revertAllChanges());
-  ipcMain.handle('git:revertFile', (_, { file, cwd } = {}) => new GitUtils(cwd || currentCwd).revertFile(file));
-  ipcMain.handle('git:restoreDiscarded', (_, { stash, cwd } = {}) => new GitUtils(cwd || currentCwd).restoreDiscarded(stash));
+  ipcMain.handle('git:revert', (_, { cwd } = {}) => new GitUtils(cwd || currentCwd).revertAllChangesAsync());
+  ipcMain.handle('git:revertFile', (_, { file, cwd } = {}) => new GitUtils(cwd || currentCwd).revertFileAsync(String(file)));
+  ipcMain.handle('git:restoreDiscarded', (_, { stash, cwd } = {}) => new GitUtils(cwd || currentCwd).restoreDiscardedAsync(stash));
 
   ipcMain.handle('git:branch', (_, { cwd = process.cwd() } = {}) => {
     const git = new GitUtils(cwd);
     return git.getBranchAsync();
   });
 
-  ipcMain.handle('git:commit', (_, { message, cwd = process.cwd() }) => {
+  ipcMain.handle('git:commit', async (_, { message, cwd = process.cwd() }) => {
     const git = new GitUtils(cwd);
-    return git.commitAll(configManager.getConfig().coAuthorVulgr === false ? message : withVulgrCoAuthor(message));
+    const res = await git.commitAllAsync(configManager.getConfig().coAuthorVulgr === false ? message : withVulgrCoAuthor(message));
+    return res.success;
   });
 
   // Commit everything with a message, then push when asked; says what happened and why not.
-  ipcMain.handle('git:commit-push', (_, { message, push, cwd }: { message: string; push?: boolean; cwd?: string }) => {
+  ipcMain.handle('git:commit-push', async (_, { message, push, cwd }: { message: string; push?: boolean; cwd?: string }) => {
     const git = new GitUtils(cwd || currentCwd);
     const text = String(message || '').trim();
-    const commit = git.commitAllDetailed(configManager.getConfig().coAuthorVulgr === false ? text : withVulgrCoAuthor(text));
+    const commit = await git.commitAllAsync(configManager.getConfig().coAuthorVulgr === false ? text : withVulgrCoAuthor(text));
     if (!commit.success) return { committed: false, pushed: false, error: commit.error };
     if (!push) return { committed: true, pushed: false };
-    const pushed = git.push('origin');
+    const pushed = await git.pushAsync('origin');
     return { committed: true, pushed: pushed.success, error: pushed.error };
   });
 
@@ -489,7 +490,7 @@ function setupIpcHandlers() {
 
   ipcMain.handle('git:push', (_, { remote = 'origin', branch, cwd = process.cwd() } = {}) => {
     const git = new GitUtils(cwd);
-    return git.push(remote, branch);
+    return git.pushAsync(remote, branch);
   });
 
   // Autonomous Agent Mesh IPC Handler

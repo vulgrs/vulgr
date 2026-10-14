@@ -36,6 +36,22 @@ describe('GitUtils diff', () => {
     assert.equal(existsSync(join(repo, 'pwned2')), false);
   });
 
+  test('async discard and restore take any file name literally', async () => {
+    execSync('git config user.email t@t && git config user.name t', { cwd: repo });
+    const name = 'a $(touch pwned) "q".txt';
+    writeFileSync(join(repo, name), 'one\n');
+    const git = new GitUtils(repo);
+    assert.equal((await git.commitAllAsync('add file')).success, true);
+    writeFileSync(join(repo, name), 'two\n');
+    const stash = await git.revertFileAsync(name);
+    assert.ok(stash);
+    assert.equal(readFileSync(join(repo, name), 'utf-8'), 'one\n');
+    assert.equal(existsSync(join(repo, 'pwned')), false);
+    assert.equal(await git.restoreDiscardedAsync(stash!), true);
+    assert.equal(readFileSync(join(repo, name), 'utf-8'), 'two\n');
+    assert.equal((await git.commitAllAsync('')).success, false);
+  });
+
   test('excludeFromGit hides Vulgr folders without touching .gitignore', () => {
     mkdirSync(join(repo, '.ai-bridge'));
     writeFileSync(join(repo, '.ai-bridge', 'log.json'), '{}');
