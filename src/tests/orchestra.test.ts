@@ -258,6 +258,72 @@ describe('Orchestra', () => {
     assert.equal(execSync('git worktree list', { cwd: repo, encoding: 'utf-8' }).trim().split('\n').length, 1);
   });
 
+  test('restartTask stops only that agent and starts its task again from a clean copy', async () => {
+    fakeAgent('r-lead', (prompt) =>
+      prompt.includes('Reply with only this JSON') ? JSON.stringify({ tasks: [{ id: 'a', title: 'A' }] }) : 'VERDICT: APPROVED'
+    );
+    let calls = 0;
+    let firstStarted!: () => void;
+    const started = new Promise<void>((r) => (firstStarted = r));
+    fakeAgent('r-worker', (_p, options) => {
+      calls++;
+      if (calls === 1) {
+        // First attempt leaves a stray file and hangs until it is stopped.
+        writeFileSync(join(options.cwd!, 'stray.txt'), 'x\n');
+        firstStarted();
+        return new Promise((resolve) => options.signal?.addEventListener('abort', () => resolve('stopped')));
+      }
+      assert.equal(existsSync(join(options.cwd!, 'stray.txt')), false, 'the restart starts from a clean copy');
+      writeFileSync(join(options.cwd!, 'a.txt'), 'a\n');
+      return 'done';
+    });
+    const orchestra = new Orchestra({ planner: 'r-lead', workers: ['r-worker'], cwd: repo, lang: 'en', verifyCmd: 'node -e "process.exit(0)"' });
+    const pending = orchestra.run('One file');
+    await started;
+    assert.equal(orchestra.restartTask('nope'), false);
+    assert.equal(orchestra.restartTask('a'), true);
+    const result = await pending;
+    assert.equal(calls, 2);
+    assert.equal(result.tasks[0].state, 'done');
+    assert.equal(existsSync(join(repo, 'stray.txt')), false);
+    assert.equal(readFileSync(join(repo, 'a.txt'), 'utf-8'), 'a\n');
+  });
+
+  test('pause holds new agent calls until resume', async () => {
+    fakeAgent('p-lead', (prompt) =>
+      prompt.includes('Reply with only this JSON') ? JSON.stringify({ tasks: [{ id: 'a', title: 'A' }] }) : 'VERDICT: APPROVED'
+    );
+    let workerCalls = 0;
+    fakeAgent('p-worker', (_p, options) => {
+      workerCalls++;
+      writeFileSync(join(options.cwd!, 'a.txt'), 'a\n');
+      return 'done';
+    });
+    const events: OrchestraEvent[] = [];
+    const orchestra = new Orchestra({ planner: 'p-lead', workers: ['p-worker'], cwd: repo, lang: 'en', onEvent: (e) => events.push(e) });
+    orchestra.pause();
+    assert.equal(orchestra.paused, true);
+    const pending = orchestra.run('One file');
+    await sleep(600);
+    assert.equal(workerCalls, 0, 'nothing ran while paused');
+    orchestra.resume();
+    const result = await pending;
+    assert.equal(result.success, true);
+    assert.equal(workerCalls, 1);
+    assert.deepEqual(events.filter((e) => e.type === 'paused').map((e) => (e as any).paused), [true, false]);
+  });
+
+  test('stop while paused ends the run', async () => {
+    fakeAgent('ps-lead', () => JSON.stringify({ tasks: [{ id: 'a', title: 'A' }] }));
+    const orchestra = new Orchestra({ planner: 'ps-lead', workers: ['ps-lead'], cwd: repo, lang: 'en' });
+    orchestra.pause();
+    const pending = orchestra.run('Anything');
+    await sleep(200);
+    orchestra.stop();
+    const result = await pending;
+    assert.equal(result.stopped, true);
+  });
+
   test('parsePlan reads fenced or bare JSON and drops cycles and unknown dependencies', () => {
     const plan = parsePlan('Here:\n```json\n{"tasks":[{"id":"a","title":"A","dependsOn":["b"]},{"id":"b","title":"B","dependsOn":["a","zz"]}]}\n```');
     assert.ok(plan);

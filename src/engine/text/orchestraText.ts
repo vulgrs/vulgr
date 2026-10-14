@@ -32,6 +32,9 @@ const en = {
   applyFailed: 'The change could not be applied to your folder automatically; it is waiting in the Sandbox panel.',
   done: 'Done.',
   stopped: 'Stopped.',
+  paused: 'Paused: agents already working finish their step, nothing new starts.',
+  resumed: 'Resumed.',
+  taskRestarted: (agent: string, title: string) => `${agent} restarts "${title}" from scratch.`,
 };
 
 export type OrchestraText = typeof en;
@@ -67,6 +70,9 @@ const tr: OrchestraText = {
   applyFailed: 'Değişiklik klasörüne otomatik uygulanamadı; Sandbox panelinde seni bekliyor.',
   done: 'Tamamlandı.',
   stopped: 'Durduruldu.',
+  paused: 'Duraklatıldı: çalışan ajanlar adımlarını bitirir, yenisi başlamaz.',
+  resumed: 'Devam ediliyor.',
+  taskRestarted: (agent: string, title: string) => `${agent} "${title}" görevine baştan başlıyor.`,
 };
 
 const de: OrchestraText = {
@@ -100,6 +106,9 @@ const de: OrchestraText = {
   applyFailed: 'Die Änderung konnte nicht automatisch auf deinen Ordner angewendet werden; sie wartet im Sandbox-Bereich.',
   done: 'Fertig.',
   stopped: 'Gestoppt.',
+  paused: 'Pausiert: Laufende Agenten beenden ihren Schritt, nichts Neues startet.',
+  resumed: 'Fortgesetzt.',
+  taskRestarted: (agent: string, title: string) => `${agent} beginnt "${title}" von vorn.`,
 };
 
 const es: OrchestraText = {
@@ -133,6 +142,9 @@ const es: OrchestraText = {
   applyFailed: 'No se pudo aplicar el cambio a tu carpeta automáticamente; te espera en el panel Sandbox.',
   done: 'Hecho.',
   stopped: 'Detenido.',
+  paused: 'En pausa: los agentes en marcha terminan su paso y no empieza nada nuevo.',
+  resumed: 'Reanudado.',
+  taskRestarted: (agent: string, title: string) => `${agent} empieza "${title}" de nuevo desde cero.`,
 };
 
 const fr: OrchestraText = {
@@ -166,6 +178,9 @@ const fr: OrchestraText = {
   applyFailed: 'La modification n’a pas pu être appliquée automatiquement à ton dossier ; elle t’attend dans le panneau Sandbox.',
   done: 'Terminé.',
   stopped: 'Arrêté.',
+  paused: 'En pause : les agents en cours terminent leur étape, rien de nouveau ne démarre.',
+  resumed: 'Reprise.',
+  taskRestarted: (agent: string, title: string) => `${agent} recommence "${title}" depuis le début.`,
 };
 
 const ja: OrchestraText = {
@@ -199,6 +214,9 @@ const ja: OrchestraText = {
   applyFailed: '変更をフォルダーに自動で適用できませんでした。Sandbox パネルで待機しています。',
   done: '完了。',
   stopped: '停止しました。',
+  paused: '一時停止中: 作業中のエージェントは今のステップを終えますが、新しい作業は始まりません。',
+  resumed: '再開しました。',
+  taskRestarted: (agent: string, title: string) => `${agent} が「${title}」を最初からやり直します。`,
 };
 
 const zh: OrchestraText = {
@@ -232,6 +250,9 @@ const zh: OrchestraText = {
   applyFailed: '无法自动将更改应用到你的文件夹；它正在 Sandbox 面板中等待。',
   done: '完成。',
   stopped: '已停止。',
+  paused: '已暂停：正在工作的代理会完成当前步骤，不会开始新的工作。',
+  resumed: '已继续。',
+  taskRestarted: (agent: string, title: string) => `${agent} 从头重新开始“${title}”。`,
 };
 
 const ru: OrchestraText = {
@@ -265,6 +286,9 @@ const ru: OrchestraText = {
   applyFailed: 'Не удалось автоматически применить изменение к вашей папке; оно ждёт на панели Sandbox.',
   done: 'Готово.',
   stopped: 'Остановлено.',
+  paused: 'Пауза: работающие агенты завершат свой шаг, новое не начнётся.',
+  resumed: 'Продолжаем.',
+  taskRestarted: (agent: string, title: string) => `${agent} начинает «${title}» заново.`,
 };
 
 export const ORCHESTRA_TEXT: Record<EngineLang, OrchestraText> = { en, tr, de, es, fr, ja, zh, ru };

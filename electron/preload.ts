@@ -83,6 +83,10 @@ export interface WarpApi {
     lang?: string;
   }) => Promise<any>;
   stopOrchestra: () => Promise<boolean>;
+  /** Holds (true) or resumes (false) the run; returns whether it is paused. */
+  pauseOrchestra: (paused: boolean) => Promise<boolean>;
+  /** Restarts one task's agent from a clean copy; false when it isn't running. */
+  restartOrchestraTask: (taskId: string) => Promise<boolean>;
   /** What agents have written so far: a running task's copy, or the combined change. */
   orchestraDiff: (taskId?: string) => Promise<string>;
   applyOrchestra: (files?: string[]) => Promise<{ applied: boolean }>;
@@ -247,6 +251,8 @@ const api: WarpApi = {
   },
   runOrchestra: (options) => ipcRenderer.invoke('orchestra:run', options),
   stopOrchestra: () => ipcRenderer.invoke('orchestra:stop'),
+  pauseOrchestra: (paused) => ipcRenderer.invoke('orchestra:pause', paused),
+  restartOrchestraTask: (taskId) => ipcRenderer.invoke('orchestra:restart-task', taskId),
   orchestraDiff: (taskId) => ipcRenderer.invoke('orchestra:diff', taskId),
   applyOrchestra: (files) => ipcRenderer.invoke('orchestra:apply', files),
   discardOrchestra: () => ipcRenderer.invoke('orchestra:discard'),

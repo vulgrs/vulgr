@@ -543,6 +543,12 @@ function setupIpcHandlers() {
     orchestra?.stop();
     return true;
   });
+  ipcMain.handle('orchestra:pause', (_, paused: boolean) => {
+    if (paused) orchestra?.pause();
+    else orchestra?.resume();
+    return orchestra?.paused ?? false;
+  });
+  ipcMain.handle('orchestra:restart-task', (_, taskId: string) => orchestra?.restartTask(taskId) ?? false);
 
   // Which agent CLIs are installed, so the UI only offers ones that can run.
   ipcMain.handle('agents:available', async () => {

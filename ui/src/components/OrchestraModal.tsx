@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, CheckCircle2, Loader2, Play, RotateCcw, Square, TriangleAlert, X, XCircle, Minus } from 'lucide-react';
+import { Check, CheckCircle2, Loader2, Pause, Play, RotateCcw, Square, TriangleAlert, X, XCircle, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button.js';
 import { Dialog, DialogContent } from '@/components/ui/dialog.js';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
@@ -170,6 +170,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
 
   const [running, setRunning] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [runGoal, setRunGoal] = useState('');
   const [phase, setPhase] = useState<Phase | null>(null);
   const [statusText, setStatusText] = useState('');
@@ -214,7 +215,9 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   useEffect(() => {
     if (!window.warpApi?.onOrchestraEvent) return;
     return window.warpApi.onOrchestraEvent((e: any) => {
-      if (e.type === 'status') {
+      if (e.type === 'paused') {
+        setPaused(e.paused);
+      } else if (e.type === 'status') {
         setPhase(e.phase);
         setStatusText(e.text);
         if (e.text) runLogRef.current.push({ at: Date.now(), text: e.text });
@@ -280,6 +283,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     save('parallel', parallel);
     save('rounds', rounds);
     setRunning(true);
+    setPaused(false);
     runStartRef.current = Date.now();
     runLogRef.current = [];
     setStopping(false);
@@ -325,6 +329,14 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   const stop = () => {
     setStopping(true);
     window.warpApi?.stopOrchestra?.();
+  };
+
+  const togglePause = () => {
+    void window.warpApi?.pauseOrchestra?.(!paused).then((p: boolean) => setPaused(!!p));
+  };
+
+  const restartTask = (id: string) => {
+    void window.warpApi?.restartOrchestraTask?.(id);
   };
 
   const reset = () => {
@@ -606,10 +618,11 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                     {tasks.map((task) => {
                       const deps = task.dependsOn.map((d) => tasks.find((x) => x.id === d)?.title).filter(Boolean) as string[];
                       const active = ['running', 'testing', 'fixing', 'merging'].includes(task.state);
+                      const restartable = running && !stopping && ['running', 'fixing'].includes(task.state);
                       return (
+                        <div key={task.id} className="relative min-w-0">
                         <button
                           type="button"
-                          key={task.id}
                           onClick={() => setWatching(task.id === watching ? null : task.id)}
                           className={`flex min-w-0 flex-col rounded-[11px] border px-3 py-2.5 text-left transition-colors ${
                             watching === task.id && running ? 'ring-1 ring-[color:var(--flow-accent)] ' : ''
@@ -639,6 +652,19 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                             </p>
                           )}
                         </button>
+                        {restartable && (
+                          <button
+                            type="button"
+                            onClick={() => restartTask(task.id)}
+                            title={o.restartHint}
+                            aria-label={`${o.restartTask}: ${task.title}`}
+                            className="absolute bottom-2 right-2 flex items-center gap-1 rounded-[6px] border border-zinc-800 bg-base-app/90 px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+                          >
+                            <RotateCcw size={10} />
+                            {o.restartTask}
+                          </button>
+                        )}
+                        </div>
                       );
                     })}
                   </div>
@@ -671,8 +697,8 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
 
               {running && (
                 <div className="flex items-center gap-2 text-[12px] text-zinc-300">
-                  <Loader2 size={12} className="animate-spin text-[color:var(--flow-accent)]" />
-                  <span>{stopping ? o.stopping : statusText}</span>
+                  {paused ? <Pause size={12} className="text-zinc-400" /> : <Loader2 size={12} className="animate-spin text-[color:var(--flow-accent)]" />}
+                  <span>{stopping ? o.stopping : paused ? o.pausedNote : statusText}</span>
                 </div>
               )}
 
@@ -773,6 +799,12 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                 {f.start}
               </Button>
             </>
+          )}
+          {running && (
+            <Button variant="ghost" size="sm" disabled={stopping} onClick={togglePause}>
+              {paused ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+              {paused ? o.resume : o.pause}
+            </Button>
           )}
           {running && (
             <Button variant="outline" size="sm" disabled={stopping} onClick={stop}>

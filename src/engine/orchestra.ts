@@ -47,6 +47,8 @@ export interface OrchestraTask {
 
 export type OrchestraEvent =
   | { type: 'status'; phase: OrchestraPhase; text: string }
+  /** Paused: agents already working finish their step, nothing new starts until resumed. */
+  | { type: 'paused'; paused: boolean }
   | { type: 'plan'; summary: string; tasks: OrchestraTask[] }
   | { type: 'task'; id: string; state: OrchestraTaskState; note?: string }
   /** `chars`: everything the agent has written for this task so far, for a rough token count. */
@@ -187,6 +189,11 @@ export class Orchestra {
   private readonly taskSandboxes = new Map<string, SandboxSession>();
   /** The combined change waiting for the developer (autoApply: false). */
   private pending: { goal: string; base: string; integration: SandboxSession; cmd: string } | null = null;
+  /** Set while paused; resolves when the run goes on. */
+  private pauseGate: { promise: Promise<void>; open: () => void } | null = null;
+  /** Each task agent's own stop switch, so one agent can be restarted. */
+  private readonly taskAborts = new Map<string, AbortController>();
+  private readonly restartRequests = new Set<string>();
 
   constructor(options: OrchestraOptions = {}) {
     this.cwd = options.cwd || process.cwd();
@@ -207,6 +214,47 @@ export class Orchestra {
   /** Stops every running agent; run() then cleans up and resolves as stopped. */
   stop(): void {
     this.abort.abort();
+    this.pauseGate?.open();
+    this.pauseGate = null;
+  }
+
+  /** Holds the run: agents already working finish their step, but no new agent call or test starts. */
+  pause(): void {
+    if (this.pauseGate || this.stopped) return;
+    let open!: () => void;
+    const promise = new Promise<void>((resolve) => (open = resolve));
+    this.pauseGate = { promise, open };
+    this.emit({ type: 'paused', paused: true });
+    this.log('orchestrator', this.text.paused);
+  }
+
+  resume(): void {
+    const gate = this.pauseGate;
+    if (!gate) return;
+    this.pauseGate = null;
+    gate.open();
+    this.emit({ type: 'paused', paused: false });
+    this.log('orchestrator', this.text.resumed);
+  }
+
+  get paused(): boolean {
+    return this.pauseGate !== null;
+  }
+
+  /**
+   * Stops the agent working on `taskId` and starts the task again from the copy
+   * it was given. Only while that agent is running; returns whether it did.
+   */
+  restartTask(taskId: string): boolean {
+    const own = this.taskAborts.get(taskId);
+    if (!own || this.stopped) return false;
+    this.restartRequests.add(taskId);
+    own.abort();
+    return true;
+  }
+
+  private async whilePaused(): Promise<void> {
+    while (this.pauseGate && !this.stopped) await this.pauseGate.promise;
   }
 
   private get stopped() {
@@ -239,6 +287,7 @@ export class Orchestra {
   }
 
   private async runCommand(cmd: string, cwd: string): Promise<{ ok: boolean; output: string }> {
+    await this.whilePaused();
     try {
       const { stdout, stderr } = await execFileAsync(process.platform === 'win32' ? 'cmd.exe' : '/bin/sh', process.platform === 'win32' ? ['/d', '/s', '/c', cmd] : ['-c', cmd], {
         cwd,
@@ -276,14 +325,16 @@ export class Orchestra {
   }
 
   /** Runs an agent, streaming its last output lines to the UI for this task. */
-  private execAgent(name: string, prompt: string, cwd: string, allowEdits: boolean, taskId?: string) {
+  private async execAgent(name: string, prompt: string, cwd: string, allowEdits: boolean, taskId?: string): Promise<CliExecutionResult> {
+    await this.whilePaused();
     let buffer = '';
     let chars = 0;
     let last = 0;
     // After stop() no new agent starts; one that ignored an already-aborted signal would never return.
     if (this.stopped) {
-      return Promise.resolve<CliExecutionResult>({ exitCode: null, stdout: '', stderr: 'stopped', executionTimeMs: 0, timedOut: false });
+      return { exitCode: null, stdout: '', stderr: 'stopped', executionTimeMs: 0, timedOut: false };
     }
+    const own = taskId ? this.taskAborts.get(taskId) : undefined;
     const flush = () => {
       if (!taskId) return;
       const lines = stripAnsi(buffer).trim().split('\n').filter(Boolean).slice(-4).join('\n');
@@ -293,7 +344,7 @@ export class Orchestra {
       cwd,
       allowEdits,
       timeoutMs: this.timeoutMs,
-      signal: this.abort.signal,
+      signal: own ? AbortSignal.any([this.abort.signal, own.signal]) : this.abort.signal,
       onStdout: (chunk) => {
         chars += stripAnsi(chunk).length;
         buffer = (buffer + chunk).slice(-4000);
@@ -415,7 +466,7 @@ export class Orchestra {
       taskSandboxes.set(task.id, sb);
       const cmd = this.verifyCmd || detectTestCommand(sb.worktreePath) || '';
       const others = tasks.filter((t) => t.id !== task.id).map((t) => `- ${t.title}${t.files.length ? ` (${t.files.join(', ')})` : ''}`);
-      let prompt = [
+      const firstPrompt = [
         `You are one of several coding agents working in parallel on this goal: "${goal}"`,
         '',
         `Your task: ${task.title}`,
@@ -428,13 +479,26 @@ export class Orchestra {
         'Do not ask questions; make reasonable assumptions. Finish with a short summary of what you changed.',
         memory,
       ].filter(Boolean).join('\n');
+      let prompt = firstPrompt;
 
       let passed = !cmd;
       for (let round = 1; round <= this.maxRounds; round++) {
         if (round > 1) setTask(task, 'fixing', this.text.taskFixing(round, this.maxRounds));
         const before = (await this.tryGit(sb.worktreePath, ['status', '--porcelain'])).out;
+        this.taskAborts.set(task.id, new AbortController());
         const res = await this.execAgent(task.agent, prompt, sb.worktreePath, true, task.id);
+        this.taskAborts.delete(task.id);
         if (this.stopped) return;
+        if (this.restartRequests.delete(task.id)) {
+          // Restarted by the developer: back to the copy as the task got it, round 1 again.
+          await this.tryGit(sb.worktreePath, ['reset', '--hard', '-q']);
+          await this.tryGit(sb.worktreePath, ['clean', '-fdq']);
+          prompt = firstPrompt;
+          round = 0;
+          setTask(task, 'running', this.text.taskRestarted(label(task.agent), task.title));
+          this.log(task.agent, this.text.taskRestarted(label(task.agent), task.title));
+          continue;
+        }
         const after = (await this.tryGit(sb.worktreePath, ['status', '--porcelain'])).out;
         if (after === before && (res.exitCode !== 0 || res.timedOut)) {
           setTask(task, 'failed', this.text.taskAgentFailed(lastLine(res)));
