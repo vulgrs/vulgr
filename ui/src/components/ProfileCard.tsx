@@ -4,6 +4,7 @@ import { useGitHubAuth } from '../hooks/useGitHubAuth.js';
 import { useI18n } from '../i18n/index.js';
 import { useTheme } from '../theme.js';
 import settingsIcon from '../assets/sidebar/settings.svg';
+import { UpdateButton } from './UpdateButton.js';
 
 /** Sidebar footer card: GitHub sign-in when signed out, the signed-in user's profile otherwise. */
 export const ProfileCard: React.FC<{ onOpenSettings: () => void }> = ({ onOpenSettings }) => {
@@ -139,6 +140,7 @@ export const ProfileCard: React.FC<{ onOpenSettings: () => void }> = ({ onOpenSe
             </div>
           </div>
         </button>
+        <UpdateButton />
         <button
           onClick={toggleTheme}
           className="p-1 mr-0.5 rounded-[5px] text-zinc-500 hover:text-zinc-100 hover:bg-white/5 transition-colors flex-shrink-0"
