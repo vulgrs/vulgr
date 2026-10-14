@@ -1019,7 +1019,7 @@ export const fr: Messages = {
     byProject: 'Par projet',
     perDay: 'Par jour',
     usageEmpty: 'Aucune utilisation d’agent enregistrée pour cette période.',
-    usageNote: 'Utilisation réelle signalée par Claude Code et Codex dans Agent Swarm et Orchestrator. Duo Loop et les sessions de terminal ne sont pas comptés.',
+    usageNote: 'Utilisation réelle signalée par Claude Code et Codex dans Agent Swarm et Orchestrator, et par Claude Code dans Duo Loop. Les agents que tu lances toi-même dans un terminal ne sont pas comptés.',
     lowerBound: (n: number) => `${n} appel${n === 1 ? '' : 's'} sans prix (ex. Codex) : le coût réel est au moins celui-ci.`,
     clearUsage: 'Effacer l’utilisation',
     usageCleared: 'Utilisation effacée',

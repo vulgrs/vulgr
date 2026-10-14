@@ -1057,7 +1057,7 @@ export const ru: Messages = {
     byProject: 'По проектам',
     perDay: 'По дням',
     usageEmpty: 'За этот период расход агентов ещё не записан.',
-    usageNote: 'Реальный расход, о котором сообщают Claude Code и Codex в Agent Swarm и Orchestrator. Duo Loop и сеансы терминала не учитываются.',
+    usageNote: 'Реальный расход, о котором сообщают Claude Code и Codex в Agent Swarm и Orchestrator, а также Claude Code в Duo Loop. Агенты, которых вы запускаете сами в терминале, не учитываются.',
     lowerBound: (n: number) => `Вызовов без цены (например, Codex): ${n}, поэтому реальная стоимость не меньше этой.`,
     clearUsage: 'Очистить расход',
     usageCleared: 'Расход очищен',

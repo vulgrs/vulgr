@@ -1024,7 +1024,7 @@ export const de: Messages = {
     byProject: 'Nach Projekt',
     perDay: 'Pro Tag',
     usageEmpty: 'Für diesen Zeitraum ist noch keine Agentennutzung erfasst.',
-    usageNote: 'Echte Nutzung, die Claude Code und Codex in Agent Swarm und Orchestrator melden. Duo Loop und Terminalsitzungen werden nicht gezählt.',
+    usageNote: 'Echte Nutzung, die Claude Code und Codex in Agent Swarm und Orchestrator sowie Claude Code in Duo Loop melden. Agenten, die du selbst im Terminal startest, werden nicht gezählt.',
     lowerBound: (n: number) => `${n} Aufruf${n === 1 ? '' : 'e'} ohne Preis (z. B. Codex), die echten Kosten sind also mindestens so hoch.`,
     clearUsage: 'Nutzung löschen',
     usageCleared: 'Nutzung gelöscht',

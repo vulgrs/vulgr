@@ -1044,7 +1044,7 @@ export const zh: Messages = {
     byProject: '按项目',
     perDay: '每日',
     usageEmpty: '此期间还没有记录到代理用量。',
-    usageNote: 'Agent Swarm 和 Orchestrator 中由 Claude Code 和 Codex 报告的实际用量。Duo Loop 和终端会话不计入。',
+    usageNote: 'Agent Swarm 和 Orchestrator 中 Claude Code 与 Codex、以及 Duo Loop 中 Claude Code 报告的实际用量。你自己在终端中启动的代理不计入。',
     lowerBound: (n: number) => `${n} 次调用没有价格（例如 Codex），实际费用至少为此数。`,
     clearUsage: '清除用量',
     usageCleared: '已清除用量',

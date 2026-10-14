@@ -1044,7 +1044,7 @@ export const ja: Messages = {
     byProject: 'プロジェクト別',
     perDay: '日別',
     usageEmpty: 'この期間のエージェント使用量はまだ記録されていません。',
-    usageNote: 'Agent Swarm と Orchestrator で Claude Code と Codex が報告した実際の使用量です。Duo Loop とターミナルのセッションは含まれません。',
+    usageNote: 'Agent Swarm と Orchestrator で Claude Code と Codex が、Duo Loop で Claude Code が報告した実際の使用量です。ターミナルで自分で起動したエージェントは含まれません。',
     lowerBound: (n: number) => `${n} 件の呼び出しに価格がありません（例: Codex）。実際のコストは少なくともこの額です。`,
     clearUsage: '使用量をクリア',
     usageCleared: '使用量をクリアしました',

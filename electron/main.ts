@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, basename, extname } from 'node:path';
 import { get as httpGet } from 'node:http';
 import { execSync, exec } from 'node:child_process';
-import { existsSync, writeFileSync, readdirSync, statSync, readFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, readdirSync, statSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import { PtyManager } from './ptyManager.js';
 import { ClaudeChatManager } from './claudeChatManager.js';
@@ -619,6 +619,32 @@ function setupIpcHandlers() {
 
   // Squad: prompts are written to a temp file and piped into the agent CLI, so
   // multi-line text with quotes never has to survive shell quoting.
+  // Duo Loop + Claude: how to pipe Claude's JSON stream through the formatter
+  // (src/cli/claudeStream.ts), run by this app's own Electron as Node, and a
+  // fresh file for the step's usage.
+  ipcMain.handle('squad:claude-stream', () => {
+    const dir = join(os.tmpdir(), 'vulgr-squad');
+    mkdirSync(dir, { recursive: true });
+    return {
+      exe: process.execPath,
+      script: join(__dirname, '../src/cli/claudeStream.js'),
+      usageFile: join(dir, `usage-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`),
+    };
+  });
+  // After a Duo Loop step: its usage goes into the ledger (and back to the app).
+  ipcMain.handle('squad:collect-usage', (_, { file, cwd }: { file: string; cwd?: string }) => {
+    const dir = join(os.tmpdir(), 'vulgr-squad');
+    if (typeof file !== 'string' || !file.startsWith(dir) || !existsSync(file)) return null;
+    try {
+      const usage = JSON.parse(readFileSync(file, 'utf-8'));
+      rmSync(file, { force: true });
+      usageLedger.add({ at: Date.now(), agent: 'claude', cwd: cwd || currentCwd, tag: 'duo', usage });
+      return usage;
+    } catch {
+      return null;
+    }
+  });
+
   ipcMain.handle('squad:write-prompt', (_, text: string) => {
     const dir = join(os.tmpdir(), 'vulgr-squad');
     mkdirSync(dir, { recursive: true });

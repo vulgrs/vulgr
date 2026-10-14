@@ -1,9 +1,10 @@
+import type React from 'react';
 import { useEffect, useRef } from 'react';
 import type { SquadSession } from '../types/warp.js';
 import { duoMap } from '../components/flowMaps.js';
 import { MAP_AGENTS } from '../components/SquadBar.js';
 import { useI18n } from '../i18n/index.js';
-import { newRunId, runNotice, saveRun, useRunRecorder, type RunRecord } from '../runHistory.js';
+import { newRunId, runNotice, runTokens, saveRun, useRunRecorder, type RunRecord, type RunUsage } from '../runHistory.js';
 
 const EMPTY = { nodes: [], edges: [] };
 const isOver = (s: SquadSession) => s.phase === 'consensus' || s.phase === 'failed';
@@ -12,7 +13,7 @@ const isOver = (s: SquadSession) => s.phase === 'consensus' || s.phase === 'fail
  * Saves each Duo Loop run to the history when it ends: approved, failed, or
  * closed by the user while still working (stopped).
  */
-export function useDuoHistory(squad: SquadSession | null, cwd: string) {
+export function useDuoHistory(squad: SquadSession | null, cwd: string, usage?: React.MutableRefObject<RunUsage | undefined>) {
   const { t } = useI18n();
   const graph = squad
     ? duoMap(
@@ -37,6 +38,7 @@ export function useDuoHistory(squad: SquadSession | null, cwd: string) {
   useEffect(() => {
     const prev = current.current;
     const save = (s: SquadSession, startedAt: number, outcome: 'success' | 'failed' | 'stopped') => {
+      const map = recordMap();
       const record: RunRecord = {
         id: newRunId(),
         kind: 'duo',
@@ -49,7 +51,8 @@ export function useDuoHistory(squad: SquadSession | null, cwd: string) {
         agents: [...new Set([s.builderType, s.verifierType])],
         settings: { builder: s.builderType, verifier: s.verifierType, verifyCmd: s.verifyCmd, maxRounds: String(s.maxRounds) },
         log: (s.log ?? []).map((entry) => ({ at: entry.at, text: entry.text })),
-        map: recordMap(),
+        map,
+        ...runTokens(usage?.current, map),
       };
       // Closing the bar yourself is not news; only a loop that ended on its own notifies.
       void saveRun(record, outcome === 'stopped' ? undefined : runNotice(t, record));

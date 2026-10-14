@@ -17,6 +17,7 @@ import { AgentSetupModal } from './components/AgentSetupModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
 import { useDuoHistory } from './hooks/useDuoHistory.js';
+import { addRunUsage, type RunUsage } from './runHistory.js';
 import type { TemplateSettings } from './components/TemplateBar.js';
 import { comboFromEvent, displayCombo, shortcutFor, useShortcuts, type ShortcutId } from './shortcuts.js';
 import type { Section as SettingsSection } from './components/SettingsView.js';
@@ -252,10 +253,27 @@ export const App: React.FC = () => {
     [recordWork]
   );
 
+  // Duo Loop: Claude steps' usage files still to read, and the running loop's total.
+  const pendingUsageFiles = useRef(new Set<string>());
+  const duoUsage = useRef<RunUsage | undefined>(undefined);
+
   const squadDeps: SquadDeps = {
     runInPane: (sessionId, command) =>
       new Promise<PaneRunResult>((resolve) => {
-        paneWaiters.current[sessionId] = resolve;
+        paneWaiters.current[sessionId] = (result) => {
+          // A Claude step's usage, written by the stream formatter, goes into this loop's total.
+          for (const file of [...pendingUsageFiles.current]) {
+            if (!command.includes(file)) continue;
+            pendingUsageFiles.current.delete(file);
+            void window.warpApi
+              ?.collectSquadUsage?.(file, cwdRef.current || undefined)
+              .then((usage: RunUsage | null) => {
+                if (usage) duoUsage.current = addRunUsage(duoUsage.current, usage);
+              })
+              .catch(() => {});
+          }
+          resolve(result);
+        };
         // Ctrl+U clears anything left on the prompt line by the previous step.
         if (!/Windows/i.test(navigator.userAgent)) window.warpApi?.writeTerminal(sessionId, '\x15');
         dispatchToShell(sessionId, command);
@@ -302,6 +320,21 @@ export const App: React.FC = () => {
           : agent === 'codex'
             ? `${base} exec ${allowEdits ? '--full-auto' : '--sandbox read-only'} -`
             : base;
+      // Claude's JSON stream through Vulgr's formatter: the pane still shows plain
+      // text, and the step's real tokens and cost are recorded (not for cmd.exe).
+      if (agent === 'claude' && shell !== 'cmd') {
+        const stream = await window.warpApi?.getClaudeStream?.().catch(() => null);
+        if (stream) {
+          pendingUsageFiles.current.add(stream.usageFile);
+          const json = `${run} --output-format stream-json --verbose`;
+          if (shell === 'powershell') {
+            const q = (p: string) => `'${p.replace(/'/g, "''")}'`;
+            return `$env:ELECTRON_RUN_AS_NODE='1'; ${read} | ${json} | & ${q(stream.exe)} ${q(stream.script)} ${q(stream.usageFile)}; $env:ELECTRON_RUN_AS_NODE=$null`;
+          }
+          const q = (p: string) => `'${p.replace(/'/g, `'\\''`)}'`;
+          return `${read} | ${json} | env ELECTRON_RUN_AS_NODE=1 ${q(stream.exe)} ${q(stream.script)} ${q(stream.usageFile)}`;
+        }
+      }
       return `${read} | ${run}`;
     },
     getDiff: async () => {
@@ -315,7 +348,7 @@ export const App: React.FC = () => {
   };
 
   const { squad, startSquad, togglePause, stopSquad } = useSquadOrchestrator(squadDeps);
-  useDuoHistory(squad, cwd);
+  useDuoHistory(squad, cwd, duoUsage);
 
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
   const activeSession =
@@ -650,6 +683,7 @@ export const App: React.FC = () => {
     maxRounds: number;
   }) => {
     if (squad) stopSquad();
+    duoUsage.current = undefined;
     // What was already changed, so the end of the loop can tell its own changes apart.
     setSquadChangesBefore([]);
     void changedFilesNow(cwd || undefined).then(setSquadChangesBefore);

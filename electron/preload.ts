@@ -113,6 +113,10 @@ export interface WarpApi {
   cancelAgentInstall: (id: string) => Promise<void>;
   onAgentInstallOutput: (callback: (event: { id: string; chunk: string }) => void) => () => void;
   writeSquadPrompt: (text: string) => Promise<string>;
+  /** For Duo Loop + Claude: the formatter that turns Claude's JSON stream into text and records usage. */
+  getClaudeStream: () => Promise<{ exe: string; script: string; usageFile: string }>;
+  /** Reads (and removes) a Duo Loop step's usage file, adding it to the usage ledger. */
+  collectSquadUsage: (file: string, cwd?: string) => Promise<any | null>;
 
   // AI Command Search
   generateCommand: (query: string) => Promise<{ command: string; explanation: string; source: string }>;
@@ -311,6 +315,8 @@ const api: WarpApi = {
     return () => ipcRenderer.removeListener('agents:install-output', handler);
   },
   writeSquadPrompt: (text) => ipcRenderer.invoke('squad:write-prompt', text),
+  getClaudeStream: () => ipcRenderer.invoke('squad:claude-stream'),
+  collectSquadUsage: (file, cwd) => ipcRenderer.invoke('squad:collect-usage', { file, cwd }),
 
   generateCommand: (query) => ipcRenderer.invoke('ai:generateCommand', query),
 

@@ -42,6 +42,20 @@ export interface RunUsage {
   costUsd?: number;
 }
 
+/** Two usages added up; the cost stays unknown unless one of them has it. */
+export function addRunUsage(a: RunUsage | undefined, b: RunUsage): RunUsage {
+  if (!a) return b;
+  const total = (u: RunUsage) => u.totalTokens ?? u.inputTokens + u.outputTokens + (u.cacheReadTokens ?? 0) + (u.cacheWriteTokens ?? 0);
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    cacheReadTokens: (a.cacheReadTokens ?? 0) + (b.cacheReadTokens ?? 0),
+    cacheWriteTokens: (a.cacheWriteTokens ?? 0) + (b.cacheWriteTokens ?? 0),
+    totalTokens: total(a) + total(b),
+    costUsd: a.costUsd === undefined && b.costUsd === undefined ? undefined : (a.costUsd ?? 0) + (b.costUsd ?? 0),
+  };
+}
+
 /** The token and cost fields of a run record: the reported usage when there is one, else the map's estimate. */
 export function runTokens(usage: RunUsage | undefined, map: SavedMap): Pick<RunRecord, 'tokens' | 'tokensExact' | 'costUsd'> {
   if (usage) {
