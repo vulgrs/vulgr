@@ -33,7 +33,7 @@ import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 import { newRunId, runNotice, runTokens, saveRun, useRunRecorder, type RunRecord, type RunUsage } from '../runHistory.js';
 import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
-import { TemplateBar } from './TemplateBar.js';
+import { TemplateBar, type TemplateSettings } from './TemplateBar.js';
 
 const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
 
@@ -78,6 +78,8 @@ interface OrchestraModalProps {
   onOpenChanges?: () => void;
   onOpenSandboxes?: () => void;
   onInstallAgents?: () => void;
+  /** Fill the dialog in with this goal and setup (e.g. "Run again" from the history); `at` makes a repeat count. */
+  preset?: { goal: string; settings: TemplateSettings; at: number } | null;
 }
 
 const AGENTS: AgentOption[] = [
@@ -158,6 +160,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   onOpenChanges,
   onOpenSandboxes,
   onInstallAgents,
+  preset,
 }) => {
   const { t, lang } = useI18n();
   const o = t.orchestra;
@@ -281,6 +284,24 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   const noneInstalled = available !== null && installed.length === 0;
   const started = running || result !== null;
   const canStart = !!goal.trim() && workers.length > 0 && !noneInstalled;
+
+  /** Fills the dialog in from a template or a past run. */
+  const applySetup = (g: string, s: TemplateSettings) => {
+    setGoal(g);
+    setPlanner(str(s.planner, planner));
+    if (Array.isArray(s.workers) && s.workers.length) setWorkers(s.workers);
+    setReviewer(str(s.reviewer, reviewer));
+    setVerifyCmd(str(s.verifyCmd, verifyCmd));
+    setParallel(str(s.parallel, parallel));
+    setRounds(str(s.rounds, rounds));
+    setBudget(str(s.budget, budget));
+  };
+
+  useEffect(() => {
+    if (!preset || running || pending) return;
+    reset();
+    applySetup(preset.goal, preset.settings);
+  }, [preset]);
 
   const start = async () => {
     if (!canStart || running) return;
@@ -440,6 +461,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
       outcome: result.stopped ? 'stopped' : result.success ? 'success' : 'failed',
       summary: result.error || (result.tasks.length ? `${done}/${result.tasks.length}` : undefined),
       agents: [...new Set([planner, ...workers, reviewer])],
+      settings: { planner, workers, reviewer, verifyCmd: verifyCmd.trim(), parallel, rounds, budget },
       log: runLogRef.current,
       map,
       ...runTokens(result.usage, map),
@@ -528,16 +550,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                   kind="orchestra"
                   goal={goal}
                   settings={{ planner, workers, reviewer, verifyCmd, parallel, rounds, budget }}
-                  onApply={(g, s) => {
-                    setGoal(g);
-                    setPlanner(str(s.planner, planner));
-                    if (Array.isArray(s.workers) && s.workers.length) setWorkers(s.workers);
-                    setReviewer(str(s.reviewer, reviewer));
-                    setVerifyCmd(str(s.verifyCmd, verifyCmd));
-                    setParallel(str(s.parallel, parallel));
-                    setRounds(str(s.rounds, rounds));
-                    setBudget(str(s.budget, budget));
-                  }}
+                  onApply={applySetup}
                 />
               </div>
               <SectionLabel htmlFor="orchestra-goal">{f.goal}</SectionLabel>

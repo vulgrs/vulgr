@@ -1043,6 +1043,8 @@ export const ru: Messages = {
     clear: 'Очистить',
     clearHint: 'Удалить все запуски из этого списка',
     cleared: (n: number) => `Удалено запусков: ${n}`,
+    rerun: 'Запустить снова',
+    rerunHint: 'Открыть с той же целью и командой',
     copyGoal: 'Копировать цель',
     copied: 'Цель скопирована',
     tabRuns: 'Запуски',

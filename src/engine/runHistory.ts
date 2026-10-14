@@ -27,6 +27,8 @@ export interface RunRecord {
   tokensExact?: boolean;
   /** USD reported by the CLIs (Claude Code); a lower bound when some agents report none. */
   costUsd?: number;
+  /** The team setup it ran with (agents, test command, rounds...), to run it again. */
+  settings?: Record<string, string | number | boolean | string[]>;
 }
 
 /** What the list shows: a record without its log and map. */

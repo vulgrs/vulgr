@@ -47,6 +47,7 @@ export function useDuoHistory(squad: SquadSession | null, cwd: string) {
         outcome,
         summary: s.error || s.statusText,
         agents: [...new Set([s.builderType, s.verifierType])],
+        settings: { builder: s.builderType, verifier: s.verifierType, verifyCmd: s.verifyCmd, maxRounds: String(s.maxRounds) },
         log: (s.log ?? []).map((entry) => ({ at: entry.at, text: entry.text })),
         map: recordMap(),
       };

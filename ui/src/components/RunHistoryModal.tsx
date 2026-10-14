@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Copy, Search, Trash2 } from 'lucide-react';
+import { Copy, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent } from '@/components/ui/dialog.js';
 import { Spinner } from '@/components/ui/spinner.js';
@@ -55,10 +55,12 @@ interface RunHistoryModalProps {
   onClose: () => void;
   /** The project open in the sidebar; "This project" shows only its runs. */
   cwd?: string;
+  /** Open the run's dialog with its goal and team. */
+  onRerun?: (run: RunRecord) => void;
 }
 
 /** Finished Duo Loop, Agent Swarm and Orchestrator runs, each with its steps and a map to play back. */
-export const RunHistoryModal: React.FC<RunHistoryModalProps> = ({ isOpen, onClose, cwd }) => {
+export const RunHistoryModal: React.FC<RunHistoryModalProps> = ({ isOpen, onClose, cwd, onRerun }) => {
   const { t, lang } = useI18n();
   const h = t.history;
   const [scope, setScope] = useState<'project' | 'all'>(() => (cwd ? 'project' : 'all'));
@@ -272,6 +274,17 @@ export const RunHistoryModal: React.FC<RunHistoryModalProps> = ({ isOpen, onClos
                     {(run.agents ?? []).map((a) => (
                       <AgentLogo key={a} id={a} name={a} size={18} />
                     ))}
+                    {onRerun && (
+                      <button
+                        type="button"
+                        onClick={() => onRerun(run)}
+                        title={h.rerunHint}
+                        className="ml-1 flex items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-200 transition-colors hover:border-zinc-600"
+                      >
+                        <RotateCcw size={12} />
+                        {h.rerun}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {

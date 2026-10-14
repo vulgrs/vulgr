@@ -28,6 +28,8 @@ export interface RunRecord {
   tokens?: number;
   tokensExact?: boolean;
   costUsd?: number;
+  /** The team setup it ran with (agents, test command, rounds...), to run it again. */
+  settings?: Record<string, string | number | boolean | string[]>;
 }
 
 /** What the CLIs reported for a run (see AgentUsage in src/types). */

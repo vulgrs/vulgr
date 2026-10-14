@@ -1030,6 +1030,8 @@ export const ja: Messages = {
     clear: 'クリア',
     clearHint: 'この一覧の実行をすべて削除',
     cleared: (n: number) => `${n} 件の実行を削除しました`,
+    rerun: 'もう一度実行',
+    rerunHint: '同じ目標とチームで開く',
     copyGoal: '目標をコピー',
     copied: '目標をコピーしました',
     tabRuns: '実行',

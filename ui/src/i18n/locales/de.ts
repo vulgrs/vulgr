@@ -1010,6 +1010,8 @@ export const de: Messages = {
     clear: 'Leeren',
     clearHint: 'Alle Läufe in dieser Liste löschen',
     cleared: (n: number) => `${n} Lauf${n === 1 ? '' : 'e'} gelöscht`,
+    rerun: 'Erneut ausführen',
+    rerunHint: 'Mit demselben Ziel und Team öffnen',
     copyGoal: 'Ziel kopieren',
     copied: 'Ziel kopiert',
     tabRuns: 'Läufe',

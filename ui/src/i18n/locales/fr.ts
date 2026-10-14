@@ -1005,6 +1005,8 @@ export const fr: Messages = {
     clear: 'Vider',
     clearHint: 'Supprimer toutes les exécutions de cette liste',
     cleared: (n: number) => `${n} exécution${n === 1 ? ' supprimée' : 's supprimées'}`,
+    rerun: 'Relancer',
+    rerunHint: 'Ouvrir avec le même objectif et la même équipe',
     copyGoal: 'Copier l’objectif',
     copied: 'Objectif copié',
     tabRuns: 'Exécutions',

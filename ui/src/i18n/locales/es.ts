@@ -1005,6 +1005,8 @@ export const es: Messages = {
     clear: 'Vaciar',
     clearHint: 'Eliminar todas las ejecuciones de esta lista',
     cleared: (n: number) => `${n} ejecuci${n === 1 ? 'ón eliminada' : 'ones eliminadas'}`,
+    rerun: 'Ejecutar de nuevo',
+    rerunHint: 'Abrir con el mismo objetivo y equipo',
     copyGoal: 'Copiar objetivo',
     copied: 'Objetivo copiado',
     tabRuns: 'Ejecuciones',

@@ -17,6 +17,7 @@ import { AgentSetupModal } from './components/AgentSetupModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
 import { useDuoHistory } from './hooks/useDuoHistory.js';
+import type { TemplateSettings } from './components/TemplateBar.js';
 import { comboFromEvent, displayCombo, shortcutFor, useShortcuts, type ShortcutId } from './shortcuts.js';
 import type { Section as SettingsSection } from './components/SettingsView.js';
 import { changedFilesNow } from './components/RunChangesCard.js';
@@ -171,6 +172,8 @@ export const App: React.FC = () => {
   const [onboardingOpen, setOnboardingOpen] = useState(shouldShowOnboarding);
   const [guideOpen, setGuideOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // "Run again" from the history: the dialog of that kind opens filled in.
+  const [rerun, setRerun] = useState<{ kind: string; goal: string; settings: TemplateSettings; at: number } | null>(null);
   const [squadChangesBefore, setSquadChangesBefore] = useState<string[]>([]);
   const closeGuide = () => setGuideOpen(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -1719,6 +1722,7 @@ export const App: React.FC = () => {
         <Suspense fallback={null}>
           <AgentMeshModal
             isOpen={meshModalOpen}
+            preset={rerun?.kind === 'swarm' ? rerun : null}
             onClose={() => setMeshModalOpen(false)}
             cwd={cwd}
             onOpenChanges={() => {
@@ -1736,6 +1740,7 @@ export const App: React.FC = () => {
         <Suspense fallback={null}>
           <OrchestraModal
             isOpen={orchestraOpen}
+            preset={rerun?.kind === 'orchestra' ? rerun : null}
             onClose={() => setOrchestraOpen(false)}
             cwd={cwd}
             onOpenChanges={() => {
@@ -1753,6 +1758,7 @@ export const App: React.FC = () => {
         <Suspense fallback={null}>
           <LiveSquadModal
             isOpen={squadModalOpen}
+            preset={rerun?.kind === 'duo' ? rerun : null}
             cwd={cwd || undefined}
             onClose={() => setSquadModalOpen(false)}
             onLaunchSquad={handleLaunchLiveSquad}
@@ -1788,7 +1794,18 @@ export const App: React.FC = () => {
       {/* Finished Duo Loop, Agent Swarm and Orchestrator runs */}
       {runHistoryModalLoaded && (
         <Suspense fallback={null}>
-          <RunHistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} cwd={cwd || undefined} />
+          <RunHistoryModal
+            isOpen={historyOpen}
+            onClose={() => setHistoryOpen(false)}
+            cwd={cwd || undefined}
+            onRerun={(run) => {
+              setHistoryOpen(false);
+              setRerun({ kind: run.kind, goal: run.goal, settings: run.settings ?? {}, at: Date.now() });
+              if (run.kind === 'swarm') setMeshModalOpen(true);
+              else if (run.kind === 'orchestra') setOrchestraOpen(true);
+              else setSquadModalOpen(true);
+            }}
+          />
         </Suspense>
       )}
 

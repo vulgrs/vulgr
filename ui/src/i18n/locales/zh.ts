@@ -1030,6 +1030,8 @@ export const zh: Messages = {
     clear: '清空',
     clearHint: '删除此列表中的所有运行',
     cleared: (n: number) => `已删除 ${n} 个运行`,
+    rerun: '再次运行',
+    rerunHint: '以相同的目标和团队打开',
     copyGoal: '复制目标',
     copied: '已复制目标',
     tabRuns: '运行',

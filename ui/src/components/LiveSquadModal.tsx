@@ -29,7 +29,7 @@ import {
 } from './FlowParts.js';
 import type { SessionType } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
-import { TemplateBar } from './TemplateBar.js';
+import { TemplateBar, type TemplateSettings } from './TemplateBar.js';
 
 const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
@@ -48,6 +48,8 @@ interface LiveSquadModalProps {
   }) => void;
   /** Opens the agent installer, offered when some agents aren't installed. */
   onInstallAgents?: () => void;
+  /** Fill the dialog in with this goal and setup (e.g. "Run again" from the history); `at` makes a repeat count. */
+  preset?: { goal: string; settings: TemplateSettings; at: number } | null;
 }
 
 const AGENT_ITEMS: AgentOption[] = [
@@ -73,7 +75,7 @@ const save = (key: string, value: string) => {
   } catch {}
 };
 
-export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, cwd, onClose, onLaunchSquad, onInstallAgents }) => {
+export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, cwd, onClose, onLaunchSquad, onInstallAgents, preset }) => {
   const { t } = useI18n();
   const f = t.flow;
   const d = t.modals.duo;
@@ -103,6 +105,19 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, cwd, onC
   const missing = available ? AGENT_ITEMS.filter((a) => !available[a.value]).map((a) => a.label) : [];
   const noBuilder = available !== null && installed.length === 0;
   const cmd = verifyCmd.trim();
+
+  /** Fills the dialog in from a template or a past run. */
+  const applySetup = (g: string, s: TemplateSettings) => {
+    setGoal(g);
+    setBuilder(str(s.builder, builder));
+    setVerifier(str(s.verifier, verifier));
+    setVerifyCmd(str(s.verifyCmd, verifyCmd));
+    setMaxRounds(str(s.maxRounds, maxRounds));
+  };
+
+  useEffect(() => {
+    if (preset) applySetup(preset.goal, preset.settings);
+  }, [preset]);
 
   const handleSubmit = () => {
     if (!goal.trim() || noBuilder) return;
@@ -151,13 +166,7 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, cwd, onC
                 kind="duo"
                 goal={goal}
                 settings={{ builder, verifier, verifyCmd, maxRounds }}
-                onApply={(g, s) => {
-                  setGoal(g);
-                  setBuilder(str(s.builder, builder));
-                  setVerifier(str(s.verifier, verifier));
-                  setVerifyCmd(str(s.verifyCmd, verifyCmd));
-                  setMaxRounds(str(s.maxRounds, maxRounds));
-                }}
+                onApply={applySetup}
               />
             </div>
             <SectionLabel htmlFor="squad-goal">{f.goal}</SectionLabel>

@@ -37,7 +37,7 @@ import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 import { newRunId, runNotice, runTokens, saveRun, useRunRecorder, type RunRecord, type RunUsage } from '../runHistory.js';
 import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
-import { TemplateBar } from './TemplateBar.js';
+import { TemplateBar, type TemplateSettings } from './TemplateBar.js';
 
 const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
 
@@ -84,6 +84,8 @@ interface AgentMeshModalProps {
   onOpenSandboxes?: () => void;
   /** Opens the agent installer, offered when some agents aren't installed. */
   onInstallAgents?: () => void;
+  /** Fill the dialog in with this goal and setup (e.g. "Run again" from the history); `at` makes a repeat count. */
+  preset?: { goal: string; settings: TemplateSettings; at: number } | null;
 }
 
 const AGENTS: AgentOption[] = [
@@ -153,6 +155,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   onOpenChanges,
   onOpenSandboxes,
   onInstallAgents,
+  preset,
 }) => {
   const { t, lang } = useI18n();
   const m = t.mesh;
@@ -223,6 +226,24 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
   const noneInstalled = available !== null && installedItems.length === 0;
   const cmd = verifyCmd.trim();
   const started = isRunning || result !== null;
+
+  /** Fills the dialog in from a template or a past run. */
+  const applySetup = (g: string, s: TemplateSettings) => {
+    setGoal(g);
+    setBuilder(str(s.builder, builder));
+    setVerifier(str(s.verifier, verifier));
+    setAuditor(str(s.auditor, auditor));
+    setVerifyCmd(str(s.verifyCmd, verifyCmd));
+    setMaxRounds(str(s.maxRounds, maxRounds));
+    if (typeof s.useSandbox === 'boolean') setUseSandbox(s.useSandbox);
+    setBudget(str(s.budget, budget));
+  };
+
+  useEffect(() => {
+    if (!preset || isRunning) return;
+    newTask();
+    applySetup(preset.goal, preset.settings);
+  }, [preset]);
 
   const handleStartMesh = async () => {
     if (!goal.trim() || isRunning || noneInstalled) return;
@@ -334,6 +355,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
       outcome: result.stopped ? 'stopped' : result.success ? 'success' : 'failed',
       summary: result.error || status?.text,
       agents: [...new Set([verifier, builder, auditor])],
+      settings: { builder, verifier, auditor, verifyCmd: cmd, maxRounds, useSandbox, budget },
       log: messages.map((msg) => ({ at: Date.parse(msg.timestamp) || undefined, who: msg.from, text: msg.payload.summary })),
       map,
       ...runTokens(result.usage, map),
@@ -412,16 +434,7 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
                   kind="swarm"
                   goal={goal}
                   settings={{ builder, verifier, auditor, verifyCmd, maxRounds, useSandbox, budget }}
-                  onApply={(g, s) => {
-                    setGoal(g);
-                    setBuilder(str(s.builder, builder));
-                    setVerifier(str(s.verifier, verifier));
-                    setAuditor(str(s.auditor, auditor));
-                    setVerifyCmd(str(s.verifyCmd, verifyCmd));
-                    setMaxRounds(str(s.maxRounds, maxRounds));
-                    if (typeof s.useSandbox === 'boolean') setUseSandbox(s.useSandbox);
-                    setBudget(str(s.budget, budget));
-                  }}
+                  onApply={applySetup}
                 />
               </div>
               <SectionLabel htmlFor="mesh-goal">{f.goal}</SectionLabel>
