@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # node-gyp needs Python for node-pty.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb
+
+      - run: npm ci
+
+      - run: npm run type-check
+
+      - run: npm run build
+
+      - run: npm test
+
+      # Starts the real app with a throwaway profile and fails on any load or
+      # console error: the check that would have caught a blank window.
+      - name: Smoke test (macOS)
+        if: runner.os == 'macOS'
+        run: npx electron dist/electron/main.js --smoke
+
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npx electron dist/electron/main.js --smoke --no-sandbox
