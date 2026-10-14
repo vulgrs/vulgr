@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { UpdateNotice } from './updater.js';
+import type { UpdateNotice, UpdateStatus } from './updater.js';
 
 export interface PtyCreateOptions {
   id: string;
@@ -193,6 +193,10 @@ export interface WarpApi {
   onUpdateNotice: (callback: (notice: UpdateNotice) => void) => () => void;
   openUpdateRelease: () => Promise<void>;
   installUpdate: () => Promise<void>;
+  getUpdateStatus: () => Promise<UpdateStatus>;
+  /** Looks for a new version now; resolves to the status once the check started or finished. */
+  checkForUpdates: () => Promise<UpdateStatus>;
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
 
   // Frameless Window Controls
   windowMinimize: () => void;
@@ -381,6 +385,13 @@ const api: WarpApi = {
   },
   openUpdateRelease: () => ipcRenderer.invoke('update:open-release'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  getUpdateStatus: () => ipcRenderer.invoke('update:get-status'),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  onUpdateStatus: (callback) => {
+    const handler = (_: any, status: UpdateStatus) => callback(status);
+    ipcRenderer.on('update:status', handler);
+    return () => ipcRenderer.removeListener('update:status', handler);
+  },
 
   // Frameless Window Controls
   windowMinimize: () => ipcRenderer.send('window:minimize'),

@@ -31,6 +31,7 @@ import { useTheme, type ThemePreference } from '../theme.js';
 import { setTerminalPrefs, terminalPrefsFrom } from '../terminalPrefs.js';
 import { SHORTCUT_DEFAULTS, SHORTCUT_IDS, keymapFrom, setKeymap, type ShortcutId } from '../shortcuts.js';
 import { ShortcutField } from './ShortcutField.js';
+import { UpdateSettings } from './UpdateSettings.js';
 
 interface SettingsViewProps {
   isOpen: boolean;
@@ -684,6 +685,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                       <Row label={s.languageTitle} hint={s.languageDescription} htmlFor="ui-language">
                         <OptionSelect id="ui-language" value={lang} items={LANGUAGE_ITEMS} onValueChange={(value) => setLang(value as Lang)} />
                       </Row>
+                    </Group>
+                    <Group title={t.update.settingsTitle}>
+                      {/* Not a searchable row: shown whenever the General section is. */}
+                      {!query && (
+                        <div data-setting-row className="py-4">
+                          <UpdateSettings />
+                        </div>
+                      )}
                     </Group>
                     <Group title={s.notifyTitle}>
                       <Row label={s.notifyRuns} hint={s.notifyRunsHint}>
