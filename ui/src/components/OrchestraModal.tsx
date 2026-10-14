@@ -33,6 +33,9 @@ import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 import { newRunId, runTokens, saveRun, useRunRecorder, type RunUsage } from '../runHistory.js';
 import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
+import { TemplateBar } from './TemplateBar.js';
+
+const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
 
 type TaskState = 'waiting' | 'running' | 'testing' | 'fixing' | 'merging' | 'done' | 'failed' | 'skipped';
 type Phase = 'checking' | 'planning' | 'working' | 'integrating' | 'reviewing' | 'awaiting-review' | 'done' | 'failed' | 'stopped';
@@ -513,6 +516,22 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
             </div>
           ) : (
             <div>
+              <div className="mb-3">
+                <TemplateBar
+                  kind="orchestra"
+                  goal={goal}
+                  settings={{ planner, workers, reviewer, verifyCmd, parallel, rounds }}
+                  onApply={(g, s) => {
+                    setGoal(g);
+                    setPlanner(str(s.planner, planner));
+                    if (Array.isArray(s.workers) && s.workers.length) setWorkers(s.workers);
+                    setReviewer(str(s.reviewer, reviewer));
+                    setVerifyCmd(str(s.verifyCmd, verifyCmd));
+                    setParallel(str(s.parallel, parallel));
+                    setRounds(str(s.rounds, rounds));
+                  }}
+                />
+              </div>
               <SectionLabel htmlFor="orchestra-goal">{f.goal}</SectionLabel>
               <GoalInput id="orchestra-goal" value={goal} placeholder={o.goalPlaceholder} onChange={setGoal} onSubmit={start} />
             </div>

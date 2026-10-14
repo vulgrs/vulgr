@@ -973,4 +973,16 @@ export const es: Messages = {
     reviewCommit: 'Revisar y hacer commit',
     more: (n: number) => `+${n} más`,
   },
+  templates: {
+    label: 'Plantillas',
+    save: 'Guardar como plantilla',
+    saveHint: 'Guardar este objetivo y equipo para volver a empezarlo con un clic',
+    namePlaceholder: 'Nombre de la plantilla',
+    confirm: 'Guardar',
+    cancel: 'Cancelar',
+    saved: (name: string) => `Plantilla «${name}» guardada`,
+    deleted: 'Plantilla eliminada',
+    remove: (name: string) => `Eliminar «${name}»`,
+    applyHint: (goal: string) => `Rellenar: ${goal}`,
+  },
 };

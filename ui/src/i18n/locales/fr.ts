@@ -973,4 +973,16 @@ export const fr: Messages = {
     reviewCommit: 'Vérifier et commiter',
     more: (n: number) => `+${n} de plus`,
   },
+  templates: {
+    label: 'Modèles',
+    save: 'Enregistrer comme modèle',
+    saveHint: 'Garder cet objectif et cette équipe pour les relancer en un clic',
+    namePlaceholder: 'Nom du modèle',
+    confirm: 'Enregistrer',
+    cancel: 'Annuler',
+    saved: (name: string) => `Modèle « ${name} » enregistré`,
+    deleted: 'Modèle supprimé',
+    remove: (name: string) => `Supprimer « ${name} »`,
+    applyHint: (goal: string) => `Remplir : ${goal}`,
+  },
 };

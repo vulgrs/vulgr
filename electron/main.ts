@@ -20,6 +20,7 @@ import { Orchestra } from '../src/engine/orchestra.js';
 import { toEngineLang } from '../src/engine/engineLang.js';
 import { RunHistoryStore } from '../src/engine/runHistory.js';
 import { UsageLedger } from '../src/engine/usageLedger.js';
+import { TemplateStore, type TemplateKind } from '../src/engine/templateStore.js';
 import { onAgentUsage } from '../src/adapters/usageEvents.js';
 import { AdapterFactory } from '../src/adapters/factory.js';
 import { generateShellCommand } from '../src/engine/commandGenerator.js';
@@ -73,6 +74,7 @@ const runHistory = new RunHistoryStore(join(os.homedir(), '.vulgr', 'runs'));
 // Every agent call whose CLI reports its usage (Claude Code, Codex) is written down.
 const usageLedger = new UsageLedger(join(os.homedir(), '.vulgr', 'usage.jsonl'));
 onAgentUsage((event) => usageLedger.add(event));
+const templates = new TemplateStore(join(os.homedir(), '.vulgr', 'templates.json'));
 const ptyManager = new PtyManager();
 ptyManager.setConfigManager(configManager);
 const claudeChatManager = new ClaudeChatManager();
@@ -659,6 +661,12 @@ function setupIpcHandlers() {
   // Real token use and cost of agent calls
   ipcMain.handle('usage:summary', (_, since?: number, cwd?: string) => usageLedger.summary(since ?? 0, cwd));
   ipcMain.handle('usage:clear', () => usageLedger.clear());
+
+  // Run templates
+  ipcMain.handle('templates:list', (_, kind?: TemplateKind) => templates.list(kind));
+  ipcMain.handle('templates:save', (_, template) => templates.save(template));
+  ipcMain.handle('templates:touch', (_, id: string) => templates.touch(id));
+  ipcMain.handle('templates:delete', (_, id: string) => templates.remove(id));
 
   // Session Timeline & Technical Report Export Handlers
   ipcMain.handle('export:generate', (_, { data, format, options }) => {

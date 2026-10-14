@@ -978,4 +978,16 @@ export const de: Messages = {
     reviewCommit: 'Prüfen & committen',
     more: (n: number) => `+${n} weitere`,
   },
+  templates: {
+    label: 'Vorlagen',
+    save: 'Als Vorlage speichern',
+    saveHint: 'Dieses Ziel und Team behalten, um es mit einem Klick erneut zu starten',
+    namePlaceholder: 'Name der Vorlage',
+    confirm: 'Speichern',
+    cancel: 'Abbrechen',
+    saved: (name: string) => `Vorlage „${name}“ gespeichert`,
+    deleted: 'Vorlage gelöscht',
+    remove: (name: string) => `„${name}“ löschen`,
+    applyHint: (goal: string) => `Einsetzen: ${goal}`,
+  },
 };

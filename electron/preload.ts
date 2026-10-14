@@ -155,6 +155,12 @@ export interface WarpApi {
   getUsageSummary: (since?: number, cwd?: string) => Promise<any>;
   clearUsage: () => Promise<void>;
 
+  // Saved goal + team setups for Duo Loop, Agent Swarm and Orchestrator
+  listTemplates: (kind?: string) => Promise<any[]>;
+  saveTemplate: (template: any) => Promise<any | null>;
+  touchTemplate: (id: string) => Promise<void>;
+  deleteTemplate: (id: string) => Promise<boolean>;
+
   // Session Timeline & Technical Report Export
   generateReport: (data: any, format: 'markdown' | 'html' | 'json', options?: any) => Promise<string>;
   saveReportToFile: (content: string, defaultName?: string, format?: 'markdown' | 'html' | 'json') => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
@@ -323,6 +329,10 @@ const api: WarpApi = {
   clearRuns: (cwd) => ipcRenderer.invoke('runs:clear', cwd),
   getUsageSummary: (since, cwd) => ipcRenderer.invoke('usage:summary', since, cwd),
   clearUsage: () => ipcRenderer.invoke('usage:clear'),
+  listTemplates: (kind) => ipcRenderer.invoke('templates:list', kind),
+  saveTemplate: (template) => ipcRenderer.invoke('templates:save', template),
+  touchTemplate: (id) => ipcRenderer.invoke('templates:touch', id),
+  deleteTemplate: (id) => ipcRenderer.invoke('templates:delete', id),
 
   // Session Timeline & Technical Report Export
   generateReport: (data, format, options) => ipcRenderer.invoke('export:generate', { data, format, options }),

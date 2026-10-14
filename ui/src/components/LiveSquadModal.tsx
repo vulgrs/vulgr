@@ -29,6 +29,9 @@ import {
 } from './FlowParts.js';
 import type { SessionType } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
+import { TemplateBar } from './TemplateBar.js';
+
+const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 
 interface LiveSquadModalProps {
@@ -143,6 +146,20 @@ export const LiveSquadModal: React.FC<LiveSquadModalProps> = ({ isOpen, cwd, onC
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
           <div>
+            <div className="mb-3">
+              <TemplateBar
+                kind="duo"
+                goal={goal}
+                settings={{ builder, verifier, verifyCmd, maxRounds }}
+                onApply={(g, s) => {
+                  setGoal(g);
+                  setBuilder(str(s.builder, builder));
+                  setVerifier(str(s.verifier, verifier));
+                  setVerifyCmd(str(s.verifyCmd, verifyCmd));
+                  setMaxRounds(str(s.maxRounds, maxRounds));
+                }}
+              />
+            </div>
             <SectionLabel htmlFor="squad-goal">{f.goal}</SectionLabel>
             <GoalInput
               id="squad-goal"

@@ -998,4 +998,16 @@ export const zh: Messages = {
     reviewCommit: '检查并提交',
     more: (n: number) => `还有 ${n} 个`,
   },
+  templates: {
+    label: '模板',
+    save: '保存为模板',
+    saveHint: '保存此目标和团队配置，一键重新开始',
+    namePlaceholder: '模板名称',
+    confirm: '保存',
+    cancel: '取消',
+    saved: (name: string) => `已保存模板“${name}”`,
+    deleted: '已删除模板',
+    remove: (name: string) => `删除“${name}”`,
+    applyHint: (goal: string) => `填入：${goal}`,
+  },
 };

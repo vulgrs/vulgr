@@ -37,6 +37,9 @@ import { useI18n } from '../i18n/index.js';
 import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 import { newRunId, runTokens, saveRun, useRunRecorder, type RunUsage } from '../runHistory.js';
 import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
+import { TemplateBar } from './TemplateBar.js';
+
+const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
 
 export interface AgentMessage {
   id: string;
@@ -380,6 +383,22 @@ export const AgentMeshModal: React.FC<AgentMeshModalProps> = ({
             </div>
           ) : (
             <div>
+              <div className="mb-3">
+                <TemplateBar
+                  kind="swarm"
+                  goal={goal}
+                  settings={{ builder, verifier, auditor, verifyCmd, maxRounds, useSandbox }}
+                  onApply={(g, s) => {
+                    setGoal(g);
+                    setBuilder(str(s.builder, builder));
+                    setVerifier(str(s.verifier, verifier));
+                    setAuditor(str(s.auditor, auditor));
+                    setVerifyCmd(str(s.verifyCmd, verifyCmd));
+                    setMaxRounds(str(s.maxRounds, maxRounds));
+                    if (typeof s.useSandbox === 'boolean') setUseSandbox(s.useSandbox);
+                  }}
+                />
+              </div>
               <SectionLabel htmlFor="mesh-goal">{f.goal}</SectionLabel>
               <GoalInput
                 id="mesh-goal"

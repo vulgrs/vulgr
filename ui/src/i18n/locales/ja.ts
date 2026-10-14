@@ -998,4 +998,16 @@ export const ja: Messages = {
     reviewCommit: '確認してコミット',
     more: (n: number) => `ほか ${n} 件`,
   },
+  templates: {
+    label: 'テンプレート',
+    save: 'テンプレートとして保存',
+    saveHint: 'この目標とチーム構成を保存して、ワンクリックで再開できるようにします',
+    namePlaceholder: 'テンプレート名',
+    confirm: '保存',
+    cancel: 'キャンセル',
+    saved: (name: string) => `テンプレート「${name}」を保存しました`,
+    deleted: 'テンプレートを削除しました',
+    remove: (name: string) => `「${name}」を削除`,
+    applyHint: (goal: string) => `入力内容: ${goal}`,
+  },
 };

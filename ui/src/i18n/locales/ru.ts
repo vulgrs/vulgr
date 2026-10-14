@@ -1011,4 +1011,16 @@ export const ru: Messages = {
     reviewCommit: 'Проверить и закоммитить',
     more: (n: number) => `ещё ${n}`,
   },
+  templates: {
+    label: 'Шаблоны',
+    save: 'Сохранить как шаблон',
+    saveHint: 'Сохранить эту цель и состав команды, чтобы запускать их в один клик',
+    namePlaceholder: 'Название шаблона',
+    confirm: 'Сохранить',
+    cancel: 'Отмена',
+    saved: (name: string) => `Шаблон «${name}» сохранён`,
+    deleted: 'Шаблон удалён',
+    remove: (name: string) => `Удалить «${name}»`,
+    applyHint: (goal: string) => `Подставить: ${goal}`,
+  },
 };
