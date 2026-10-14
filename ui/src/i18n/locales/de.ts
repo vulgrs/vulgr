@@ -366,6 +366,10 @@ export const de: Messages = {
       openSettings: 'Einstellungen (Claude, AGY, Codex)',
       exportReport: 'Technischen Bericht exportieren (Markdown / HTML / JSON)',
       tokenHud: 'Token- & Kontext-HUD',
+      openMesh: 'Agent Swarm öffnen',
+      openOrchestra: 'Orchestrator öffnen',
+      goToTerminal: (title: string) => `Zum Terminal: ${title}`,
+      settingsSection: (name: string) => `Einstellungen: ${name}`,
     },
   },
   dock: {

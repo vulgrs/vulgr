@@ -39,9 +39,11 @@ interface SettingsViewProps {
   onOpenAgents?: () => void;
   /** The open project folder; enables the per-project section. */
   cwd?: string;
+  /** Jump to this section (e.g. from the command palette); `at` makes a repeat request count again. */
+  requestedSection?: { section: Section; at: number } | null;
 }
 
-type Section = 'general' | 'agents' | 'terminal' | 'safety' | 'project';
+export type Section = 'general' | 'agents' | 'terminal' | 'safety' | 'project';
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 const SECTIONS: Section[] = ['general', 'agents', 'terminal', 'safety', 'project'];
@@ -335,7 +337,7 @@ function useDebounced<T>(fn: (value: T) => Promise<unknown>, delay: number) {
  * Every change applies and is saved as it is made; "Undo changes" goes back to how
  * things were when the page was opened.
  */
-export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onConfigChanged, onShowWelcome, onOpenAgents, cwd }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onConfigChanged, onShowWelcome, onOpenAgents, cwd, requestedSection }) => {
   const { t, lang, setLang } = useI18n();
   const s = t.settings;
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
@@ -360,6 +362,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
       localStorage.setItem(SECTION_KEY, next);
     } catch {}
   };
+
+  useEffect(() => {
+    if (requestedSection) setSection(requestedSection.section);
+  }, [requestedSection]);
 
   const persistConfig = useDebounced<WarpConfig>(async (next) => {
     if (!window.warpApi?.updateConfig) return;

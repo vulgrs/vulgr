@@ -376,6 +376,10 @@ export const zh: Messages = {
       openSettings: '设置与 CLI 参数（Claude、AGY、Codex）',
       exportReport: '导出技术报告（Markdown / HTML / JSON）',
       tokenHud: 'Token 与上下文优化 HUD',
+      openMesh: '打开 Agent Swarm',
+      openOrchestra: '打开 Orchestrator',
+      goToTerminal: (title: string) => `转到终端：${title}`,
+      settingsSection: (name: string) => `设置：${name}`,
     },
   },
   dock: {

@@ -44,6 +44,10 @@ export const app = ns(
       openSettings: 'Settings & CLI Flags (Claude, AGY, Codex)',
       exportReport: 'Export Technical Report (Markdown / HTML / JSON)',
       tokenHud: 'Token & Context Optimizer HUD',
+      openMesh: 'Open Agent Swarm',
+      openOrchestra: 'Open Orchestrator',
+      goToTerminal: (title: string) => `Go to terminal: ${title}`,
+      settingsSection: (name: string) => `Settings: ${name}`,
     },
   },
   {
@@ -88,6 +92,10 @@ export const app = ns(
       openSettings: 'Ayarlar ve CLI Bayrakları (Claude, AGY, Codex)',
       exportReport: 'Teknik Rapor Dışa Aktar (Markdown / HTML / JSON)',
       tokenHud: 'Token ve Bağlam Optimizasyon Paneli',
+      openMesh: 'Agent Swarm\'ı aç',
+      openOrchestra: 'Orchestrator\'ı aç',
+      goToTerminal: (title: string) => `Terminale git: ${title}`,
+      settingsSection: (name: string) => `Ayarlar: ${name}`,
     },
   }
 );

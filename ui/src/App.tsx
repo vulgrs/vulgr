@@ -17,6 +17,7 @@ import { AgentSetupModal } from './components/AgentSetupModal.js';
 import { subscriptionRegistry } from './utils/subscriptionManager.js';
 import { useSquadOrchestrator, squadAgentLabel, type PaneRunResult, type SquadDeps } from './hooks/useSquadOrchestrator.js';
 import { useDuoHistory } from './hooks/useDuoHistory.js';
+import type { Section as SettingsSection } from './components/SettingsView.js';
 import { changedFilesNow } from './components/RunChangesCard.js';
 import { useI18n } from './i18n/index.js';
 import { describeCommand, titleFromWork } from './utils/workTitle.js';
@@ -157,6 +158,7 @@ export const App: React.FC = () => {
   const [sandboxDrawerOpen, setSandboxDrawerOpen] = useState(false);
   const [activeSandboxes, setActiveSandboxes] = useState<any[]>([]);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<{ section: SettingsSection; at: number } | null>(null);
   const [agentSetupOpen, setAgentSetupOpen] = useState(false);
   // First launch shows the welcome flow; the guide opens from Help / F1.
   const [onboardingOpen, setOnboardingOpen] = useState(shouldShowOnboarding);
@@ -1271,6 +1273,47 @@ export const App: React.FC = () => {
         keywords: 'token context optimizer memory quota subscription savings cost',
         run: () => setHudOpen(true),
       },
+      {
+        id: 'open-mesh',
+        label: t.app.actions.openMesh,
+        group: t.app.groups.autonomous,
+        keywords: 'agent swarm mesh tests builder auditor autonomous',
+        run: () => setMeshModalOpen(true),
+      },
+      {
+        id: 'open-orchestra',
+        label: t.app.actions.openOrchestra,
+        group: t.app.groups.autonomous,
+        keywords: 'orchestrator orchestra parallel tasks planner workers',
+        run: () => setOrchestraOpen(true),
+      },
+      // Every open terminal tab, to jump to it by name.
+      ...tabs.map((tab) => ({
+        id: `goto-${tab.id}`,
+        label: t.app.actions.goToTerminal(tab.title || t.sidebar.untitled),
+        group: t.app.groups.tabs,
+        keywords: `terminal tab switch ${tab.sessions.map((s) => s.title).join(' ')}`,
+        run: () => setActiveTabId(tab.id),
+      })),
+      // Each settings section, opened directly.
+      ...(
+        [
+          ['general', t.settings.tabGeneral],
+          ['agents', t.settings.tabPermissions],
+          ['terminal', t.settings.tabTerminal],
+          ['safety', t.settings.tabSafety],
+          ...(cwd ? [['project', t.settings.tabProject]] : []),
+        ] as [SettingsSection, string][]
+      ).map(([section, name]) => ({
+        id: `settings-${section}`,
+        label: t.app.actions.settingsSection(name),
+        group: t.app.groups.settings,
+        keywords: 'settings preferences',
+        run: () => {
+          setSettingsSection({ section, at: Date.now() });
+          setSettingsModalOpen(true);
+        },
+      })),
     ],
     [activeSession, tabs, activeTabId, cwd, handleOpenExportModal, t]
   );
@@ -1289,6 +1332,17 @@ export const App: React.FC = () => {
       if (!mod) return;
 
       const key = e.key.toLowerCase();
+
+      // Ctrl/Cmd+K also opens the palette, except inside a terminal, where
+      // Ctrl+K is the shell's "kill line" (Cmd+K on macOS is always safe).
+      if (key === 'k' && !e.shiftKey && !e.altKey) {
+        const inTerminal = (document.activeElement as HTMLElement | null)?.closest?.('.xterm');
+        if (e.metaKey || !inTerminal) {
+          e.preventDefault();
+          setPaletteOpen((v) => !v);
+          return;
+        }
+      }
 
       if (key === 'tab') {
         e.preventDefault();
@@ -1534,6 +1588,7 @@ export const App: React.FC = () => {
                 }}
                 onOpenAgents={() => setAgentSetupOpen(true)}
                 cwd={cwd || undefined}
+                requestedSection={settingsSection}
               />
             </Suspense>
           )}

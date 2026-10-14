@@ -376,6 +376,10 @@ export const ja: Messages = {
       openSettings: '設定と CLI フラグ（Claude、AGY、Codex）',
       exportReport: '技術レポートをエクスポート（Markdown / HTML / JSON）',
       tokenHud: 'トークンとコンテキスト最適化 HUD',
+      openMesh: 'Agent Swarm を開く',
+      openOrchestra: 'Orchestrator を開く',
+      goToTerminal: (title: string) => `ターミナルへ移動: ${title}`,
+      settingsSection: (name: string) => `設定: ${name}`,
     },
   },
   dock: {

@@ -388,6 +388,10 @@ export const ru: Messages = {
       openSettings: 'Настройки и флаги CLI (Claude, AGY, Codex)',
       exportReport: 'Экспорт технического отчёта (Markdown / HTML / JSON)',
       tokenHud: 'HUD оптимизации токенов и контекста',
+      openMesh: 'Открыть Agent Swarm',
+      openOrchestra: 'Открыть Orchestrator',
+      goToTerminal: (title: string) => `Перейти к терминалу: ${title}`,
+      settingsSection: (name: string) => `Настройки: ${name}`,
     },
   },
   dock: {
