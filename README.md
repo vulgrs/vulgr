@@ -92,17 +92,7 @@ Project layout:
 
 ## Website
 
-[vulgr.tech](https://vulgr.tech) is built from `docs-site/` (plain HTML/CSS) and published to GitHub Pages by `.github/workflows/pages.yml`. To point the domain at it, add these DNS records at your registrar, then set the custom domain under **Settings → Pages**:
-
-| Type | Name | Value |
-| --- | --- | --- |
-| A | `@` | `185.199.108.153` |
-| A | `@` | `185.199.109.153` |
-| A | `@` | `185.199.110.153` |
-| A | `@` | `185.199.111.153` |
-| CNAME | `www` | `vulgrs.github.io` |
-
-Optionally add AAAA records for IPv6: `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`.
+[vulgr.tech](https://vulgr.tech) is built from `docs-site/` (plain HTML/CSS) and published to GitHub Pages by `.github/workflows/pages.yml`.
 
 ## Contributing
 
