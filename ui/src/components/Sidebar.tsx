@@ -16,6 +16,7 @@ import sidebarToggleIcon from '../assets/sidebar/sidebar-toggle.svg';
 import duoLoopIcon from '../assets/sidebar/duo-loop.svg';
 import agentSwarmIcon from '../assets/sidebar/agent-swarm.svg';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
+import pullRequestIcon from '../assets/sidebar/pull-request.svg';
 import folderIcon from '../assets/sidebar/folder.svg';
 import chevronDownIcon from '../assets/sidebar/chevron-down.svg';
 import agentIcon from '../assets/sidebar/agent.svg';
@@ -55,6 +56,8 @@ interface SidebarProps {
   onOpenOrchestra?: () => void;
   /** Finished agent runs. */
   onOpenHistory?: () => void;
+  /** Open a pull request for the current branch. */
+  onOpenPullRequest?: () => void;
   onOpenSkills: () => void;
   onOpenSettings: () => void;
   pastRuns?: any[];
@@ -279,6 +282,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenMesh,
   onOpenOrchestra,
   onOpenHistory,
+  onOpenPullRequest,
   onOpenSettings,
   pastConversations = [],
   onSelectConversation,
@@ -451,6 +455,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { label: 'Duo Loop', icon: duoLoopIcon, w: 7, h: 5.47, onClick: onOpenSquads, title: t.sidebar.duoLoopHint },
     { label: 'Agent Swarm', icon: agentSwarmIcon, w: 7, h: 8, onClick: onOpenMesh, title: t.sidebar.agentSwarmHint },
     { label: 'Orchestrator', icon: orchestratorIcon, w: 7, h: 8, onClick: onOpenOrchestra ?? openWorkspace, title: t.sidebar.orchestratorHint },
+    ...(onOpenPullRequest ? [{ label: 'Pull Request', icon: pullRequestIcon, w: 8, h: 8, onClick: onOpenPullRequest, title: t.pr.openHint }] : []),
   ];
 
   return (
