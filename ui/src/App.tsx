@@ -8,7 +8,7 @@ import { Onboarding, shouldShowOnboarding } from './components/Onboarding.js';
 import { BottomCommandDock } from './components/BottomCommandDock.js';
 import { RightPanel } from './components/RightPanel.js';
 import { ClaudeChatView } from './components/ClaudeChatView.js';
-import { Sidebar, SIDEBAR_WIDTH, SIDEBAR_MAX_WIDTH, clampSidebarWidth } from './components/Sidebar.js';
+import { Sidebar, SIDEBAR_WIDTH } from './components/Sidebar.js';
 import { StatusBar } from './components/StatusBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { SquadBar } from './components/SquadBar.js';
@@ -153,14 +153,8 @@ export const App: React.FC = () => {
   cwdRef.current = cwd;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => loadPersisted('vulgr.sidebarOpen', true));
-  const [sidebarWidth, setSidebarWidth] = useState(() => clampSidebarWidth(loadPersisted('vulgr.sidebarWidth', SIDEBAR_WIDTH)));
-  const [resizingSidebar, setResizingSidebar] = useState(false);
-  // While the sidebar is closed, resting the pointer on the window's left edge shows it
-  // over the terminals until the pointer leaves; `sidebarOverlay` stays on until it has slid away.
-  const [sidebarPeek, setSidebarPeek] = useState(false);
-  const [sidebarOverlay, setSidebarOverlay] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const peekTimer = useRef<number>(0);
+  // Fixed width: the sidebar opens and closes, but doesn't resize or slide out on hover.
+  const sidebarWidth = SIDEBAR_WIDTH;
   const [meshModalOpen, setMeshModalOpen] = useState(false);
   const [orchestraOpen, setOrchestraOpen] = useState(false);
   const [squadModalOpen, setSquadModalOpen] = useState(false);
@@ -366,17 +360,7 @@ export const App: React.FC = () => {
   }, [tabs, activeTabId, groups]);
   useEffect(() => {
     localStorage.setItem('vulgr.sidebarOpen', JSON.stringify(sidebarOpen));
-    if (sidebarOpen) {
-      setSidebarPeek(false);
-      setSidebarOverlay(false);
-    }
   }, [sidebarOpen]);
-  useEffect(() => {
-    if (resizingSidebar) return;
-    try {
-      localStorage.setItem('vulgr.sidebarWidth', JSON.stringify(sidebarWidth));
-    } catch {}
-  }, [sidebarWidth, resizingSidebar]);
   useEffect(() => {
     localStorage.setItem('vulgr.rightPanelOpen', JSON.stringify(rightPanelOpen));
   }, [rightPanelOpen]);
@@ -1494,54 +1478,15 @@ export const App: React.FC = () => {
       {/* Main Content: Sidebar + Center Workspace + Right Panel */}
       <div className="flex-1 w-full min-h-0 relative flex bg-base-app">
         {/* Kept mounted so it can slide closed; the wrapper's width animates and clips it. */}
-        {!sidebarOpen && (
-          // The hot edge that shows the closed sidebar for a moment.
-          <div
-            aria-hidden
-            className="absolute inset-y-0 left-0 z-30 w-1.5"
-            onMouseEnter={(e) => {
-              if (e.buttons !== 0) return;
-              window.clearTimeout(peekTimer.current);
-              peekTimer.current = window.setTimeout(() => {
-                setSidebarOverlay(true);
-                setSidebarPeek(true);
-              }, 120);
-            }}
-            onMouseLeave={() => {
-              if (!sidebarPeek) window.clearTimeout(peekTimer.current);
-            }}
-          />
-        )}
         <div
-          ref={sidebarRef}
-          className={`flex-shrink-0 overflow-hidden ${
-            resizingSidebar ? '' : 'transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none'
-          } ${sidebarOverlay && !sidebarOpen ? 'absolute inset-y-0 left-0 z-30 shadow-[var(--shadow-modal)]' : 'relative'}`}
-          style={{ width: sidebarOpen || sidebarPeek ? sidebarWidth : 0 }}
-          inert={!(sidebarOpen || sidebarPeek)}
-          aria-hidden={!(sidebarOpen || sidebarPeek)}
-          onMouseEnter={() => window.clearTimeout(peekTimer.current)}
-          onMouseLeave={() => {
-            if (!sidebarPeek || resizingSidebar) return;
-            // Stay while a menu from the sidebar is open or the pointer came back.
-            const tryClose = () => {
-              const menuOpen = document.querySelector('[role="menu"],[role="listbox"],[role="dialog"]');
-              if (menuOpen || sidebarRef.current?.matches(':hover')) {
-                peekTimer.current = window.setTimeout(tryClose, 300);
-                return;
-              }
-              setSidebarPeek(false);
-            };
-            window.clearTimeout(peekTimer.current);
-            peekTimer.current = window.setTimeout(tryClose, 250);
-          }}
-          onTransitionEnd={(e) => {
-            if (e.target === e.currentTarget && e.propertyName === 'width' && !sidebarPeek) setSidebarOverlay(false);
-          }}
+          className="relative flex-shrink-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+          style={{ width: sidebarOpen ? sidebarWidth : 0 }}
+          inert={!sidebarOpen}
+          aria-hidden={!sidebarOpen}
         >
           <div
             className={`h-full transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
-              sidebarOpen || sidebarPeek ? 'translate-x-0 opacity-100' : '-translate-x-6 opacity-0'
+              sidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-6 opacity-0'
             }`}
             style={{ width: sidebarWidth }}
           >
@@ -1569,6 +1514,7 @@ export const App: React.FC = () => {
             onOpenMesh={() => setMeshModalOpen(true)}
             onOpenOrchestra={() => setOrchestraOpen(true)}
             onOpenHistory={() => setHistoryOpen(true)}
+            onOpenPullRequest={() => setPrOpen(true)}
             onOpenSkills={() => setSkillsModalOpen(true)}
             onOpenSettings={() => setSettingsModalOpen(true)}
             pastRuns={[]}
@@ -1582,48 +1528,6 @@ export const App: React.FC = () => {
             onAddMemoryFact={handleAddMemoryFact}
             onDeleteMemoryFact={handleDeleteMemoryFact}
           />
-          </div>
-          {/* Drag the right edge to resize; double-click puts the default width back. */}
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={t.sidebar.resizeHandle}
-            aria-valuemin={SIDEBAR_WIDTH}
-            aria-valuemax={SIDEBAR_MAX_WIDTH}
-            aria-valuenow={sidebarWidth}
-            tabIndex={0}
-            title={t.sidebar.resizeHandle}
-            className={`group absolute inset-y-0 right-0 z-30 w-1.5 cursor-col-resize outline-none ${resizingSidebar ? 'bg-primary/40' : ''}`}
-            onPointerDown={(e) => {
-              if (e.button !== 0) return;
-              e.preventDefault();
-              const startX = e.clientX;
-              const startWidth = sidebarWidth;
-              const handle = e.currentTarget;
-              handle.setPointerCapture(e.pointerId);
-              setResizingSidebar(true);
-              document.body.style.cursor = 'col-resize';
-              const move = (ev: PointerEvent) => setSidebarWidth(clampSidebarWidth(startWidth + ev.clientX - startX));
-              const up = () => {
-                handle.removeEventListener('pointermove', move);
-                handle.removeEventListener('pointerup', up);
-                handle.removeEventListener('pointercancel', up);
-                document.body.style.cursor = '';
-                setResizingSidebar(false);
-              };
-              handle.addEventListener('pointermove', move);
-              handle.addEventListener('pointerup', up);
-              handle.addEventListener('pointercancel', up);
-            }}
-            onDoubleClick={() => setSidebarWidth(SIDEBAR_WIDTH)}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                e.preventDefault();
-                setSidebarWidth((w) => clampSidebarWidth(w + (e.key === 'ArrowRight' ? 16 : -16)));
-              }
-            }}
-          >
-            <span className="absolute inset-y-0 right-0 w-px bg-transparent transition-colors group-hover:bg-zinc-600 group-focus-visible:bg-primary" />
           </div>
         </div>
 
