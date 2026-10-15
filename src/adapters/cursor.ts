@@ -22,11 +22,13 @@ export class CursorAgentAdapter extends BaseCliAdapter {
   /**
    * `cursor-agent -p "<prompt>"` runs one turn in print mode. Without `--force`
    * it only proposes edits, so builders get it; reviewers stay read-only.
+   * `--trust`: print mode can't answer the "trust this folder?" question and
+   * exits 1 on any folder not trusted before.
    */
   protected buildArgs(prompt: string, options?: CliExecutionOptions): string[] {
     const text =
       prompt.length > MAX_PROMPT_CHARS ? `${prompt.slice(0, MAX_PROMPT_CHARS)}\n[...truncated]` : prompt;
-    const args: string[] = ['-p', text];
+    const args: string[] = ['-p', '--trust', text];
     if (options?.allowEdits) args.push('--force');
     if (this.extraArgs.length > 0) args.push(...this.extraArgs);
     return args;

@@ -310,7 +310,8 @@ export const App: React.FC = () => {
               [`${base} -p`, allowEdits ? ' --sandbox --dangerously-skip-permissions' : '']
             : agent === 'opencode'
               ? [`${base} run`, '']
-              : [`${base} -p`, allowEdits ? ' --force' : ''];
+              : // cursor-agent: --trust, or print mode stops at "trust this folder?" and exits 1.
+                [`${base} -p --trust`, allowEdits ? ' --force' : ''];
         if (shell === 'powershell') return `${head} (${read})${flags}`;
         if (shell === 'cmd') return `${head} "${text.replace(/\s+/g, ' ').slice(0, 7000)}"${flags}`;
         // No stdin: the prompt is an argument, and an agent holding the pane's
