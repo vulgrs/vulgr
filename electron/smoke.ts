@@ -37,11 +37,13 @@ export function watchSmoke(win: BrowserWindow): void {
   wc.on('render-process-gone', (_e, details) => errors.push(`renderer gone: ${details.reason}`));
   wc.on('did-fail-load', (_e, code, description, url) => errors.push(`load ${url}: [${code}] ${description}`));
   // When a step fails with "Object has been destroyed", these say why the window went away.
-  wc.on('destroyed', () => console.error('[smoke] web contents destroyed'));
-  win.on('closed', () => console.error('[smoke] window closed'));
+  let finishing = false;
+  wc.on('destroyed', () => !finishing && console.error('[smoke] web contents destroyed'));
+  win.on('closed', () => !finishing && console.error('[smoke] window closed'));
   wc.on('unresponsive', () => errors.push('window became unresponsive'));
 
   const finish = (code: number) => {
+    finishing = true;
     if (code === 0) console.log('[smoke] OK');
     else console.error(`[smoke] FAILED\n${errors.map((e) => `  - ${e}`).join('\n')}`);
     if (code !== 0) console.error(`[smoke] Profile and log kept in ${app.getPath('userData')}`);
