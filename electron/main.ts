@@ -450,25 +450,25 @@ function setupIpcHandlers() {
   });
 
   // Git Diff & Revert
-  ipcMain.handle('git:diff', (_, { cwd = process.cwd() }) => {
-    const git = new GitUtils(cwd);
+  ipcMain.handle('git:diff', (_, { cwd } = {}) => {
+    const git = new GitUtils(cwd || currentCwd);
     return git.getDiffAsync();
   });
 
-  ipcMain.handle('git:status', (_, { cwd = process.cwd() } = {}) => new GitUtils(cwd).getChangedFilesAsync());
+  ipcMain.handle('git:status', (_, { cwd } = {}) => new GitUtils(cwd || currentCwd).getChangedFilesAsync());
 
   // Discarding stashes the changes (recoverable), always in the open project.
   ipcMain.handle('git:revert', (_, { cwd } = {}) => new GitUtils(cwd || currentCwd).revertAllChangesAsync());
   ipcMain.handle('git:revertFile', (_, { file, cwd } = {}) => new GitUtils(cwd || currentCwd).revertFileAsync(String(file)));
   ipcMain.handle('git:restoreDiscarded', (_, { stash, cwd } = {}) => new GitUtils(cwd || currentCwd).restoreDiscardedAsync(stash));
 
-  ipcMain.handle('git:branch', (_, { cwd = process.cwd() } = {}) => {
-    const git = new GitUtils(cwd);
+  ipcMain.handle('git:branch', (_, { cwd } = {}) => {
+    const git = new GitUtils(cwd || currentCwd);
     return git.getBranchAsync();
   });
 
-  ipcMain.handle('git:commit', async (_, { message, cwd = process.cwd() }) => {
-    const git = new GitUtils(cwd);
+  ipcMain.handle('git:commit', async (_, { message, cwd }) => {
+    const git = new GitUtils(cwd || currentCwd);
     const res = await git.commitAllAsync(configManager.getConfig().coAuthorVulgr === false ? message : withVulgrCoAuthor(message));
     return res.success;
   });
@@ -506,8 +506,8 @@ function setupIpcHandlers() {
     suggestCommitMessage(cwd || currentCwd, { note }).catch((err) => ({ error: 'failed', detail: String(err?.message || err) }))
   );
 
-  ipcMain.handle('git:push', (_, { remote = 'origin', branch, cwd = process.cwd() } = {}) => {
-    const git = new GitUtils(cwd);
+  ipcMain.handle('git:push', (_, { remote = 'origin', branch, cwd } = {}) => {
+    const git = new GitUtils(cwd || currentCwd);
     return git.pushAsync(remote, branch);
   });
 

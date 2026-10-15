@@ -451,7 +451,7 @@ export const App: React.FC = () => {
   const refreshGitDiff = async () => {
     if (window.warpApi) {
       try {
-        const res = await window.warpApi.getGitDiff();
+        const res = await window.warpApi.getGitDiff(cwdRef.current || undefined);
         setGitDiff(res.diff || '');
         const files: string[] = res.filesChanged || [];
         setGitFiles((prev) => (sameJson(prev, files) ? prev : files));
@@ -463,7 +463,7 @@ export const App: React.FC = () => {
   const refreshGitStatus = async () => {
     if (!window.warpApi?.getGitStatus) return refreshGitDiff();
     try {
-      const files: string[] = (await window.warpApi.getGitStatus()) || [];
+      const files: string[] = (await window.warpApi.getGitStatus(cwdRef.current || undefined)) || [];
       setGitFiles((prev) => (sameJson(prev, files) ? prev : files));
     } catch {}
   };
@@ -481,7 +481,7 @@ export const App: React.FC = () => {
   const refreshGitBranch = async () => {
     if (window.warpApi?.getGitBranch) {
       try {
-        const branch = await window.warpApi.getGitBranch();
+        const branch = await window.warpApi.getGitBranch(cwdRef.current || undefined);
         setGitBranch(branch);
       } catch {}
     }
@@ -1051,6 +1051,18 @@ export const App: React.FC = () => {
   // currently running (dock hides so the program's own UI owns the terminal)
   // and the shell's current directory.
   const [sessionUi, setSessionUi] = useState<Record<string, { busy: boolean; cwd: string; agent?: boolean }>>({});
+  // The project folder follows the active terminal: `cd` somewhere and new
+  // terminals, agents, Changes and the branch all use that folder.
+  const activePaneCwd = activeSession ? sessionUi[activeSession.id]?.cwd : undefined;
+  useEffect(() => {
+    if (!activePaneCwd || activePaneCwd === cwdRef.current) return;
+    cwdRef.current = activePaneCwd;
+    setCwd(activePaneCwd);
+    void window.warpApi?.setProjectFolder?.(activePaneCwd).catch(() => {});
+    void refreshGitBranch();
+    void refreshGitStatus();
+  }, [activePaneCwd]);
+
   const handleSessionState = useCallback(
     (sessionId: string, state: { busy: boolean; cwd: string; agent?: boolean }) => {
       setSessionUi((prev) => {
