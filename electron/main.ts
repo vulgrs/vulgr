@@ -609,6 +609,21 @@ function setupIpcHandlers() {
     orchestra?.stop();
     return true;
   });
+  // The reviewed change on a new branch and a pull request, instead of into the folder.
+  ipcMain.handle('orchestra:open-pr', async (_, opts: { branch: string; title?: string; body?: string }) => {
+    if (!orchestra || orchestraRunning) return { error: 'Nothing is waiting for review' };
+    orchestraRunning = true;
+    try {
+      const res = await orchestra.openPullRequest(opts);
+      if (res.url) {
+        if (res.viaBrowser) await shell.openExternal(res.url);
+        orchestra = null;
+      }
+      return res;
+    } finally {
+      orchestraRunning = false;
+    }
+  });
   ipcMain.handle('orchestra:pause', (_, paused: boolean) => {
     if (paused) orchestra?.pause();
     else orchestra?.resume();

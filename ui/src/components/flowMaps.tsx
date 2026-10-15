@@ -213,7 +213,7 @@ export interface OrchestraMapInput {
   review?: 'approved' | 'rejected' | 'skipped';
   /** Waiting for the developer, or what they decided. */
   pending?: boolean;
-  decision?: 'applied' | 'discarded' | null;
+  decision?: 'applied' | 'discarded' | 'pr' | null;
 }
 
 const BUSY = ['running', 'testing', 'fixing', 'merging'];

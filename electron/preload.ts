@@ -100,6 +100,8 @@ export interface WarpApi {
   }) => Promise<any>;
   stopOrchestra: () => Promise<boolean>;
   stopMesh: () => Promise<boolean>;
+  /** Orchestrator's reviewed change onto a new branch and a pull request. */
+  openOrchestraPullRequest: (opts: { branch: string; title?: string; body?: string }) => Promise<{ url?: string; viaBrowser?: boolean; branch?: string; error?: string }>;
   /** Holds (true) or resumes (false) the Agent Swarm run; returns whether it is paused. */
   pauseMesh: (paused: boolean) => Promise<boolean>;
   /** Holds (true) or resumes (false) the run; returns whether it is paused. */
@@ -301,6 +303,7 @@ const api: WarpApi = {
   runOrchestra: (options) => ipcRenderer.invoke('orchestra:run', options),
   stopOrchestra: () => ipcRenderer.invoke('orchestra:stop'),
   stopMesh: () => ipcRenderer.invoke('mesh:stop'),
+  openOrchestraPullRequest: (opts) => ipcRenderer.invoke('orchestra:open-pr', opts),
   pauseMesh: (paused) => ipcRenderer.invoke('mesh:pause', paused),
   pauseOrchestra: (paused) => ipcRenderer.invoke('orchestra:pause', paused),
   restartOrchestraTask: (taskId) => ipcRenderer.invoke('orchestra:restart-task', taskId),

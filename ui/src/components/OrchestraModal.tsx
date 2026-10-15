@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, CheckCircle2, Loader2, Pause, Play, RotateCcw, Square, TriangleAlert, X, XCircle, Minus } from 'lucide-react';
+import { Check, CheckCircle2, GitPullRequest, Loader2, Pause, Play, RotateCcw, Square, TriangleAlert, X, XCircle, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button.js';
 import { Dialog, DialogContent } from '@/components/ui/dialog.js';
 import orchestratorIcon from '../assets/sidebar/orchestrator.svg';
@@ -34,6 +34,22 @@ import { useProjectTestCommand } from '../hooks/useProjectTestCommand.js';
 import { newRunId, runNotice, runTokens, saveRun, useRunRecorder, type RunRecord, type RunUsage } from '../runHistory.js';
 import { RunChangesCard, changedFilesNow } from './RunChangesCard.js';
 import { TemplateBar, type TemplateSettings } from './TemplateBar.js';
+import { Switch } from '@/components/ui/switch.js';
+import { toast } from 'sonner';
+
+/** A branch name from the goal: "vulgr/add-csv-export" (ASCII, up to five words). */
+const branchFromGoal = (goal: string) => {
+  const map: Record<string, string> = { ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i', û: 'u' };
+  const words = goal
+    .toLowerCase()
+    .replace(/[çğıöşüâîû]/g, (ch) => map[ch] ?? ch)
+    .normalize('NFKD')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 5);
+  return `vulgr/${words.join('-') || 'orchestra'}`;
+};
 
 const str = (v: unknown, fallback: string) => (typeof v === 'string' ? v : fallback);
 
@@ -200,7 +216,13 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   // Review: the combined change waits until the developer applies, revises or discards it.
   const [reviewDiff, setReviewDiff] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [decision, setDecision] = useState<'applied' | 'discarded' | null>(null);
+  const [decision, setDecision] = useState<'applied' | 'discarded' | 'pr' | null>(null);
+  // Pull request mode: the work goes to a new branch and a PR instead of the folder.
+  const [asPr, setAsPr] = useState(() => load('asPr', '') === '1');
+  const [prBranch, setPrBranch] = useState('');
+  const [prBranchEdited, setPrBranchEdited] = useState(false);
+  const [openingPr, setOpeningPr] = useState(false);
+  const [prUrl, setPrUrl] = useState<string | null>(null);
   const [applyFailed, setApplyFailed] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -311,6 +333,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
     save('testCommand', verifyCmd.trim());
     save('parallel', parallel);
     save('rounds', rounds);
+    save('asPr', asPr ? '1' : '');
     save('budget', budget.trim());
     changesBeforeRef.current = await changedFilesNow(cwd);
     setRunning(true);
@@ -388,6 +411,28 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
       setPhase('done');
       onOpenChanges?.();
     } else setApplyFailed(true);
+  };
+
+  // Follows the goal until the user types a branch name of their own.
+  useEffect(() => {
+    if (!prBranchEdited && !running && !result) setPrBranch(branchFromGoal(goal));
+  }, [goal, prBranchEdited]);
+
+  const openPr = async () => {
+    setOpeningPr(true);
+    try {
+      const res = await window.warpApi?.openOrchestraPullRequest?.({ branch: prBranch.trim() || branchFromGoal(runGoal) });
+      if (!res?.url) {
+        toast.error(o.prFailed(res?.error ?? ''));
+        return;
+      }
+      toast.success(res.viaBrowser ? o.prBrowser : o.prOpened);
+      setPrUrl(res.viaBrowser ? null : res.url);
+      setDecision('pr');
+      setPhase('done');
+    } finally {
+      setOpeningPr(false);
+    }
   };
 
   const discard = async () => {
@@ -471,7 +516,7 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
   }, [result, running]);
 
 
-  const settingsSummary = [verifyCmd.trim() ? f.testCmd(verifyCmd.trim()) : '', o.parallel(Number(parallel)), f.rounds(Number(rounds)), Number(budget) > 0 ? f.budgetSummary(budget) : '']
+  const settingsSummary = [asPr ? o.asPr : '', verifyCmd.trim() ? f.testCmd(verifyCmd.trim()) : '', o.parallel(Number(parallel)), f.rounds(Number(rounds)), Number(budget) > 0 ? f.budgetSummary(budget) : '']
     .filter(Boolean)
     .join(' · ');
 
@@ -496,6 +541,14 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
         icon: <CheckCircle2 size={15} className="text-emerald-400" />,
         title: o.appliedTitle,
         body: o.appliedBody(selected.length),
+      };
+    }
+    if (decision === 'pr') {
+      return {
+        tone: 'border-emerald-500/30 bg-emerald-500/[0.06]',
+        icon: <CheckCircle2 size={15} className="text-emerald-400" />,
+        title: prUrl ? o.prOpened : o.prBrowser,
+        body: `${o.prOnBranch(prBranch)}${prUrl ? ` · ${prUrl}` : ''}`,
       };
     }
     if (result.pendingReview) {
@@ -593,6 +646,31 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
               </div>
 
               <SettingsDisclosure label={f.settings} summary={settingsSummary}>
+                <SettingRow
+                  htmlFor="orchestra-as-pr"
+                  label={o.asPr}
+                  hint={o.asPrHint}
+                  control={<Switch id="orchestra-as-pr" checked={asPr} onCheckedChange={setAsPr} />}
+                />
+                {asPr && (
+                  <SettingRow
+                    stacked
+                    htmlFor="orchestra-pr-branch"
+                    label={o.branchLabel}
+                    hint=""
+                    control={
+                      <FlowInput
+                        id="orchestra-pr-branch"
+                        value={prBranch}
+                        onChange={(e) => {
+                          setPrBranchEdited(true);
+                          setPrBranch(e.target.value.replace(/\s+/g, '-'));
+                        }}
+                        className={MONO}
+                      />
+                    }
+                  />
+                )}
                 <SettingRow
                   htmlFor="orchestra-budget"
                   label={f.budgetLabel}
@@ -893,10 +971,22 @@ export const OrchestraModal: React.FC<OrchestraModalProps> = ({
                   {o.requestChanges}
                 </Button>
               )}
-              <Button size="sm" className={ACCENT_BUTTON} disabled={revising || selected.length === 0} onClick={applySelected}>
+              <Button
+                size="sm"
+                variant={asPr ? 'outline' : undefined}
+                className={asPr ? '' : ACCENT_BUTTON}
+                disabled={revising || openingPr || selected.length === 0}
+                onClick={applySelected}
+              >
                 <Check data-icon="inline-start" />
                 {o.applySelected(selected.length)}
               </Button>
+              {asPr && (
+                <Button size="sm" className={ACCENT_BUTTON} disabled={revising || openingPr} onClick={() => void openPr()}>
+                  {openingPr ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <GitPullRequest data-icon="inline-start" />}
+                  {openingPr ? o.openingPr : o.openPr}
+                </Button>
+              )}
             </>
           )}
           {result && !pending && (

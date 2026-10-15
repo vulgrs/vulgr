@@ -11,6 +11,7 @@ import type { AgentUsage, CliExecutionResult, ICliAdapter } from '../types/index
 import { addUsage } from '../adapters/outputParsers.js';
 import { LANG_NAMES, type EngineLang } from './engineLang.js';
 import { ORCHESTRA_TEXT as TEXT, type OrchestraText } from './text/orchestraText.js';
+import { createPullRequest, suggestPullRequest } from './pullRequest.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -783,6 +784,38 @@ export class Orchestra {
     const applied = await this.applyPatch(p.integration.worktreePath, p.base, files);
     if (applied) await this.discardReviewed();
     return { applied };
+  }
+
+  /**
+   * Instead of applying it, puts the reviewed change on a new branch `branch`
+   * (from the project's current commit), pushes it and opens a pull request into
+   * the branch the project is on. The project's own files are not touched. An
+   * agent writes the title and description when they aren't given.
+   */
+  async openPullRequest(opts: { branch: string; title?: string; body?: string }): Promise<{ url?: string; viaBrowser?: boolean; branch?: string; error?: string }> {
+    const p = this.pending;
+    if (!p) return { error: 'Nothing is waiting for review' };
+    const branch = opts.branch.trim();
+    const check = await this.tryGit(this.cwd, ['check-ref-format', '--branch', branch]);
+    if (!branch || !check.ok) return { error: `"${branch}" is not a valid branch name` };
+    const intCwd = p.integration.worktreePath;
+    // Anything the last fixes left uncommitted goes into the branch too.
+    await this.tryGit(intCwd, ['add', '-A']);
+    await this.tryGit(intCwd, ['commit', '--no-verify', '-q', '-m', `orchestra: ${p.goal.split('\n')[0].slice(0, 60)}`]);
+    const head = (await this.tryGit(intCwd, ['rev-parse', 'HEAD'])).out.trim();
+    const made = await this.tryGit(this.cwd, ['branch', branch, head]);
+    if (!made.ok) return { error: made.out.trim().split('\n').slice(-2).join('\n') };
+    const base = (await this.tryGit(this.cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim() || 'main';
+
+    let { title, body } = opts;
+    if (!title) {
+      const written = await suggestPullRequest(intCwd, p.base).catch(() => ({}) as { title?: string; body?: string });
+      title = written.title || p.goal.split('\n')[0].slice(0, 70);
+      body = body ?? written.body ?? p.goal;
+    }
+    const res = await createPullRequest(this.cwd, { base, title, body: body ?? '', head: branch });
+    if (res.url) await this.discardReviewed();
+    return { ...res, branch };
   }
 
   /** Drops the waiting change without touching the project. */

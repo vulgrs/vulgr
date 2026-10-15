@@ -67,7 +67,8 @@ async function ghReady(cwd: string): Promise<boolean> {
 export async function pullRequestInfo(cwd: string): Promise<PrInfo> {
   const branch = (await git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => '')).trim() || null;
   const base = await detectBase(cwd);
-  const github = parseGitHubRemote(await git(cwd, ['remote', 'get-url', 'origin']).catch(() => ''));
+  // The URL as configured (get-url would apply insteadOf rewrites).
+  const github = parseGitHubRemote(await git(cwd, ['config', '--get', 'remote.origin.url']).catch(() => ''));
   let commits = 0;
   if (branch && base && branch !== base) {
     commits = Number((await git(cwd, ['rev-list', '--count', `${base}..HEAD`]).catch(() => '0')).trim()) || 0;
@@ -134,9 +135,10 @@ export async function suggestPullRequest(cwd: string, base: string): Promise<{ t
  */
 export async function createPullRequest(
   cwd: string,
-  opts: { base: string; title: string; body: string }
+  opts: { base: string; title: string; body: string; /** A branch other than the checked-out one. */ head?: string }
 ): Promise<{ url?: string; viaBrowser?: boolean; error?: string }> {
   const info = await pullRequestInfo(cwd);
+  if (opts.head) info.branch = opts.head;
   if (!info.branch) return { error: 'Not on a branch' };
   if (info.branch === opts.base) return { error: `You are on ${opts.base}; switch to the branch with your changes first.` };
   try {

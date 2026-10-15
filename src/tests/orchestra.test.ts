@@ -329,6 +329,40 @@ describe('Orchestra', () => {
     assert.equal(result.stopped, true);
   });
 
+  test('openPullRequest puts the reviewed work on a new branch, pushes it and leaves the project untouched', async () => {
+    fakeAgent('pr-lead', (prompt) =>
+      prompt.includes('Reply with only this JSON')
+        ? JSON.stringify({ tasks: [{ id: 'a', title: 'A' }] })
+        : prompt.includes('pull request')
+          ? 'Add a.txt\n\n## Summary\n- writes a.txt'
+          : 'VERDICT: APPROVED'
+    );
+    fakeAgent('pr-worker', (_p, options) => {
+      writeFileSync(join(options.cwd!, 'a.txt'), 'a\n');
+      return 'done';
+    });
+    // "GitHub" is a local bare repository: pushes to the GitHub URL land there.
+    const bare = mkdtempSync(join(tmpdir(), 'vulgr-bare-'));
+    try {
+      execSync('git init -q --bare', { cwd: bare });
+      execSync(`git remote add origin https://github.com/acme/app.git && git config url."${bare.replace(/\\/g, '/')}".insteadOf https://github.com/acme/app.git`, { cwd: repo });
+      const orchestra = new Orchestra({ planner: 'pr-lead', workers: ['pr-worker'], cwd: repo, lang: 'en', autoApply: false, verifyCmd: 'node -e "process.exit(0)"' });
+      const result = await orchestra.run('One file');
+      assert.equal(result.pendingReview, true);
+
+      const res = await orchestra.openPullRequest({ branch: 'vulgr/one-file', title: 'Add a.txt', body: 'Body' });
+      assert.equal(res.error, undefined, res.error);
+      assert.equal(res.viaBrowser, true);
+      assert.match(res.url ?? '', /^https:\/\/github\.com\/acme\/app\/compare\/[^.]+\.\.\.vulgr%2Fone-file\?/);
+      assert.equal(existsSync(join(repo, 'a.txt')), false, 'the project folder is untouched');
+      assert.equal(execSync('git show vulgr/one-file:a.txt', { cwd: bare, encoding: 'utf-8' }), 'a\n', 'the branch was pushed with the change');
+      assert.equal(execSync('git worktree list', { cwd: repo, encoding: 'utf-8' }).trim().split('\n').length, 1);
+      assert.match((await orchestra.openPullRequest({ branch: 'x' })).error ?? '', /Nothing is waiting/);
+    } finally {
+      rmSync(bare, { recursive: true, force: true });
+    }
+  });
+
   test('parsePlan reads fenced or bare JSON and drops cycles and unknown dependencies', () => {
     const plan = parsePlan('Here:\n```json\n{"tasks":[{"id":"a","title":"A","dependsOn":["b"]},{"id":"b","title":"B","dependsOn":["a","zz"]}]}\n```');
     assert.ok(plan);
