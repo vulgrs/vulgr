@@ -249,11 +249,16 @@ async function runZeroTokenVerify(cmd: string, cwd: string): Promise<{ ok: boole
   if (!safe) return { ok: true, output: '' };
   const parts = safe.split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { ok: true, output: '' };
+  // Windows: npm, pnpm, yarn are .cmd shims that only start through a shell.
+  // cmd.exe reads & ^ % " as syntax, so the shell only gets plain words.
+  const win = process.platform === 'win32';
+  if (win && !parts.every((p) => /^[\w./:=@+-]+$/.test(p))) return { ok: true, output: '' };
   try {
     const { stdout, stderr } = await execFileAsync(parts[0], parts.slice(1), {
       cwd,
       timeout: 60_000,
       windowsHide: true,
+      shell: win,
     });
     return { ok: true, output: `${stdout}\n${stderr}`.trim() };
   } catch (err: any) {

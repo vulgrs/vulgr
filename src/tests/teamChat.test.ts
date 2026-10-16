@@ -15,6 +15,12 @@ import {
 } from '../engine/teamChat.js';
 import { AdapterFactory } from '../adapters/factory.js';
 import { MockCliAdapter } from '../adapters/mock.js';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+/** An empty folder: no package.json, so a team run doesn't start this repo's own test suite. */
+const scratchDir = () => mkdtempSync(join(tmpdir(), 'teamchat-'));
 
 describe('TeamChatCoordinator Suite', () => {
   it('classifies simple questions vs multi-step collaborative requests', () => {
@@ -57,7 +63,7 @@ describe('TeamChatCoordinator Suite', () => {
     await coordinator.run({
       id: 'test-solo-1',
       prompt: 'Explain the project structure',
-      cwd: process.cwd(),
+      cwd: scratchDir(),
       mode: 'solo',
       soloAgent: 'agy',
       soloModel: 'gemini-2.5-flash',
@@ -79,7 +85,7 @@ describe('TeamChatCoordinator Suite', () => {
     await coordinator.run({
       id: 'test-team-economy',
       prompt: 'nedir bu fonksiyon?',
-      cwd: process.cwd(),
+      cwd: scratchDir(),
       mode: 'team',
       teamAgents: ['claude', 'agy'],
       lang: 'tr',
@@ -113,7 +119,7 @@ describe('TeamChatCoordinator Suite', () => {
     await coordinator.run({
       id: 'test-team-talk',
       prompt: 'Kullanıcı profili için backend API servisi ve React arayüz modülünü baştan sona oluştur',
-      cwd: process.cwd(),
+      cwd: scratchDir(),
       mode: 'team',
       teamAgents: ['claude', 'cursor'],
       lang: 'tr',
@@ -144,7 +150,7 @@ describe('TeamChatCoordinator Suite', () => {
     await coordinator.run({
       id: 'test-solo-thinking',
       prompt: 'Refactor database indexing',
-      cwd: process.cwd(),
+      cwd: scratchDir(),
       mode: 'solo',
       soloAgent: 'cursor',
       soloModel: 'claude-fable-5-1-thinking-max',
@@ -167,7 +173,7 @@ describe('TeamChatCoordinator Suite', () => {
     await coordinator.run({
       id: 'test-solo-plain',
       prompt: 'Explain the project structure',
-      cwd: process.cwd(),
+      cwd: scratchDir(),
       mode: 'solo',
       soloAgent: 'agy',
       lang: 'tr',
@@ -245,7 +251,7 @@ describe('TeamChatCoordinator Suite', () => {
     await new TeamChatCoordinator().run({
       id: 't-multi',
       prompt: '@claude @cursor fix it',
-      cwd: process.cwd(),
+      cwd: scratchDir(),
       mode: 'solo',
       soloAgent: 'claude',
       teamModels: { claude: { model: 'opus', effort: 'high' }, cursor: { model: 'gpt-5.3-codex' } },
@@ -292,7 +298,7 @@ describe('TeamChatCoordinator Suite', () => {
     await new TeamChatCoordinator().run({
       id: 't-twins',
       prompt: '@claude @claude cache katmanını tasarlayın',
-      cwd: process.cwd(),
+      cwd: scratchDir(),
       mode: 'team',
       teamModels: { 'claude-1': { model: 'opus' }, 'claude-2': { model: 'sonnet' } },
       onEvent: (e) => events.push(e),
@@ -322,7 +328,7 @@ describe('TeamChatCoordinator Suite', () => {
     await new TeamChatCoordinator().run({
       id: 't-fast',
       prompt: '@claude @cursor fix it',
-      cwd: process.cwd(),
+      cwd: scratchDir(),
       mode: 'team',
       fast: true,
       teamModels: { claude: { model: 'opus' } },
