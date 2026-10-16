@@ -1,5 +1,6 @@
 import { safeStorage, shell, type BrowserWindow } from 'electron';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { needsRefresh, refreshTokenSet, tokenSetFrom, type GitHubTokenSet } from '../src/engine/githubTokens.js';
 
 /** Public profile shown in the sidebar. */
 export interface GitHubUser {
@@ -23,6 +24,10 @@ interface StoredAuth {
   token: string; // base64 of safeStorage ciphertext, or plain token when encryption is unavailable
   encrypted: boolean;
   user: GitHubUser;
+  /** Stored like `token`. Absent in files from before tokens were refreshed. */
+  refreshToken?: string;
+  expiresAt?: number;
+  refreshExpiresAt?: number;
 }
 
 /**
@@ -46,8 +51,9 @@ const DEVICE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 export class GitHubAuth {
   private window: BrowserWindow | null = null;
   private user: GitHubUser | null = null;
-  private token: string | null = null;
+  private tokens: GitHubTokenSet | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
+  private refreshing: Promise<boolean> | null = null;
 
   constructor(private storePath: string) {
     this.load();
@@ -57,11 +63,22 @@ export class GitHubAuth {
     this.window = window;
   }
 
-  /** Returns the signed-in user, refreshing the profile and dropping a revoked token. */
+  /**
+   * Returns the signed-in user and refreshes the profile. An expiring token is
+   * renewed first; the user is signed out only when GitHub turns down both the
+   * token and its refresh token, never because of a network error.
+   */
   async getUser(): Promise<GitHubUser | null> {
-    if (!this.token) return null;
+    if (!this.tokens) return null;
     try {
-      const fresh = await this.fetchUser(this.token);
+      if (needsRefresh(this.tokens) && !(await this.refresh())) {
+        this.logout();
+        return null;
+      }
+      let fresh = await this.fetchUser(this.tokens!.accessToken);
+      if (!fresh && this.tokens?.refreshToken && (await this.refresh())) {
+        fresh = await this.fetchUser(this.tokens!.accessToken);
+      }
       if (fresh) {
         this.user = fresh;
         this.save();
@@ -72,6 +89,24 @@ export class GitHubAuth {
       // Offline: keep showing the cached profile.
     }
     return this.user;
+  }
+
+  /** Renews the token pair; false when GitHub rejects the refresh token. Throws when offline. */
+  private refresh(): Promise<boolean> {
+    const refreshToken = this.tokens?.refreshToken;
+    if (!refreshToken) return Promise.resolve(false);
+    // getUser can run several times at once; they share one refresh.
+    this.refreshing ??= refreshTokenSet(process.env.GITHUB_CLIENT_ID || VULGR_GITHUB_CLIENT_ID, refreshToken)
+      .then((set) => {
+        if (!set) return false;
+        this.tokens = set;
+        this.save();
+        return true;
+      })
+      .finally(() => {
+        this.refreshing = null;
+      });
+    return this.refreshing;
   }
 
   async startLogin(): Promise<DeviceCodeInfo | { error: string }> {
@@ -105,7 +140,7 @@ export class GitHubAuth {
 
   logout() {
     this.cancelLogin();
-    this.token = null;
+    this.tokens = null;
     this.user = null;
     if (existsSync(this.storePath)) unlinkSync(this.storePath);
     this.emit('auth:changed', null);
@@ -126,14 +161,15 @@ export class GitHubAuth {
         });
         const data: any = await res.json();
 
-        if (data.access_token) {
+        const set = tokenSetFrom(data);
+        if (set) {
           this.pollTimer = null;
-          const user = await this.fetchUser(data.access_token);
+          const user = await this.fetchUser(set.accessToken);
           if (!user) {
             this.emit('auth:error', 'no-profile');
             return;
           }
-          this.token = data.access_token;
+          this.tokens = set;
           this.user = user;
           this.save();
           this.emit('auth:changed', user);
@@ -185,23 +221,31 @@ export class GitHubAuth {
     try {
       if (!existsSync(this.storePath)) return;
       const stored: StoredAuth = JSON.parse(readFileSync(this.storePath, 'utf-8'));
-      this.token = stored.encrypted
-        ? safeStorage.decryptString(Buffer.from(stored.token, 'base64'))
-        : stored.token;
+      const open = (v: string) => (stored.encrypted ? safeStorage.decryptString(Buffer.from(v, 'base64')) : v);
+      this.tokens = {
+        accessToken: open(stored.token),
+        refreshToken: stored.refreshToken ? open(stored.refreshToken) : undefined,
+        expiresAt: stored.expiresAt,
+        refreshExpiresAt: stored.refreshExpiresAt,
+      };
       this.user = stored.user;
     } catch {
-      this.token = null;
+      this.tokens = null;
       this.user = null;
     }
   }
 
   private save() {
-    if (!this.token || !this.user) return;
+    if (!this.tokens || !this.user) return;
     const encrypted = safeStorage.isEncryptionAvailable();
+    const seal = (v: string) => (encrypted ? safeStorage.encryptString(v).toString('base64') : v);
     const stored: StoredAuth = {
-      token: encrypted ? safeStorage.encryptString(this.token).toString('base64') : this.token,
+      token: seal(this.tokens.accessToken),
       encrypted,
       user: this.user,
+      refreshToken: this.tokens.refreshToken ? seal(this.tokens.refreshToken) : undefined,
+      expiresAt: this.tokens.expiresAt,
+      refreshExpiresAt: this.tokens.refreshExpiresAt,
     };
     writeFileSync(this.storePath, JSON.stringify(stored), { mode: 0o600 });
   }
