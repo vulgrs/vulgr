@@ -157,6 +157,31 @@ function getRecentProjects(): string[] {
   return [currentCwd];
 }
 
+/**
+ * Shows the system folder picker. The window is brought forward first, since
+ * Windows won't show a dialog for a minimized or unfocused frameless window.
+ * If the dialog can't be tied to the window it opens on its own instead.
+ */
+async function pickDirectory(title: string): Promise<string | null> {
+  const options: Electron.OpenDialogOptions = {
+    title,
+    properties: ['openDirectory', 'createDirectory'],
+    defaultPath: currentCwd && existsSync(currentCwd) ? currentCwd : os.homedir(),
+  };
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  let result: Electron.OpenDialogReturnValue;
+  try {
+    if (!win) throw new Error('no window');
+    if (win.isMinimized()) win.restore();
+    win.focus();
+    result = await dialog.showOpenDialog(win, options);
+  } catch (err) {
+    console.error('[Electron] Folder dialog failed on the window, opening it on its own:', err);
+    result = await dialog.showOpenDialog(options);
+  }
+  return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
+}
+
 function addRecentProject(dir: string): void {
   try {
     const list = getRecentProjects().filter((p) => p !== dir);
@@ -982,15 +1007,8 @@ function setupIpcHandlers() {
 
   // Project Workspace & File Explorer Handlers
   ipcMain.handle('workspace:open-folder', async () => {
-    if (!mainWindow) return null;
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openDirectory'],
-      title: 'Select Project Directory',
-    });
-    if (result.canceled || result.filePaths.length === 0) {
-      return null;
-    }
-    const chosenDir = result.filePaths[0];
+    const chosenDir = await pickDirectory('Select Project Directory');
+    if (!chosenDir) return null;
     currentCwd = chosenDir;
     memoryStore = new MemoryStore(chosenDir);
     autoSuggestEngine = new AutoSuggestEngine(chosenDir, memoryStore, skillsRegistry);
@@ -1022,14 +1040,9 @@ function setupIpcHandlers() {
   // Folder picker for the chat view: picks a directory without switching the
   // app's workspace, so a chat can run in a different project than the terminals.
   ipcMain.handle('chat:pick-folder', async () => {
-    if (!mainWindow) return null;
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openDirectory'],
-      title: 'Select Chat Folder',
-    });
-    if (result.canceled || result.filePaths.length === 0) return null;
-    addRecentProject(result.filePaths[0]);
-    return result.filePaths[0];
+    const dir = await pickDirectory('Select Chat Folder');
+    if (dir) addRecentProject(dir);
+    return dir;
   });
 
   ipcMain.handle('workspace:list-files', (_, { dir, maxDepth = 3 } = {}) => {

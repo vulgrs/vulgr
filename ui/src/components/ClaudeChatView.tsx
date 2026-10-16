@@ -1627,9 +1627,26 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   );
 
   const pickFolder = useCallback(async () => {
-    const dir = await api?.pickChatFolder?.();
-    if (dir) changeFolder(dir);
-  }, [api, changeFolder]);
+    try {
+      const dir = await api?.pickChatFolder?.();
+      if (dir) changeFolder(dir);
+    } catch (err: any) {
+      // Shown, not swallowed: a silent failure here looks like a dead button.
+      console.error('Folder picker failed:', err);
+      setState((prev) => ({
+        ...prev,
+        messages: [
+          ...prev.messages,
+          {
+            id: `err-${Date.now()}`,
+            kind: 'error',
+            text: `${isTr ? 'Klasör seçme penceresi açılamadı' : "Couldn't open the folder picker"}: ${err?.message || String(err)}`,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      }));
+    }
+  }, [api, changeFolder, isTr]);
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files) return;
