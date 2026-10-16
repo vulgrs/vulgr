@@ -205,7 +205,7 @@ export class SessionExporter {
             <div class="cmd-meta">
               <span>${escapeHtml(cmd.timestamp)}</span>
               ${cmd.durationMs ? `<span>• ${cmd.durationMs}ms</span>` : ''}
-              <button class="copy-btn" onclick="navigator.clipboard.writeText(${JSON.stringify(cmd.command)})">Copy</button>
+              <button class="copy-btn" onclick="navigator.clipboard.writeText(${escapeHtml(JSON.stringify(cmd.command))})">Copy</button>
             </div>
           </div>
           ${

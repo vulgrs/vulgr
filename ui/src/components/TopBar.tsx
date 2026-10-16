@@ -12,6 +12,8 @@ import {
   Copy,
   X,
   CircleHelp,
+  Sparkles,
+  TerminalSquare,
 } from 'lucide-react';
 import type { DoctorStatus } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
@@ -27,6 +29,8 @@ interface TopBarProps {
   onToggleSidebar: () => void;
   onOpenPalette: () => void;
   onOpenGuide: () => void;
+  chatModeOpen?: boolean;
+  onToggleChatMode?: () => void;
 }
 
 
@@ -65,8 +69,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleSidebar,
   onOpenPalette,
   onOpenGuide,
+  chatModeOpen,
+  onToggleChatMode,
 }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const keymap = useShortcuts();
   const [isMaximized, setIsMaximized] = useState(false);
   const isMac =
@@ -103,6 +109,27 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           {sidebarOpen ? <PanelLeftClose size={13} /> : <PanelLeft size={13} />}
         </button>
+        {onToggleChatMode && (
+          <ToolButton
+            onClick={onToggleChatMode}
+            icon={chatModeOpen ? <TerminalSquare size={13} /> : <Sparkles size={13} />}
+            label={
+              chatModeOpen
+                ? lang === 'tr'
+                  ? 'CLI Modu'
+                  : 'CLI Mode'
+                : lang === 'tr'
+                ? 'Sohbet (AI Chat)'
+                : 'AI Chat'
+            }
+            title={
+              lang === 'tr'
+                ? 'Sohbet (Tekli/Ortak Ajan) ve CLI Terminal görünümü arasında geçiş yap'
+                : 'Switch between AI Chat (Solo/Team) and CLI Terminal mode'
+            }
+            highlight={chatModeOpen}
+          />
+        )}
         <ToolButton
           onClick={onOpenSkillsModal}
           icon={<Sliders size={13} />}

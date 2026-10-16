@@ -1468,6 +1468,20 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handler, true);
   }, [activeSession, activeTabId, cycleTab]);
 
+  const handleSetWorkspaceMode = useCallback((mode: 'cli' | 'chat') => {
+    setChatModeOpen(mode === 'chat');
+    void window.warpApi?.updateConfig?.({ workspaceMode: mode }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    window.warpApi
+      ?.getConfig?.()
+      .then((cfg: any) => {
+        if (cfg?.workspaceMode === 'chat') setChatModeOpen(true);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="flex flex-col h-screen w-screen ambient-background overflow-hidden select-none font-sans text-zinc-200">
       {/* Top Bar: Tabs & Quick Agent Launchers */}
@@ -1484,6 +1498,8 @@ export const App: React.FC = () => {
         onOpenSkillsModal={() => setSkillsModalOpen(true)}
         onOpenExportReport={handleOpenExportModal}
         onOpenGuide={() => setGuideOpen(true)}
+        chatModeOpen={chatModeOpen}
+        onToggleChatMode={() => handleSetWorkspaceMode(chatModeOpen ? 'cli' : 'chat')}
       />
 
 
@@ -1550,6 +1566,9 @@ export const App: React.FC = () => {
               <SettingsView
                 isOpen={settingsModalOpen}
                 onClose={() => setSettingsModalOpen(false)}
+                onConfigChanged={(cfg) => {
+                  if (cfg.workspaceMode) setChatModeOpen(cfg.workspaceMode === 'chat');
+                }}
                 onShowWelcome={() => {
                   setSettingsModalOpen(false);
                   setOnboardingOpen(true);
@@ -1622,10 +1641,10 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* Claude Code Chat — structured stream-json chat overlay with live diff */}
+        {/* Unified AI Chat (Solo Agent+Model or Quota-Friendly Multi-Agent Team) */}
         <ClaudeChatView
           isOpen={chatModeOpen}
-          onClose={() => setChatModeOpen(false)}
+          onClose={() => handleSetWorkspaceMode('cli')}
           cwd={cwd}
           gitBranch={gitBranch}
           initialPrompt={chatInitialPrompt}

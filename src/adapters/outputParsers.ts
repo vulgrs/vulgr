@@ -50,10 +50,15 @@ export function claudeStreamJsonParser(onActivity?: (a: AgentActivity) => void):
       }
     }
     if (event.type === 'assistant' && Array.isArray(event.message?.content)) {
-      const out = event.message.content
+      const thinkingOut = event.message.content
+        .filter((block: any) => block?.type === 'thinking' && typeof block.thinking === 'string' && block.thinking.trim())
+        .map((block: any) => `<think>\n${block.thinking.trim()}\n</think>`)
+        .join('\n');
+      const textOut = event.message.content
         .filter((block: any) => block?.type === 'text' && typeof block.text === 'string')
         .map((block: any) => block.text)
         .join('');
+      const out = [thinkingOut, textOut].filter(Boolean).join('\n');
       if (out) {
         const piece = text ? `\n${out}` : out;
         text += piece;

@@ -34,9 +34,10 @@ export class CursorAgentAdapter extends BaseCliAdapter {
   protected buildArgs(prompt: string, options?: CliExecutionOptions): string[] {
     const text =
       prompt.length > MAX_PROMPT_CHARS ? `${prompt.slice(0, MAX_PROMPT_CHARS)}\n[...truncated]` : prompt;
-    const args: string[] = ['-p', '--trust', '--output-format', 'stream-json', text];
+    const args: string[] = ['-p', '--trust', '--output-format', 'stream-json'];
     if (options?.allowEdits) args.push('--force');
     if (this.extraArgs.length > 0) args.push(...this.extraArgs);
+    args.push(text);
     return args;
   }
 }

@@ -1,8 +1,8 @@
 import os from 'node:os';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface CommandSuggestion {
   command: string;
@@ -172,11 +172,12 @@ export async function generateShellCommand(
         cmd = cmd.replaceAll('{port}', port);
         exp = exp.replaceAll('{port}', port);
 
-        // Target name replacement
+        // Target name replacement (strip unsafe shell metacharacters)
         const words = trimmed.split(/\s+/);
-        const lastWord = words[words.length - 1] || 'node';
-        cmd = cmd.replaceAll('{target}', lastWord);
-        exp = exp.replaceAll('{target}', lastWord);
+        const rawTarget = words[words.length - 1] || 'node';
+        const safeTarget = rawTarget.replace(/[^a-zA-Z0-9._/-]/g, '') || 'node';
+        cmd = cmd.replaceAll('{target}', safeTarget);
+        exp = exp.replaceAll('{target}', safeTarget);
 
         return {
           command: cmd,
@@ -193,7 +194,7 @@ export async function generateShellCommand(
       isWin ? 'PowerShell' : 'Bash'
     } shell command: "${trimmed}". Output ONLY the raw executable command line, no markdown, no quotes, no explanation.`;
 
-    const result = await execAsync(`claude -p "${prompt.replace(/"/g, '\\"')}"`, {
+    const result = await execFileAsync('claude', ['-p', prompt], {
       timeout: 3000,
       windowsHide: true,
     });
@@ -211,9 +212,10 @@ export async function generateShellCommand(
   }
 
   // 3. Sensible generic fallback
+  const safeQuery = trimmed.replace(/[^a-zA-Z0-9._\s-]/g, '').trim() || 'help';
   return {
-    command: isWin ? `Get-Help *${trimmed}*` : `apropos "${trimmed}"`,
-    explanation: `Search manual documentation for command "${trimmed}".`,
+    command: isWin ? `Get-Help *${safeQuery}*` : `apropos "${safeQuery}"`,
+    explanation: `Search manual documentation for command "${safeQuery}".`,
     source: 'instant-rules',
   };
 }

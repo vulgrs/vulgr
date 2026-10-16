@@ -57,6 +57,9 @@ export interface WarpConfig {
   openRouterApiKey: string;     // sk-or-... ; empty falls back to OPENROUTER_API_KEY env
   systemOneModel: string;       // OpenRouter model id for System 1
 
+  // Primary workspace experience ('cli' = terminal panes, 'chat' = unified AI & multi-agent chat)
+  workspaceMode?: 'cli' | 'chat';
+
   // Keyboard shortcuts the user changed: action id -> combo like 'Ctrl+Shift+T'
   shortcuts?: Record<string, string>;
 
@@ -103,6 +106,7 @@ export const DEFAULT_CONFIG: WarpConfig = {
   defaultVerifyCmd: 'npm test',
   openRouterApiKey: '',
   systemOneModel: 'poolside/laguna-s-2.1-20260720:free',
+  workspaceMode: 'cli',
   lastUpdated: new Date().toISOString(),
 };
 
@@ -136,14 +140,38 @@ function cleanOverrides(o: ProjectOverrides): ProjectOverrides {
   return out;
 }
 
+export interface SecretCodec {
+  encrypt: (plain: string) => string;
+  decrypt: (cipher: string) => string;
+}
+
+const ENCRYPTED_KEY_PREFIX = 'enc:v1:';
+
 export class ConfigManager {
   private readonly configPath: string;
   private config: WarpConfig;
+  private secretCodec?: SecretCodec;
 
   /** `legacyPath` is read when `configPath` doesn't exist yet, so older settings carry over. */
   constructor(workspaceDir: string = process.cwd(), configFileName = '.warp-config.json', private readonly legacyPath?: string) {
     this.configPath = join(workspaceDir, configFileName);
     this.config = this.loadConfig();
+  }
+
+  /** Enables OS keychain encryption (e.g. Electron safeStorage) for sensitive API keys. */
+  setSecretCodec(codec: SecretCodec): void {
+    this.secretCodec = codec;
+    const rawKey = this.config.openRouterApiKey;
+    if (rawKey && rawKey.startsWith(ENCRYPTED_KEY_PREFIX)) {
+      try {
+        this.config.openRouterApiKey = codec.decrypt(rawKey.slice(ENCRYPTED_KEY_PREFIX.length));
+      } catch {
+        this.config.openRouterApiKey = '';
+      }
+    } else if (rawKey) {
+      // Migrate existing plaintext key on disk to encrypted storage
+      this.persist();
+    }
   }
 
   private loadConfig(): WarpConfig {
@@ -152,9 +180,18 @@ export class ConfigManager {
       try {
         const raw = readFileSync(source, 'utf-8');
         const parsed = JSON.parse(raw);
+        let apiKey: string = parsed.openRouterApiKey || '';
+        if (apiKey.startsWith(ENCRYPTED_KEY_PREFIX) && this.secretCodec) {
+          try {
+            apiKey = this.secretCodec.decrypt(apiKey.slice(ENCRYPTED_KEY_PREFIX.length));
+          } catch {
+            apiKey = '';
+          }
+        }
         return {
           ...DEFAULT_CONFIG,
           ...parsed,
+          openRouterApiKey: apiKey,
           claude: migrateClaudeConfig({ ...DEFAULT_CONFIG.claude, ...(parsed.claude || {}) }),
           agy: migrateModel({ ...DEFAULT_CONFIG.agy, ...(parsed.agy || {}) }),
           codex: migrateModel({ ...DEFAULT_CONFIG.codex, ...(parsed.codex || {}) }),
@@ -171,10 +208,18 @@ export class ConfigManager {
     try {
       const dir = dirname(this.configPath);
       if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
+        mkdirSync(dir, { recursive: true, mode: 0o700 });
       }
       this.config.lastUpdated = new Date().toISOString();
-      writeFileSync(this.configPath, JSON.stringify(this.config, null, 2), 'utf-8');
+      const diskCopy: WarpConfig = { ...this.config };
+      if (diskCopy.openRouterApiKey && !diskCopy.openRouterApiKey.startsWith(ENCRYPTED_KEY_PREFIX) && this.secretCodec) {
+        try {
+          diskCopy.openRouterApiKey = ENCRYPTED_KEY_PREFIX + this.secretCodec.encrypt(diskCopy.openRouterApiKey);
+        } catch {
+          // Keep as-is if encryption is temporarily unavailable
+        }
+      }
+      writeFileSync(this.configPath, JSON.stringify(diskCopy, null, 2), { encoding: 'utf-8', mode: 0o600 });
     } catch (err) {
       console.error('[ConfigManager] Failed to persist config to disk:', err);
     }

@@ -47,6 +47,10 @@
       unsignedWin: '<strong>Windows:</strong> when SmartScreen appears, click <em>More info → Run anyway</em>.',
       unsignedLinux: '<strong>Linux:</strong> make the file executable with <code>chmod +x Vulgr-*.AppImage</code>, then run it.',
       npmLead: 'Or install it with npm and start it with <code>vulgr</code>:',
+      signpathNote: 'Free code signing on Windows is provided by <a href="https://signpath.io/">SignPath.io</a>, certificate by <a href="https://signpath.org/">SignPath Foundation</a>.',
+      privacyTitle: 'Privacy Policy',
+      privacyBody: 'This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Vulgr runs locally on your machine; network requests occur only when checking GitHub Releases for updates or when you explicitly sign in with GitHub or run AI coding agent CLIs that you have configured.',
+      privacyLink: 'Privacy',
       issues: 'Issues'
     },
     tr: {
@@ -90,6 +94,10 @@
       unsignedWin: '<strong>Windows:</strong> SmartScreen uyarısı çıktığında <em>Ek bilgi → Yine de çalıştır</em>\'a tıklayın.',
       unsignedLinux: '<strong>Linux:</strong> dosyayı <code>chmod +x Vulgr-*.AppImage</code> ile çalıştırılabilir yapıp açın.',
       npmLead: 'Ya da npm ile kurup <code>vulgr</code> komutuyla başlatın:',
+      signpathNote: 'Windows için ücretsiz kod imzalama <a href="https://signpath.io/">SignPath.io</a> tarafından, sertifika ise <a href="https://signpath.org/">SignPath Foundation</a> tarafından sağlanmaktadır.',
+      privacyTitle: 'Gizlilik Politikası',
+      privacyBody: 'Bu program, kullanıcı veya programı kuran/çalıştıran kişi tarafından özellikle istenmedikçe diğer ağ sistemlerine hiçbir bilgi aktarmaz. Vulgr bilgisayarınızda yerel olarak çalışır; ağ istekleri yalnızca GitHub Releases üzerinden güncelleme denetlenirken veya açıkça GitHub ile giriş yaptığınızda ya da yapılandırdığınız yapay zekâ kod ajanlarını çalıştırdığınızda gerçekleşir.',
+      privacyLink: 'Gizlilik',
       issues: 'Sorunlar'
     }
   };

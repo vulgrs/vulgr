@@ -88,8 +88,26 @@ describe('SessionExporter Suite', () => {
     assert.ok(html.includes('badge-pass'));
     assert.ok(html.includes('badge-fail'));
 
-    // Check HTML escaping
+    // Check HTML escaping including onclick attribute payload
     assert.ok(!html.includes('<script>alert('));
+
+    const xssData: SessionReportData = {
+      ...sampleData,
+      commands: [
+        {
+          id: 'cmd-xss',
+          command: `echo '); alert("xss");//`,
+          exitCode: 0,
+          timestamp: '13:01:00',
+          durationMs: 10,
+          stdout: 'ok',
+          stderr: '',
+        },
+      ],
+    };
+    const xssHtml = SessionExporter.toHtml(xssData);
+    assert.ok(!xssHtml.includes(`alert("xss")`));
+    assert.ok(xssHtml.includes(`&quot;echo &#039;); alert(\\&quot;xss\\&quot;);//&quot;`));
   });
 
   it('generates formatted JSON output identical to source data', () => {

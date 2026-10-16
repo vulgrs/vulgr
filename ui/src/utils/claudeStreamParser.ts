@@ -73,8 +73,10 @@ export function initialChatState(): ChatReducerState {
   return { messages: [], meta: {}, streamingText: '' };
 }
 
+const STREAMING_THINKING_ID = '__streaming_thinking__';
+
 function withoutStreaming(messages: ChatMessage[]): ChatMessage[] {
-  return messages.filter((m) => m.id !== STREAMING_ID);
+  return messages.filter((m) => m.id !== STREAMING_ID && m.id !== STREAMING_THINKING_ID);
 }
 
 /**
@@ -102,12 +104,32 @@ export function reduceChatEvent(state: ChatReducerState, event: ClaudeEvent): Ch
       if (inner?.type === 'message_start') {
         return { ...state, streamingText: '' };
       }
+      if (inner?.type === 'content_block_delta' && inner.delta?.type === 'thinking_delta') {
+        const deltaThinking = String(inner.delta.thinking ?? '');
+        if (!deltaThinking) return state;
+        const existingThinking = state.messages.find((m) => m.id === STREAMING_THINKING_ID);
+        const nextThinkingText = (existingThinking?.text ?? '') + deltaThinking;
+        const others = state.messages.filter((m) => m.id !== STREAMING_THINKING_ID);
+        const thinkingBubble: ChatMessage = {
+          id: STREAMING_THINKING_ID,
+          kind: 'thinking',
+          agent: 'claude',
+          roleLabel: 'Claude Düşünme Süreci',
+          model: state.meta.model,
+          text: nextThinkingText,
+          streaming: true,
+          timestamp: now(),
+        };
+        return { ...state, messages: [...others, thinkingBubble] };
+      }
       if (inner?.type === 'content_block_delta' && inner.delta?.type === 'text_delta') {
         const streamingText = state.streamingText + (inner.delta.text ?? '');
-        const others = withoutStreaming(state.messages);
+        const others = state.messages.filter((m) => m.id !== STREAMING_ID);
         const bubble: ChatMessage = {
           id: STREAMING_ID,
           kind: 'assistant',
+          agent: 'claude',
+          model: state.meta.model,
           text: streamingText,
           streaming: true,
           timestamp: now(),
@@ -122,27 +144,34 @@ export function reduceChatEvent(state: ChatReducerState, event: ClaudeEvent): Ch
       const blocks = event.message?.content;
       const messages = withoutStreaming(state.messages);
       const additions: ChatMessage[] = [];
+      const msgModel = event.message?.model ?? state.meta.model;
 
       if (Array.isArray(blocks)) {
         for (const block of blocks) {
-          if (block?.type === 'text' && block.text?.trim()) {
-            additions.push({
-              id: nextId('assistant'),
-              kind: 'assistant',
-              text: block.text,
-              timestamp: now(),
-            });
-          } else if (block?.type === 'thinking' && (block.thinking || '').trim()) {
+          if (block?.type === 'thinking' && (block.thinking || '').trim()) {
             additions.push({
               id: nextId('thinking'),
               kind: 'thinking',
+              agent: 'claude',
+              roleLabel: 'Düşünme Süreci',
+              model: msgModel,
               text: block.thinking,
+              timestamp: now(),
+            });
+          } else if (block?.type === 'text' && block.text?.trim()) {
+            additions.push({
+              id: nextId('assistant'),
+              kind: 'assistant',
+              agent: 'claude',
+              model: msgModel,
+              text: block.text,
               timestamp: now(),
             });
           } else if (block?.type === 'tool_use') {
             additions.push({
               id: block.id || nextId('tool'),
               kind: 'tool_use',
+              agent: 'claude',
               text: '',
               toolName: block.name,
               toolInput: summarizeToolInput(block.name, block.input),
@@ -153,7 +182,7 @@ export function reduceChatEvent(state: ChatReducerState, event: ClaudeEvent): Ch
       } else {
         const text = contentToText(event.message?.content);
         if (text.trim()) {
-          additions.push({ id: nextId('assistant'), kind: 'assistant', text, timestamp: now() });
+          additions.push({ id: nextId('assistant'), kind: 'assistant', agent: 'claude', model: msgModel, text, timestamp: now() });
         }
       }
 

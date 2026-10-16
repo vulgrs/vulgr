@@ -63,6 +63,17 @@ describe('SharedSkills Suite', () => {
       [{ name: 'branch_name', label: 'Branch', description: '', defaultValue: 'main' }]
     );
     assert.strictEqual(fallback, 'git checkout -b main');
+
+    // Sanitize shell injection payloads
+    const injected = interpolateSkillCommand(
+      template,
+      { branch_name: 'main; rm -rf / && $(whoami) `id`' },
+      []
+    );
+    assert.ok(!injected.includes(';'));
+    assert.ok(!injected.includes('&&'));
+    assert.ok(!injected.includes('$('));
+    assert.ok(!injected.includes('`'));
   });
 
   it('saves and deletes custom user skills', () => {

@@ -36,6 +36,20 @@ export function extractPlaceholders(template: string): string[] {
 }
 
 /**
+ * Strips or escapes unsafe shell control characters when interpolating into a command template.
+ */
+function sanitizeSkillValue(val: string, quotedInTemplate: boolean): string {
+  // Strip newlines and null bytes
+  const singleLine = val.replace(/[\r\n\0]/g, ' ');
+  if (quotedInTemplate) {
+    // Inside double quotes in template: escape ", $, `, \
+    return singleLine.replace(/[\\"$`]/g, '\\$&');
+  }
+  // Unquoted parameter: strip command separators, subshells, and redirection
+  return singleLine.replace(/[;&|`$<>()\\]/g, '');
+}
+
+/**
  * Replaces {{param}} placeholders with actual user values or default values.
  */
 export function interpolateSkillCommand(
@@ -54,10 +68,13 @@ export function interpolateSkillCommand(
     let val = values[key];
     if (val === undefined || val === '') {
       const def = paramMap.get(key)?.defaultValue;
-      val = def !== undefined ? def : `{{${key}}}`;
+      if (def === undefined) continue;
+      val = def;
     }
+    const quotedRegex = new RegExp(`"[^"]*\\{\\{${key}\\}\\}[^"]*"`);
+    const safeVal = sanitizeSkillValue(val, quotedRegex.test(result));
     const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-    result = result.replace(regex, val);
+    result = result.replace(regex, () => safeVal);
   }
 
   return result;

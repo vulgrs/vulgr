@@ -23,6 +23,6 @@ export class OpenCodeAdapter extends BaseCliAdapter {
   protected buildArgs(prompt: string): string[] {
     const text =
       prompt.length > MAX_PROMPT_CHARS ? `${prompt.slice(0, MAX_PROMPT_CHARS)}\n[...truncated]` : prompt;
-    return ['run', text, ...this.extraArgs];
+    return ['run', ...this.extraArgs, text];
   }
 }

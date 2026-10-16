@@ -94,6 +94,19 @@ Project layout:
 
 [vulgr.tech](https://vulgr.tech) is built from `docs-site/` (plain HTML/CSS) and published to GitHub Pages by `.github/workflows/pages.yml`.
 
+## Code Signing Policy
+
+Free code signing on Windows is provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+- **Committers and Reviewers:** [Vulgr contributors](https://github.com/vulgrs/vulgr/graphs/contributors)
+- **Approvers:** [Vulgr maintainers](https://github.com/orgs/vulgrs/people)
+
+## Privacy Policy
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
+
+Vulgr runs locally on your machine. Terminal sessions, project files, and preferences stay on your computer. Network requests occur only when checking GitHub Releases for updates or when you explicitly sign in with GitHub or run AI coding agent CLIs that you have configured.
+
 ## Contributing
 
 Issues and pull requests are welcome. For larger changes, please open an issue first so we can agree on the approach. When adding interface text, add it to both the English and Turkish tables in `ui/src/i18n/messages/` — the type-check fails if one is missing.

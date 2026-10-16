@@ -76,25 +76,58 @@ const QueryContext = createContext('');
 const matches = (query: string, ...texts: (string | undefined)[]) =>
   !query || texts.some((text) => text?.toLocaleLowerCase().includes(query));
 
-const claudeModels = (t: Messages): OptionItem[] => [
-  { value: 'default', label: t.settings.claudeModels.default },
-  { value: 'opus', label: t.settings.claudeModels.opus },
-  { value: 'sonnet', label: t.settings.claudeModels.sonnet },
-  { value: 'haiku', label: t.settings.claudeModels.haiku },
-];
+const claudeModels = (t: Messages, current?: string): OptionItem[] => {
+  const items: OptionItem[] = [
+    { value: 'default', label: t.settings.claudeModels.default },
+    { value: 'fable', label: 'Claude Fable 5.1 (En Yeni · Derin Düşünme 🧠)' },
+    { value: 'opus', label: 'Claude Opus 5.5 (1M Mimari & Akıl Yürütme 🧠)' },
+    { value: 'sonnet', label: 'Claude Sonnet 5.5 (Dengeli & Hızlı)' },
+    { value: 'haiku', label: 'Claude Haiku 5.5 (Kota Dostu ⚡)' },
+    { value: 'claude-fable-5-1-thinking-max', label: 'Claude Fable 5.1 1M Max Thinking 🧠' },
+    { value: 'claude-opus-5-5-high', label: 'Claude Opus 5.5 1M High 🧠' },
+    { value: 'claude-sonnet-5-5-high', label: 'Claude Sonnet 5.5 High' },
+  ];
+  if (current && !items.some((i) => i.value === current)) {
+    items.push({ value: current, label: current });
+  }
+  return items;
+};
 
-const agyModels = (t: Messages): OptionItem[] => [
-  { value: 'default', label: t.settings.agyModels.default },
-  { value: 'gemini-2.5-pro', label: t.settings.agyModels.pro },
-  { value: 'gemini-2.5-flash', label: t.settings.agyModels.flash },
-];
+const agyModels = (t: Messages, current?: string): OptionItem[] => {
+  const items: OptionItem[] = [
+    { value: 'default', label: t.settings.agyModels.default },
+    { value: 'gemini-4-argon-high', label: 'Gemini 4 Argon High (En Yeni 🧠)' },
+    { value: 'gemini-3.8-flash-high', label: 'Gemini 3.8 Flash High (Kota Dostu ⚡)' },
+    { value: 'gemini-3.8-flash-medium', label: 'Gemini 3.8 Flash Medium ⚡' },
+    { value: 'gemini-3.7-flash-high', label: 'Gemini 3.7 Flash High ⚡' },
+    { value: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro (Derin Mimari 🧠)' },
+    { value: 'gemini-2.5-pro', label: t.settings.agyModels.pro },
+    { value: 'gemini-2.5-flash', label: t.settings.agyModels.flash },
+  ];
+  if (current && !items.some((i) => i.value === current)) {
+    items.push({ value: current, label: current });
+  }
+  return items;
+};
 
-const codexModels = (t: Messages): OptionItem[] => [
-  { value: 'default', label: t.settings.codexModels.default },
-  { value: 'gpt-4o', label: t.settings.codexModels.gpt4o },
-  { value: 'o3-mini', label: t.settings.codexModels.o3mini },
-  { value: 'o1', label: t.settings.codexModels.o1 },
-];
+const codexModels = (t: Messages, current?: string): OptionItem[] => {
+  const items: OptionItem[] = [
+    { value: 'default', label: t.settings.codexModels.default },
+    { value: 'gpt-6.1-sol', label: 'GPT-6.1 Sol (En Yeni 🧠)' },
+    { value: 'gpt-6.1-sol-fast', label: 'GPT-6.1 Sol Fast ⚡' },
+    { value: 'gpt-6-sol', label: 'GPT-6 Sol 🧠' },
+    { value: 'gpt-5.6-terra-high', label: 'GPT-5.6 Terra 1M High 🧠' },
+    { value: 'gpt-5.6-sol-high', label: 'GPT-5.6 Sol 1M High 🧠' },
+    { value: 'gpt-5.4-high', label: 'GPT-5.4 1M High' },
+    { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini (Kota Dostu ⚡)' },
+    { value: 'gpt-5.3-codex-high', label: 'Codex 5.3 High 🧠' },
+    { value: 'gpt-5.3-codex-fast', label: 'Codex 5.3 Fast ⚡' },
+  ];
+  if (current && !items.some((i) => i.value === current)) {
+    items.push({ value: current, label: current });
+  }
+  return items;
+};
 
 /** The shells that exist on this platform, plus the saved one if it isn't among them. */
 const shells = (t: Messages, current: ShellType): OptionItem[] => {
@@ -125,7 +158,7 @@ const cursors = (t: Messages): OptionItem[] => [
 const LANGUAGE_ITEMS: OptionItem[] = LANGUAGES.map((l) => ({ value: l.value, label: l.label }));
 
 /** Settings that travel in an export; secrets, per-project entries and timestamps stay behind. */
-const EXPORT_KEYS = ['defaultShell', 'fontSize', 'cursorStyle', 'claude', 'agy', 'codex', 'autoSandbox', 'notifyRuns', 'notifyCommands', 'coAuthorVulgr', 'defaultVerifyCmd', 'shortcuts'] as const;
+const EXPORT_KEYS = ['defaultShell', 'fontSize', 'cursorStyle', 'claude', 'agy', 'codex', 'autoSandbox', 'notifyRuns', 'notifyCommands', 'coAuthorVulgr', 'defaultVerifyCmd', 'workspaceMode', 'shortcuts'] as const;
 const EXPORT_FORMAT = 'vulgr-settings';
 
 /** Takes the known settings from an imported file, keeping each only if its type matches the current one. */
@@ -673,6 +706,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                 {show('general') && (
                   <>
                     <Group title={s.appearance}>
+                      <Row
+                        label={lang === 'tr' ? 'Çalışma Arayüzü Modu' : 'Workspace Interface Mode'}
+                        hint={
+                          lang === 'tr'
+                            ? 'Uygulamayı klasik bölünmüş CLI terminalleriyle veya tek ekranlı AI / Ortak Ajan Sohbeti (Chat) modunda kullanın.'
+                            : 'Switch between classic split CLI terminals and the unified solo/multi-agent Chat interface.'
+                        }
+                      >
+                        <div className="flex justify-end">
+                          <Segmented
+                            value={config.workspaceMode === 'chat' ? 'chat' : 'cli'}
+                            items={[
+                              { value: 'cli', label: lang === 'tr' ? 'CLI / Terminal' : 'CLI / Terminal' },
+                              { value: 'chat', label: lang === 'tr' ? 'Sohbet (Chat)' : 'Chat Mode' },
+                            ]}
+                            onChange={(value) =>
+                              setConfig({ ...config, workspaceMode: value === 'chat' ? 'chat' : 'cli' })
+                            }
+                          />
+                        </div>
+                      </Row>
                       <Row label={s.themeTitle} hint={s.themeDescription}>
                         <div className="flex justify-end">
                           <Segmented
@@ -792,7 +846,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                         <OptionSelect
                           id="claude-model"
                           value={config.claude.model}
-                          items={claudeModels(t)}
+                          items={claudeModels(t, config.claude.model)}
                           onValueChange={(value) => setConfig({ ...config, claude: { ...config.claude, model: value } })}
                         />
                       </Row>
@@ -812,7 +866,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                         <OptionSelect
                           id="agy-model"
                           value={config.agy.model}
-                          items={agyModels(t)}
+                          items={agyModels(t, config.agy.model)}
                           onValueChange={(value) => setConfig({ ...config, agy: { ...config.agy, model: value } })}
                         />
                       </Row>
@@ -822,7 +876,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isOpen, onClose, onC
                         <OptionSelect
                           id="codex-model"
                           value={config.codex.model}
-                          items={codexModels(t)}
+                          items={codexModels(t, config.codex.model)}
                           onValueChange={(value) => setConfig({ ...config, codex: { ...config.codex, model: value } })}
                         />
                       </Row>

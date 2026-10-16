@@ -28,7 +28,10 @@ export function parseTestCommand(output: string): string | null {
   const clean = output.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '');
   const matches = [...clean.matchAll(/^[\s*>-]*TEST_COMMAND:\s*`*([^`\n]+?)`*[\s*]*$/gim)];
   const cmd = matches.length ? matches[matches.length - 1][1].trim() : '';
-  return cmd && !/^<.*>$/.test(cmd) ? cmd : null;
+  if (!cmd || /^<.*>$/.test(cmd)) return null;
+  // Reject subshells, command chaining, pipes and redirections to prevent prompt-injected command execution.
+  if (/[;|`<>]|\$\(|&&|\|\|/.test(cmd)) return null;
+  return cmd;
 }
 
 /** The project's own test command, for when no agent named one. */

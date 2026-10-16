@@ -91,7 +91,9 @@ export class GitHubAuth {
       return { error: data.error_description || data.error || 'failed' };
     }
 
-    shell.openExternal(data.verification_uri);
+    if (typeof data.verification_uri === 'string' && /^https:\/\/github\.com\//i.test(data.verification_uri)) {
+      shell.openExternal(data.verification_uri);
+    }
     this.poll(clientId, data.device_code, (data.interval || 5) * 1000, Date.now() + data.expires_in * 1000);
     return { userCode: data.user_code, verificationUri: data.verification_uri, expiresIn: data.expires_in };
   }

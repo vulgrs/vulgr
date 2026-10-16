@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { accessSync, constants, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
 
@@ -42,11 +42,12 @@ export function releaseDmgUrl(owner: string, repo: string, version: string, arch
 
 /** Downloads `url` to `file`, reporting progress 0-100 when the size is known. */
 export async function download(url: string, file: string, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<void> {
+  if (!/^https:\/\//i.test(url)) throw new Error('Refusing to download update over insecure protocol');
   const res = await fetch(url, { redirect: 'follow', signal });
   if (!res.ok || !res.body) throw new Error(`Download failed: HTTP ${res.status}`);
   const total = Number(res.headers.get('content-length')) || 0;
-  mkdirSync(dirname(file), { recursive: true });
-  const out = createWriteStream(file);
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  const out = createWriteStream(file, { mode: 0o600 });
   let received = 0;
   let last = -1;
   try {
@@ -85,10 +86,10 @@ export async function extractAppFromDmg(dmg: string, stagingDir: string): Promis
   const mount = mkdtempSync(join(tmpdir(), 'vulgr-dmg-'));
   await execFileAsync('/usr/bin/hdiutil', ['attach', '-nobrowse', '-readonly', '-noautoopen', '-mountpoint', mount, dmg]);
   try {
-    const app = readdirSync(mount).find((n) => n.endsWith('.app'));
+    const app = readdirSync(mount).find((n) => n.endsWith('.app') && !n.includes('/') && !n.includes('..'));
     if (!app) throw new Error('No app in the downloaded disk image');
     rmSync(stagingDir, { recursive: true, force: true });
-    mkdirSync(stagingDir, { recursive: true });
+    mkdirSync(stagingDir, { recursive: true, mode: 0o700 });
     const staged = join(stagingDir, app);
     await execFileAsync('/usr/bin/ditto', [join(mount, app), staged]);
     return staged;
@@ -123,7 +124,7 @@ exit 0
 export function startSwap(opts: { pid: number; target: string; staged: string; relaunch?: boolean; scriptDir?: string }): void {
   const dir = opts.scriptDir ?? mkdtempSync(join(tmpdir(), 'vulgr-swap-'));
   const script = join(dir, 'swap.sh');
-  writeFileSync(script, SWAP_SCRIPT, { mode: 0o755 });
+  writeFileSync(script, SWAP_SCRIPT, { mode: 0o700 });
   const child = spawn('/bin/sh', [script, String(opts.pid), opts.target, opts.staged, opts.relaunch === false ? '0' : '1'], {
     detached: true,
     stdio: 'ignore',
@@ -131,5 +132,8 @@ export function startSwap(opts: { pid: number; target: string; staged: string; r
   child.unref();
 }
 
-export const stagingDirFor = (version: string) => join(tmpdir(), 'vulgr-update', version);
+export const stagingDirFor = (version: string) => {
+  const safeVer = String(version).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 64) || 'latest';
+  return join(homedir(), '.vulgr', 'updates', safeVer);
+};
 export const hasStaged = (version: string) => existsSync(stagingDirFor(version));

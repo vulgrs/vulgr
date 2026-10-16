@@ -180,4 +180,24 @@ describe('ConfigManager Suite', () => {
     assert.strictEqual(config.agy.model, 'default');
     assert.strictEqual(config.codex.model, 'o3-mini');
   });
+
+  it('encrypts openRouterApiKey on disk when secret codec is configured', async () => {
+    const { readFileSync } = await import('node:fs');
+    const codec = {
+      encrypt: (plain: string) => Buffer.from(plain, 'utf-8').toString('base64'),
+      decrypt: (cipher: string) => Buffer.from(cipher, 'base64').toString('utf-8'),
+    };
+    const manager = new ConfigManager(process.cwd(), testFileName);
+    manager.setSecretCodec(codec);
+    manager.updateConfig({ openRouterApiKey: 'sk-or-v1-secret-test-key' });
+
+    const rawDisk = JSON.parse(readFileSync(testFilePath, 'utf-8'));
+    assert.ok(rawDisk.openRouterApiKey.startsWith('enc:v1:'));
+    assert.notStrictEqual(rawDisk.openRouterApiKey, 'sk-or-v1-secret-test-key');
+
+    const reloaded = new ConfigManager(process.cwd(), testFileName);
+    reloaded.setSecretCodec(codec);
+    assert.strictEqual(reloaded.getConfig().openRouterApiKey, 'sk-or-v1-secret-test-key');
+  });
 });
+

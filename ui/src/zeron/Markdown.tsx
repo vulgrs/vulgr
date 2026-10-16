@@ -29,16 +29,22 @@ export const Markdown: React.FC<MarkdownProps> = ({ children }) => {
           p: ({ children }) => <p className="my-1.5 first:mt-0 last:mb-0">{children}</p>,
           strong: ({ children }) => <strong className="font-semibold text-zinc-50">{children}</strong>,
           em: ({ children }) => <em className="italic text-zinc-200">{children}</em>,
-          a: ({ children, href }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noreferrer"
-              className="text-zinc-100 underline decoration-zinc-500 underline-offset-2 break-words hover:decoration-zinc-200"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ children, href }) => {
+            const safeHref = href && /^(https?:\/\/|mailto:)/i.test(href) ? href : undefined;
+            if (!safeHref) {
+              return <span className="text-zinc-300 underline decoration-zinc-600">{children}</span>;
+            }
+            return (
+              <a
+                href={safeHref}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-zinc-100 underline decoration-zinc-500 underline-offset-2 break-words hover:decoration-zinc-200"
+              >
+                {children}
+              </a>
+            );
+          },
           ul: ({ children }) => (
             <ul className="list-disc pl-5 my-1.5 space-y-1 marker:text-zinc-600">{children}</ul>
           ),

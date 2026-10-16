@@ -1,4 +1,4 @@
-import { exec, execFile, spawn, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -153,7 +153,8 @@ function which(bin: string): Promise<string | null> {
 
 function version(binPath: string): Promise<string | null> {
   return new Promise((resolve) => {
-    exec(`"${binPath}" --version`, { env: searchEnv(), timeout: 8000, windowsHide: true }, (err, out) => {
+    const needsShell = isWin && /\.(cmd|bat)$/i.test(binPath);
+    execFile(binPath, ['--version'], { env: searchEnv(), timeout: 8000, windowsHide: true, shell: needsShell }, (err, out) => {
       if (err) return resolve(null);
       const line = String(out).split(/\r?\n/).map((l) => l.trim()).find(Boolean) || '';
       resolve(line.match(/\d+\.\d+(\.\d+)?[\w.-]*/)?.[0] ?? (line.slice(0, 40) || null));

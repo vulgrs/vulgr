@@ -1,4 +1,4 @@
-import { execSync, execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, mkdirSync, rmSync, copyFileSync, symlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -61,7 +61,8 @@ export class WorktreeManager {
 
     const currentBranch = (await this.git.getBranchAsync()) || 'master';
     const base = baseBranch || currentBranch;
-    const id = runId || `sandbox-${Date.now()}-${randomBytes(3).toString('hex')}`;
+    const rawId = runId || `sandbox-${Date.now()}-${randomBytes(3).toString('hex')}`;
+    const id = rawId.replace(/[^a-zA-Z0-9._-]/g, '-');
     const branchName = `vulgr-agent/${id}`;
     const worktreePath = join(this.worktreesDir, id);
 
@@ -74,11 +75,11 @@ export class WorktreeManager {
       // 1. Create worktree on a new branch branched from HEAD
       await this.run(['worktree', 'add', '-b', branchName, worktreePath, base]);
 
-      // 2. Copy essential local config files if present (.env, .npmrc, etc.)
-      const envFile = join(this.mainCwd, '.env');
-      if (existsSync(envFile)) {
+      // 2. Copy non-secret template (.env.example) if present; never copy live .env secrets into agent sandboxes
+      const envExample = join(this.mainCwd, '.env.example');
+      if (existsSync(envExample)) {
         try {
-          copyFileSync(envFile, join(worktreePath, '.env'));
+          copyFileSync(envExample, join(worktreePath, '.env.example'));
         } catch {}
       }
 
@@ -234,9 +235,10 @@ export class WorktreeManager {
     if (!this.git.isGitRepo()) return [];
 
     try {
-      const output = execSync('git worktree list --porcelain', {
+      const output = execFileSync('git', ['worktree', 'list', '--porcelain'], {
         cwd: this.mainCwd,
         encoding: 'utf-8',
+        windowsHide: true,
       });
       return this.parseWorktreeList(output);
     } catch {

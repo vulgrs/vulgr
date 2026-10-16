@@ -118,7 +118,9 @@ export const SystemOneView: React.FC<SystemOneViewProps> = ({
 
   const handleApply = async () => {
     if (!result) return;
-    const res = await api?.writeProjectFile(result.execution.target_file || targetFile, compose(result));
+    // Always apply to the user-confirmed targetFile in the form, not an arbitrary path emitted by the model.
+    const safeTarget = targetFile.trim() || result.execution.target_file;
+    const res = await api?.writeProjectFile(safeTarget, compose(result));
     if (res?.success) {
       setApplied(true);
       setTimeout(() => setApplied(false), 2000);

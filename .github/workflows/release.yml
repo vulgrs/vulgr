@@ -21,6 +21,8 @@ jobs:
           - os: ubuntu-latest
             target: --linux
     runs-on: ${{ matrix.os }}
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,13 +54,51 @@ jobs:
 
       - run: npm run build
 
-      # TODO(signing): Windows code signing via SignPath goes here — sign the
-      # NSIS installer before it is uploaded (e.g. signpath/github-action-submit-signing-request).
       - name: Package
         run: npx electron-builder ${{ matrix.target }} --publish never
         env:
           # No signing certificates yet: skip macOS keychain lookup.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload unsigned Windows installer for SignPath
+        id: upload-unsigned
+        if: runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows-installer
+          path: release/*.exe
+          if-no-files-found: error
+
+      - name: Sign Windows installer with SignPath
+        if: runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-id: ${{ vars.SIGNPATH_PROJECT_ID || 'vulgr' }}
+          signing-policy-id: ${{ vars.SIGNPATH_SIGNING_POLICY_ID || 'release-signing' }}
+          artifact-configuration-id: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_ID || 'installer' }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: release-signed
+
+      - name: Replace installer with signed executable and refresh latest.yml checksum
+        if: runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != ''
+        shell: bash
+        run: |
+          cp -f release-signed/*.exe release/
+          node -e '
+            const fs = require("fs");
+            const crypto = require("crypto");
+            const exe = fs.readdirSync("release").find(f => f.endsWith(".exe"));
+            const buf = fs.readFileSync("release/" + exe);
+            const sha512 = crypto.createHash("sha512").update(buf).digest("base64");
+            const size = buf.length;
+            let yml = fs.readFileSync("release/latest.yml", "utf8");
+            yml = yml.replace(/sha512:\s*\S+/g, "sha512: " + sha512);
+            yml = yml.replace(/size:\s*\d+/g, "size: " + size);
+            fs.writeFileSync("release/latest.yml", yml);
+          '
 
       - uses: actions/upload-artifact@v4
         with:
