@@ -21,6 +21,7 @@ interface ToolCallProps {
 function iconFor(name?: string) {
   switch (name) {
     case 'Bash':
+    case 'Log':
       return <TerminalIcon size={13} />;
     case 'Edit':
     case 'MultiEdit':
@@ -65,6 +66,8 @@ function summarize(name?: string, input?: string): { verb: string; target: strin
       return { verb: 'Fetched', target: t };
     case 'TodoWrite':
       return { verb: 'Updated todos', target: '' };
+    case 'Log':
+      return { verb: 'Output', target: t };
     default:
       return { verb: name || 'Tool', target: t };
   }

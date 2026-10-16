@@ -34,7 +34,7 @@ export abstract class BaseCliAdapter implements ICliAdapter {
    * For CLIs whose output is machine-readable (e.g. JSON events): turns it back
    * into plain text and reads the run's usage. None by default.
    */
-  protected createOutputParser(): OutputParser | null {
+  protected createOutputParser(_options?: CliExecutionOptions): OutputParser | null {
     return null;
   }
 
@@ -134,7 +134,7 @@ export abstract class BaseCliAdapter implements ICliAdapter {
     const needsShell = process.platform === 'win32' && (!resolved || /\.(cmd|bat)$/i.test(resolved));
     const command = resolved && !needsShell ? resolved : this.binaryPath;
 
-    const parser = this.createOutputParser();
+    const parser = this.createOutputParser(options);
     // Plain text and usage from the parser; a reported usage is also announced.
     const finalize = (result: CliExecutionResult): CliExecutionResult => {
       if (!parser) return result;

@@ -9,6 +9,8 @@ export interface CliExecutionOptions {
   maxBufferBytes?: number;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
+  /** A step the agent took (ran a command, read or edited a file...), for CLIs that report them. */
+  onActivity?: (activity: AgentActivity) => void;
   signal?: AbortSignal;
   stdinInput?: string;
   /** Let the agent edit files without asking (builder role). Reviewers run read-only. */
@@ -16,6 +18,19 @@ export interface CliExecutionOptions {
   extraArgs?: string[];
   /** What the run was for (e.g. 'orchestra'), kept with its usage. */
   usageTag?: string;
+}
+
+/**
+ * One step an agent CLI took while working. Reported once when it starts and
+ * again (same id) when it finishes; `tool` uses Claude Code's tool names
+ * (Bash, Read, Edit, Write, Grep...) so every agent renders the same way.
+ */
+export interface AgentActivity {
+  id: string;
+  tool: string;
+  input?: string;
+  status: 'running' | 'done' | 'error';
+  output?: string;
 }
 
 /** What one agent call really used, as its CLI reported it. */

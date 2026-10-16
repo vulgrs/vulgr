@@ -69,6 +69,10 @@ interface WarpApi {
     lang?: string;
   }) => Promise<{ ok: boolean; error?: string }>;
   stopTeamChat: () => Promise<boolean>;
+  listChats: (cwd?: string) => Promise<any[]>;
+  getChat: (id: string) => Promise<any | null>;
+  saveChat: (record: any) => Promise<any | null>;
+  deleteChat: (id: string) => Promise<boolean>;
   onTeamChatEvent: (callback: (payload: { id: string; event: any }) => void) => () => void;
 
   // Deterministic System 1 JSON compiler
@@ -309,6 +313,10 @@ const api: WarpApi = {
   },
   runTeamChat: (options) => ipcRenderer.invoke('teamchat:run', options),
   stopTeamChat: () => ipcRenderer.invoke('teamchat:stop'),
+  listChats: (cwd) => ipcRenderer.invoke('chats:list', cwd),
+  getChat: (id) => ipcRenderer.invoke('chats:get', id),
+  saveChat: (record) => ipcRenderer.invoke('chats:save', record),
+  deleteChat: (id) => ipcRenderer.invoke('chats:delete', id),
   onTeamChatEvent: (callback) => {
     const handler = (_: any, payload: { id: string; event: any }) => callback(payload);
     ipcRenderer.on('teamchat:event', handler);

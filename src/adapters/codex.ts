@@ -1,7 +1,7 @@
 import { BaseCliAdapter } from './base.js';
 import { ClaudeAdapter } from './claude.js';
 import type { CliAdapterConfig, CliExecutionOptions, CliExecutionResult } from '../types/index.js';
-import { codexTokensParser, type OutputParser } from './outputParsers.js';
+import { codexJsonParser, type OutputParser } from './outputParsers.js';
 
 export class CodexAdapter extends BaseCliAdapter {
   readonly name = 'codex';
@@ -14,18 +14,19 @@ export class CodexAdapter extends BaseCliAdapter {
     return 'codex';
   }
 
-  /** Reads the "tokens used" count Codex prints at the end. */
-  protected override createOutputParser(): OutputParser {
-    return codexTokensParser();
+  /** Reads Codex's JSON events: the answer, each step it takes and the tokens used. */
+  protected override createOutputParser(options?: CliExecutionOptions): OutputParser {
+    return codexJsonParser(options?.onActivity);
   }
 
   /**
-   * `codex exec -` runs one task non-interactively, reading it from stdin.
+   * `codex exec --json -` runs one task non-interactively, reading it from
+   * stdin and printing one JSON event per line.
    * Builders get `--full-auto` (edits inside the workspace); reviewers a
    * read-only sandbox.
    */
   protected buildArgs(_prompt: string, options?: CliExecutionOptions): string[] {
-    const args: string[] = ['exec'];
+    const args: string[] = ['exec', '--json'];
     if (options?.allowEdits) args.push('--full-auto');
     else args.push('--sandbox', 'read-only');
     if (this.extraArgs.length > 0) args.push(...this.extraArgs);

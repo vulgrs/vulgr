@@ -14,8 +14,8 @@ export class ClaudeAdapter extends BaseCliAdapter {
   }
 
   /** JSON events, so the real token counts and cost of each call are known. */
-  protected override createOutputParser(): OutputParser {
-    return claudeStreamJsonParser();
+  protected override createOutputParser(options?: CliExecutionOptions): OutputParser {
+    return claudeStreamJsonParser(options?.onActivity);
   }
 
   /**

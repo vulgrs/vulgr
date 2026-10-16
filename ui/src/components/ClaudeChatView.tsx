@@ -22,6 +22,9 @@ import {
   PanelRightOpen,
   Info,
   CornerDownRight,
+  History,
+  Trash2,
+  MessageSquare,
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer.js';
 import { AgentLogo } from './AgentLogo.js';
@@ -46,7 +49,7 @@ import {
   type ModelFlags,
   type RawModel,
 } from '../utils/modelFamilies.js';
-import type { ChatMessage } from '../types/warp.js';
+import type { ChatActivity, ChatMessage } from '../types/warp.js';
 import { useI18n } from '../i18n/index.js';
 
 export type ChatAgentId = 'claude' | 'agy' | 'codex' | 'cursor' | 'opencode' | 'gemini';
@@ -118,6 +121,50 @@ function baseName(p: string): string {
   return p.split(/[\\/]/).filter(Boolean).pop() || p;
 }
 
+/** A saved chat as the history list shows it. */
+interface ChatSummary {
+  id: string;
+  title: string;
+  cwd: string;
+  mode?: 'solo' | 'team';
+  agents?: string[];
+  createdAt: number;
+  updatedAt: number;
+  messageCount: number;
+}
+
+function timeAgo(at: number, isTr: boolean): string {
+  const min = Math.round((Date.now() - at) / 60_000);
+  if (min < 1) return isTr ? 'şimdi' : 'just now';
+  if (min < 60) return isTr ? `${min} dk önce` : `${min}m ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return isTr ? `${h} sa önce` : `${h}h ago`;
+  const d = Math.round(h / 24);
+  if (d < 30) return isTr ? `${d} gün önce` : `${d}d ago`;
+  return new Date(at).toLocaleDateString(isTr ? 'tr-TR' : 'en-US');
+}
+
+/** Folds a started/finished step into the list, keeping fields the update leaves out. */
+function mergeActivity(list: ChatActivity[] = [], a: ChatActivity): ChatActivity[] {
+  const i = list.findIndex((x) => x.id === a.id);
+  if (i < 0) return [...list, a].slice(-300);
+  const prev = list[i];
+  const next: ChatActivity = {
+    ...prev,
+    status: a.status,
+    tool: a.tool || prev.tool,
+    input: a.input || prev.input,
+    output: a.output ?? prev.output,
+  };
+  return list.map((x, j) => (j === i ? next : x));
+}
+
+/** Changes whenever the transcript does, so unchanged chats aren't written again. */
+function transcriptSignature(messages: ChatMessage[]): string {
+  const last = messages[messages.length - 1];
+  return `${messages.length}|${last?.id}|${last?.text.length}|${last?.streaming ? 1 : 0}|${last?.activity?.length ?? 0}`;
+}
+
 /** Number of files touched by a unified diff. */
 function countDiffFiles(diff: string): number {
   return (diff.match(/^diff --git /gm) || []).length;
@@ -162,8 +209,44 @@ const ThinkingBlock: React.FC<{ message: ChatMessage; isTr: boolean; openAll: bo
   );
 };
 
+/** The steps an agent took, shown like Claude's tool calls; long runs fold to the latest few. */
+const ActivityList: React.FC<{ items: ChatActivity[]; streaming?: boolean; isTr: boolean }> = ({
+  items,
+  streaming,
+  isTr,
+}) => {
+  const [showAll, setShowAll] = useState(false);
+  const LIMIT = 6;
+  const hidden = showAll ? 0 : Math.max(0, items.length - LIMIT);
+  return (
+    <div className="space-y-1 mb-1.5">
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          {isTr ? `+${hidden} adım daha` : `+${hidden} more steps`}
+        </button>
+      )}
+      {items.slice(hidden).map((a) => (
+        <ToolCall
+          key={a.id}
+          call={{ id: a.id, kind: 'tool_use', text: '', toolName: a.tool, toolInput: a.input, timestamp: '' }}
+          result={
+            a.status === 'running' && streaming
+              ? undefined
+              : { id: `${a.id}-r`, kind: 'tool_result', text: a.output || '', isError: a.status === 'error', timestamp: '' }
+          }
+        />
+      ))}
+    </div>
+  );
+};
+
 const AssistantBubble: React.FC<{ message: ChatMessage; isTr: boolean }> = ({ message, isTr }) => {
   const agent = message.agent || 'claude';
+  const steps = message.activity ?? [];
   const placeholder = message.streaming && !message.text;
   return (
     <div className="text-[13.5px] leading-relaxed text-zinc-200 px-0.5">
@@ -185,8 +268,9 @@ const AssistantBubble: React.FC<{ message: ChatMessage; isTr: boolean }> = ({ me
         )}
         {message.streaming && <Loader2 size={11} className="animate-spin text-zinc-600" />}
       </div>
+      {steps.length > 0 && <ActivityList items={steps} streaming={message.streaming} isTr={isTr} />}
       {placeholder ? (
-        <div className="text-zinc-500 text-[12.5px]">{isTr ? 'Çalışıyor…' : 'Working…'}</div>
+        steps.length === 0 && <div className="text-zinc-500 text-[12.5px]">{isTr ? 'Çalışıyor…' : 'Working…'}</div>
       ) : message.streaming ? (
         <div className="whitespace-pre-wrap break-words">{message.text}</div>
       ) : (
@@ -536,6 +620,117 @@ const TeamMenu: React.FC<{
   );
 };
 
+const HistoryMenu: React.FC<{
+  chats: ChatSummary[];
+  currentId: string | null;
+  onOpen: () => void;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  isTr: boolean;
+}> = ({ chats, currentId, onOpen, onSelect, onDelete, isTr }) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const shown = q ? chats.filter((c) => `${c.title} ${baseName(c.cwd)}`.toLowerCase().includes(q)) : chats;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          if (!open) onOpen();
+          setOpen((v) => !v);
+        }}
+        className={`p-1.5 rounded-md transition-colors ${
+          open ? 'text-zinc-200 bg-white/[0.06]' : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05]'
+        }`}
+        title={isTr ? 'Geçmiş sohbetler' : 'Past chats'}
+      >
+        <History size={14} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute z-50 right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-32px)] rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] overflow-hidden">
+            <div className="p-2 border-b border-white/[0.06]">
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={isTr ? 'Sohbet ara…' : 'Search chats…'}
+                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-md px-2 py-1 text-[12.5px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/20"
+              />
+            </div>
+            <div className="max-h-[380px] overflow-y-auto p-1.5">
+              {shown.length === 0 ? (
+                <div className="px-2 py-6 text-center text-[12px] text-zinc-600">
+                  {isTr ? 'Kayıtlı sohbet yok' : 'No saved chats'}
+                </div>
+              ) : (
+                shown.map((c) => (
+                  <ChatHistoryRow
+                    key={c.id}
+                    chat={c}
+                    active={c.id === currentId}
+                    onSelect={() => {
+                      onSelect(c.id);
+                      setOpen(false);
+                    }}
+                    onDelete={() => onDelete(c.id)}
+                    isTr={isTr}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const ChatHistoryRow: React.FC<{
+  chat: ChatSummary;
+  active?: boolean;
+  onSelect: () => void;
+  onDelete?: () => void;
+  isTr: boolean;
+}> = ({ chat, active, onSelect, onDelete, isTr }) => (
+  <div
+    className={`group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
+      active ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05]'
+    }`}
+    onClick={onSelect}
+  >
+    <MessageSquare size={13} className="flex-shrink-0 text-zinc-500" />
+    <div className="min-w-0 flex-1">
+      <div className="text-[12.5px] text-zinc-200 truncate">{chat.title || (isTr ? 'Adsız sohbet' : 'Untitled chat')}</div>
+      <div className="text-[10.5px] text-zinc-600 truncate">
+        {baseName(chat.cwd)} · {timeAgo(chat.updatedAt, isTr)}
+      </div>
+    </div>
+    {chat.agents && chat.agents.length > 0 && (
+      <span className="flex -space-x-1 flex-shrink-0">
+        {chat.agents.slice(0, 3).map((a) => (
+          <AgentLogo key={a} id={a} name={agentLabel(a)} size={14} className="ring-1 ring-[#141416]" />
+        ))}
+      </span>
+    )}
+    {onDelete && (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="p-1 rounded text-zinc-600 opacity-0 group-hover:opacity-100 hover:text-red-300 hover:bg-white/[0.06] transition-opacity"
+        title={isTr ? 'Sohbeti sil' : 'Delete chat'}
+      >
+        <Trash2 size={12} />
+      </button>
+    )}
+  </div>
+);
+
 interface Attachment {
   id: string;
   name: string;
@@ -606,6 +801,12 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
 
   const chatCwd = folder || cwd;
   const familyId = modelByAgent[agent] || 'default';
+
+  /** The saved-chat record this transcript is written to; set on the first message. */
+  const chatIdRef = useRef<string | null>(null);
+  const createdAtRef = useRef(0);
+  const savedSigRef = useRef('');
+  const [chats, setChats] = useState<ChatSummary[]>([]);
 
   /** The live Claude Code process backing this chat, reused across turns. */
   const claudeRef = useRef<{ id: string; alive: boolean; key: string; cwd: string } | null>(null);
@@ -788,6 +989,14 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
             ),
           }));
           break;
+        case 'agent_activity':
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === event.messageId ? { ...m, activity: mergeActivity(m.activity, event.activity) } : m
+            ),
+          }));
+          break;
         case 'agent_done':
           setState((prev) => ({
             ...prev,
@@ -861,7 +1070,9 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       }
       // Model, effort or folder changed (or the process ended): start a new
       // process that resumes the same Claude conversation when it can.
-      const resume = cur && cur.cwd === chatCwd ? stateRef.current.meta.claudeSessionId : undefined;
+      // A chat opened from history has no process yet; its saved session resumes in the same folder.
+      const sessionCwd = cur ? cur.cwd : stateRef.current.meta.cwd;
+      const resume = sessionCwd === chatCwd ? stateRef.current.meta.claudeSessionId : undefined;
       if (cur?.alive) api?.stopClaudeChat?.(cur.id);
       const id = `chat-${Date.now()}`;
       claudeRef.current = { id, alive: true, key, cwd: chatCwd };
@@ -947,6 +1158,56 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
     }
   }, [isOpen, initialPrompt, sendPrompt, onClearInitialPrompt]);
 
+  const loadChats = useCallback(async () => {
+    try {
+      const list = await api?.listChats?.();
+      if (Array.isArray(list)) setChats(list);
+    } catch {}
+  }, [api]);
+
+  const saveRef = useRef<() => void>(() => {});
+  /** Writes the transcript to its saved chat when it changed since the last write. */
+  saveRef.current = () => {
+    if (!api?.saveChat) return;
+    const messages = stateRef.current.messages.filter((m) => !m.id.startsWith('__streaming'));
+    const firstUser = messages.find((m) => m.kind === 'user');
+    if (!firstUser) return;
+    const sig = transcriptSignature(messages);
+    if (chatIdRef.current && sig === savedSigRef.current) return;
+    if (!chatIdRef.current) {
+      chatIdRef.current = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      createdAtRef.current = Date.now();
+    }
+    savedSigRef.current = sig;
+    const meta = stateRef.current.meta;
+    const agents = Array.from(new Set(messages.map((m) => m.agent).filter((a): a is string => !!a)));
+    void api
+      .saveChat({
+        id: chatIdRef.current,
+        title: titleFromPrompt(firstUser.text || ''),
+        cwd: chatCwd,
+        mode,
+        agents,
+        createdAt: createdAtRef.current,
+        updatedAt: Date.now(),
+        claudeSessionId: meta.claudeSessionId,
+        claudeCwd: claudeRef.current?.cwd ?? meta.cwd,
+        messages,
+      })
+      .catch(() => {});
+  };
+
+  // Save shortly after the transcript settles, so streaming doesn't write on every chunk.
+  useEffect(() => {
+    if (state.messages.length === 0) return;
+    const timer = setTimeout(() => saveRef.current(), 700);
+    return () => clearTimeout(timer);
+  }, [state.messages, state.meta.claudeSessionId]);
+
+  useEffect(() => {
+    if (isOpen) void loadChats();
+  }, [isOpen, loadChats]);
+
   const handleStop = useCallback(() => {
     const cur = claudeRef.current;
     if (cur?.alive) {
@@ -959,13 +1220,66 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   }, [api]);
 
   const handleNewChat = useCallback(() => {
+    saveRef.current();
     stopClaude();
     if (teamRunIdRef.current) void api?.stopTeamChat?.();
     teamRunIdRef.current = '';
     foreignTurnsRef.current = [];
+    chatIdRef.current = null;
+    savedSigRef.current = '';
     setRunning(false);
     setState(initialChatState());
-  }, [api, stopClaude]);
+    void loadChats();
+  }, [api, stopClaude, loadChats]);
+
+  /** Opens a saved chat: its transcript, folder and mode; Claude resumes its session on the next turn. */
+  const openChat = useCallback(
+    async (id: string) => {
+      if (id === chatIdRef.current) return;
+      const rec = await api?.getChat?.(id);
+      if (!rec || !Array.isArray(rec.messages)) return;
+      saveRef.current();
+      stopClaude();
+      if (teamRunIdRef.current) void api?.stopTeamChat?.();
+      teamRunIdRef.current = '';
+      setRunning(false);
+
+      const messages: ChatMessage[] = rec.messages.map((m: ChatMessage) => ({ ...m, streaming: false }));
+      chatIdRef.current = rec.id;
+      createdAtRef.current = rec.createdAt || Date.now();
+      savedSigRef.current = transcriptSignature(messages);
+      // Turns Claude's session hasn't seen (other agents after its last reply) go with its next prompt.
+      let lastClaude = -1;
+      messages.forEach((m, i) => {
+        if (m.kind === 'assistant' && (m.agent || 'claude') === 'claude') lastClaude = i;
+      });
+      foreignTurnsRef.current = (rec.claudeSessionId ? messages.slice(lastClaude + 1) : messages)
+        .filter((m) => (m.kind === 'user' || m.kind === 'assistant') && m.text)
+        .slice(-6)
+        .map((m) => `${m.kind === 'user' ? (isTr ? 'Kullanıcı' : 'User') : agentLabel(m.agent)}: ${m.text.slice(0, 600)}`);
+
+      if (rec.cwd) setFolder(rec.cwd === cwd ? '' : rec.cwd);
+      if (rec.mode === 'solo' || rec.mode === 'team') setMode(rec.mode);
+      setState({
+        messages,
+        meta: { claudeSessionId: rec.claudeSessionId, cwd: rec.claudeCwd },
+        streamingText: '',
+      });
+    },
+    [api, cwd, isTr, stopClaude]
+  );
+
+  const deleteChat = useCallback(
+    async (id: string) => {
+      await api?.deleteChat?.(id);
+      setChats((prev) => prev.filter((c) => c.id !== id));
+      if (id === chatIdRef.current) {
+        chatIdRef.current = null;
+        savedSigRef.current = '';
+      }
+    },
+    [api]
+  );
 
   const changeFolder = useCallback(
     (dir: string) => {
@@ -1024,6 +1338,11 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   const fileCount = useMemo(() => countDiffFiles(diff), [diff]);
   const canAttach = mode === 'solo' && agent === 'claude';
   const empty = state.messages.length === 0;
+  // This folder's chats first, then the rest.
+  const recentChats = useMemo(
+    () => [...chats.filter((c) => c.cwd === chatCwd), ...chats.filter((c) => c.cwd !== chatCwd)].slice(0, 5),
+    [chats, chatCwd]
+  );
 
   if (!isOpen) return null;
 
@@ -1262,6 +1581,14 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
               </span>
             )}
             <div className="w-px h-4 bg-white/[0.08]" />
+            <HistoryMenu
+              chats={chats}
+              currentId={chatIdRef.current}
+              onOpen={() => void loadChats()}
+              onSelect={(id) => void openChat(id)}
+              onDelete={(id) => void deleteChat(id)}
+              isTr={isTr}
+            />
             <button
               onClick={() => {
                 setThinkingOpen((v) => !v);
@@ -1339,6 +1666,16 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
                 )}
               </div>
               {composer}
+              {recentChats.length > 0 && (
+                <div className="mt-6">
+                  <div className="px-2 mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-zinc-600">
+                    {isTr ? 'Son sohbetler' : 'Recent chats'}
+                  </div>
+                  {recentChats.map((c) => (
+                    <ChatHistoryRow key={c.id} chat={c} onSelect={() => void openChat(c.id)} isTr={isTr} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : (

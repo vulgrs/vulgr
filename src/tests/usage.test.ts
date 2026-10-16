@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { claudeStreamJsonParser, codexTokensParser, addUsage, usageTokens } from '../adapters/outputParsers.js';
+import { claudeStreamJsonParser, codexTokensParser, codexJsonParser, cursorStreamJsonParser, addUsage, usageTokens } from '../adapters/outputParsers.js';
 import { UsageLedger } from '../engine/usageLedger.js';
 import { AdapterFactory } from '../adapters/factory.js';
 import { AgentMesh } from '../engine/agentMesh.js';
@@ -148,5 +148,71 @@ describe('cost limit', () => {
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
+  });
+});
+
+describe('agent step parsers', () => {
+  it('reads Codex JSON events: answer, reasoning, commands, file changes and usage', () => {
+    const steps: any[] = [];
+    const parser = codexJsonParser((a) => steps.push(a));
+    const lines = [
+      { type: 'thread.started' },
+      { type: 'item.completed', item: { id: 'r0', type: 'reasoning', text: 'look at files' } },
+      { type: 'item.started', item: { id: 'c1', type: 'command_execution', command: 'ls', status: 'in_progress' } },
+      { type: 'item.completed', item: { id: 'c1', type: 'command_execution', command: 'ls', exit_code: 0, aggregated_output: 'a.ts' } },
+      { type: 'item.completed', item: { id: 'f1', type: 'file_change', changes: [{ path: 'a.ts', kind: 'update' }] } },
+      { type: 'item.completed', item: { id: 'm1', type: 'agent_message', text: 'Done.' } },
+      { type: 'turn.completed', usage: { input_tokens: 10, cached_input_tokens: 2, output_tokens: 5 } },
+    ];
+    const live = parser.push(lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    assert.match(live, /<think>\nlook at files\n<\/think>/);
+    const { stdout, usage } = parser.finish('', '');
+    assert.equal(stdout, 'Done.');
+    assert.equal(usage?.inputTokens, 10);
+    assert.deepEqual(
+      steps.map((s) => [s.id, s.tool, s.status]),
+      [['c1', 'Bash', 'running'], ['c1', 'Bash', 'done'], ['f1', 'Edit', 'done']]
+    );
+  });
+
+  it('falls back to plain Codex output when there is no JSON', () => {
+    const { stdout, usage } = codexJsonParser().finish('answer', 'tokens used: 42');
+    assert.equal(stdout, 'answer');
+    assert.equal(usage?.totalTokens, 42);
+  });
+
+  it('reads cursor-agent stream-json tool calls and result', () => {
+    const steps: any[] = [];
+    const parser = cursorStreamJsonParser((a) => steps.push(a));
+    const lines = [
+      { type: 'thinking', subtype: 'delta', text: 'check a.ts' },
+      { type: 'thinking', subtype: 'completed' },
+      { type: 'assistant', message: { content: [{ type: 'text', text: 'Reading.' }] } },
+      { type: 'tool_call', subtype: 'started', call_id: 't1', tool_call: { readToolCall: { args: { path: 'a.ts' } } } },
+      { type: 'tool_call', subtype: 'completed', call_id: 't1', tool_call: { readToolCall: { args: { path: 'a.ts' }, result: { success: {} } } } },
+      { type: 'assistant', message: { content: [{ type: 'text', text: 'All good.' }] } },
+      { type: 'result', subtype: 'success', result: 'Reading.All good.', usage: { inputTokens: 7, outputTokens: 3 } },
+    ];
+    const live = parser.push(lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    assert.match(live, /^<think>\ncheck a\.ts\n<\/think>\nReading\.\n\nAll good\.$/);
+    const done = parser.finish('', '');
+    assert.equal(done.stdout, 'Reading.\n\nAll good.');
+    assert.equal(done.usage?.inputTokens, 7);
+    assert.deepEqual(steps.map((s) => [s.tool, s.input, s.status]), [['Read', 'a.ts', 'running'], ['Read', 'a.ts', 'done']]);
+  });
+
+  it('reports Claude tool calls and their results', () => {
+    const steps: any[] = [];
+    const parser = claudeStreamJsonParser((a) => steps.push(a));
+    parser.push(
+      [
+        { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'x', name: 'Bash', input: { command: 'npm test' } }] } },
+        { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'ok' }] } },
+      ]
+        .map((l) => JSON.stringify(l))
+        .join('\n') + '\n'
+    );
+    assert.deepEqual(steps.map((s) => [s.id, s.status]), [['x', 'running'], ['x', 'done']]);
+    assert.equal(steps[0].input, 'npm test');
   });
 });

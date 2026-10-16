@@ -6,6 +6,7 @@ import { MemoryStore } from './memoryStore.js';
 import { GitUtils } from '../git/gitUtils.js';
 import { detectTestCommand, parseTestCommand } from './testPlan.js';
 import type { UsageSummary } from './usageLedger.js';
+import type { AgentActivity } from '../types/index.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -71,6 +72,13 @@ export type TeamChatEvent =
       text: string;
     }
   | {
+      /** A step the agent took while answering (command, file read or edit...). */
+      type: 'agent_activity';
+      messageId: string;
+      agent: ChatAgentId;
+      activity: AgentActivity;
+    }
+  | {
       type: 'agent_done';
       messageId: string;
       agent: ChatAgentId;
@@ -99,6 +107,19 @@ export type TeamChatEvent =
       type: 'error';
       message: string;
     };
+
+/** CLIs whose JSON output already reports each step; the rest show their stderr as a log. */
+const REPORTS_STEPS = new Set<ChatAgentId>(['claude', 'codex', 'cursor']);
+
+/** Drops terminal colour codes and blank lines from a CLI's stderr. */
+export function cleanLogText(raw: string): string {
+  return raw
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+    .split(/\r?\n/)
+    .map((l) => l.trimEnd())
+    .filter((l) => l.trim())
+    .join('\n');
+}
 
 const SAFE_MODEL_RE = /^[a-zA-Z0-9._:/-]+$/;
 const EFFORT_RE = /^(low|medium|high|xhigh|max)$/;
@@ -613,11 +634,28 @@ export class TeamChatCoordinator {
     };
 
     let liveAccumulated = '';
+    const activity = (a: AgentActivity) =>
+      params.onEvent({ type: 'agent_activity', messageId, agent: params.agent, activity: a });
+    // Agents without step events: their stderr (progress, tool logs) as one live log row.
+    let log = '';
+    const logId = `log-${messageId}`;
+    const onStderr = REPORTS_STEPS.has(params.agent)
+      ? undefined
+      : (chunk: string) => {
+          const clean = cleanLogText(chunk);
+          if (!clean) return;
+          log = `${log}${log ? '\n' : ''}${clean}`.slice(-4000);
+          const lastLine = clean.split('\n').pop() ?? '';
+          activity({ id: logId, tool: 'Log', input: lastLine.slice(0, 160), status: 'running', output: log });
+        };
+
     const res = await adapter.execute(params.prompt, {
       cwd: params.cwd,
       allowEdits: params.allowEdits,
       usageTag: 'chat',
       signal: this.abortController.signal,
+      onActivity: activity,
+      onStderr,
       onStdout: (chunk: string) => {
         liveAccumulated += chunk;
         const { thinking, clean } = extractThinkingAndClean(liveAccumulated);
@@ -638,8 +676,12 @@ export class TeamChatCoordinator {
       },
     });
 
+    if (log) activity({ id: logId, tool: 'Log', status: res.exitCode === 0 ? 'done' : 'error', output: log });
+
     const rawFull = (res.stdout || res.stderr || '').trim();
-    const { thinking: finalThinking, clean: cleanText } = extractThinkingAndClean(rawFull);
+    const { thinking: rawThinking, clean: cleanText } = extractThinkingAndClean(rawFull);
+    // Codex and Cursor stream their reasoning live but leave it out of the final answer.
+    const finalThinking = rawThinking || extractThinkingAndClean(liveAccumulated).thinking;
     const text = cleanText || rawFull || (params.isTr ? '(Yanıt tamamlandı)' : '(Completed)');
     const tokensUsed = res.usage ? res.usage.inputTokens + res.usage.outputTokens : undefined;
 

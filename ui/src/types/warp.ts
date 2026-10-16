@@ -361,6 +361,15 @@ export type ChatMessageKind =
   | 'system'      // session init / metadata
   | 'error';      // stderr / fatal / max-turns
 
+/** One step an agent took while answering, merged by id as it starts and finishes. */
+export interface ChatActivity {
+  id: string;
+  tool: string;
+  input?: string;
+  status: 'running' | 'done' | 'error';
+  output?: string;
+}
+
 export interface ChatMessage {
   id: string;
   kind: ChatMessageKind;
@@ -374,6 +383,8 @@ export interface ChatMessage {
   isError?: boolean;
   /** For tool_result: the id of the tool_use it answers, used to pair them. */
   toolUseId?: string;
+  /** For agent replies from the coordinator: the steps the agent took (commands, file reads/edits). */
+  activity?: ChatActivity[];
   /** Whether this bubble is still streaming in. */
   streaming?: boolean;
   /** For user messages: data-URI previews of attached images. */
