@@ -72,6 +72,7 @@ interface WarpApi {
     teamAgents?: string[];
     teamModels?: Record<string, { model?: string; effort?: string }>;
     approvals?: 'ask' | 'auto' | 'deny';
+    fast?: boolean;
     history?: Array<{ role: 'user' | 'agent'; agent?: string; text: string }>;
     lang?: string;
   }) => Promise<{ ok: boolean; error?: string }>;

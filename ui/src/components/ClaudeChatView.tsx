@@ -122,7 +122,7 @@ const MENTION_ALIASES: Record<string, ChatAgentId> = {
   gemini: 'gemini',
 };
 
-/** Same reading as the engine's extractMentionedAgents: every @agent, and the leading ones cut off. */
+/** Same reading as the engine's extractMentionedAgents: every @agent (leading repeats kept), leading ones cut off. */
 function readMentions(text: string): { agents: ChatAgentId[]; leading: ChatAgentId[]; cleanPrompt: string } {
   const agents: ChatAgentId[] = [];
   const add = (a?: ChatAgentId) => {
@@ -133,12 +133,18 @@ function readMentions(text: string): { agents: ChatAgentId[]; leading: ChatAgent
     const m = rest.match(/^\s*@([a-zA-Z0-9_-]+)(?:\s*[:,&+]|\s+(?:ve|and|ile)\b)?\s*/i);
     const target = m ? MENTION_ALIASES[m[1].toLowerCase()] : undefined;
     if (!m || !target) break;
-    add(target);
+    agents.push(target); // `@claude @claude`: two seats
     rest = rest.slice(m[0].length);
   }
   const leading = [...agents];
   for (const m of rest.matchAll(/(?:^|\s)@([a-zA-Z0-9_-]+)/g)) add(MENTION_ALIASES[m[1].toLowerCase()]);
   return { agents, leading, cleanPrompt: rest.trim() || text };
+}
+
+/** "Claude Code" for a lone seat, "Claude Code #2" for a numbered one (CLAUDE-2). */
+function seatLabel(agent: string, member?: string): string {
+  const n = member?.match(/-(\d+)$/)?.[1];
+  return n ? `${agentLabel(agent)} #${n}` : agentLabel(agent);
 }
 
 function readLocal<T>(key: string, fallback: T, parse: (raw: string) => T = (r) => r as unknown as T): T {
@@ -285,12 +291,12 @@ const AssistantBubble: React.FC<{ message: ChatMessage; isTr: boolean }> = ({ me
     <div className="text-[13.5px] leading-relaxed text-zinc-200 px-0.5">
       <div className="flex flex-wrap items-center gap-1.5 mb-1 text-[11px] text-zinc-500">
         <AgentLogo id={agent} name={agentLabel(agent)} size={16} />
-        <span className="font-semibold text-zinc-300">{agentLabel(agent)}</span>
+        <span className="font-semibold text-zinc-300">{seatLabel(agent, message.member)}</span>
         {message.replyTo ? (
           <span className="inline-flex items-center gap-1 text-zinc-500" title={isTr ? 'Yanıt verdiği ajan' : 'Replying to'}>
             <CornerDownRight size={11} />
             <AgentLogo id={message.replyTo} name={agentLabel(message.replyTo)} size={14} />
-            {agentLabel(message.replyTo)}
+            {seatLabel(message.replyTo, message.replyToMember)}
           </span>
         ) : (
           message.roleLabel && <span>· {message.roleLabel}</span>
@@ -592,16 +598,47 @@ const AgentModelMenu: React.FC<AgentModelMenuProps> = ({
   );
 };
 
+/** Most seats one agent can take in a team. */
+const MAX_SEATS = 3;
+
+/**
+ * The seats of a team list, named like the engine's buildTeamMembers: a
+ * repeated agent gets `claude-1`, `claude-2`. `modelKey` is where its model
+ * pick is kept; the first seat shares the agent's own pick.
+ */
+function teamSeats(team: ChatAgentId[]): Array<{ key: string; agent: ChatAgentId; n: number; modelKey: string }> {
+  const total = new Map<ChatAgentId, number>();
+  for (const a of team) total.set(a, (total.get(a) ?? 0) + 1);
+  const seen = new Map<ChatAgentId, number>();
+  return team.map((agent) => {
+    const n = (seen.get(agent) ?? 0) + 1;
+    seen.set(agent, n);
+    return {
+      key: (total.get(agent) ?? 1) > 1 ? `${agent}-${n}` : agent,
+      agent,
+      n,
+      modelKey: n === 1 ? agent : `${agent}-${n}`,
+    };
+  });
+}
+
 const TeamMenu: React.FC<{
   team: ChatAgentId[];
   available: Record<string, boolean>;
   families: Record<ChatAgentId, ModelFamily[]>;
   modelByAgent: Record<string, string>;
+  fast: boolean;
   onToggle: (a: ChatAgentId) => void;
-  onSelectModel: (a: ChatAgentId, familyId: string) => void;
+  onAddSeat: (a: ChatAgentId) => void;
+  onRemoveSeat: (a: ChatAgentId) => void;
+  onSelectModel: (modelKey: string, familyId: string) => void;
+  onToggleFast: () => void;
   isTr: boolean;
-}> = ({ team, available, families, modelByAgent, onToggle, onSelectModel, isTr }) => {
+}> = ({ team, available, families, modelByAgent, fast, onToggle, onAddSeat, onRemoveSeat, onSelectModel, onToggleFast, isTr }) => {
   const [open, setOpen] = useState(false);
+  const seats = teamSeats(team);
+  const seatBtn =
+    'w-5 h-5 flex items-center justify-center rounded text-[13px] leading-none text-zinc-400 hover:text-white hover:bg-white/[0.08] disabled:opacity-30 disabled:hover:bg-transparent';
   return (
     <div className="relative">
       <button
@@ -611,60 +648,98 @@ const TeamMenu: React.FC<{
         title={isTr ? 'Ortak çalışacak ajanlar' : 'Agents in the team'}
       >
         <span className="flex -space-x-1">
-          {team.map((a) => (
-            <AgentLogo key={a} id={a} name={agentLabel(a)} size={16} className="ring-1 ring-[#151517]" />
+          {team.map((a, i) => (
+            <AgentLogo key={`${a}-${i}`} id={a} name={agentLabel(a)} size={16} className="ring-1 ring-[#151517]" />
           ))}
         </span>
         <span className="font-semibold text-zinc-200">
           {team.length} {isTr ? 'ajan' : team.length === 1 ? 'agent' : 'agents'}
         </span>
+        {fast && <span className="text-amber-300 text-[11px]">⚡</span>}
         <ChevronDown size={12} className="text-zinc-600" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 left-0 bottom-full mb-2 w-80 max-w-[calc(100vw-48px)] rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] p-1.5">
+          <div className="absolute z-50 left-0 bottom-full mb-2 w-[340px] max-w-[calc(100vw-48px)] rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] p-1.5">
             <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
               {isTr ? 'Takım' : 'Team'}
             </div>
             {AGENTS.map((a) => {
-              const on = team.includes(a.id);
+              const mine = seats.filter((st) => st.agent === a.id);
+              const on = mine.length > 0;
               const missing = available[a.id] === false;
               const list = families[a.id] ?? [];
               return (
-                <div key={a.id} className="flex items-center gap-1 rounded-md hover:bg-white/[0.06] transition-colors">
-                  <button
-                    type="button"
-                    onClick={() => onToggle(a.id)}
-                    className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 text-[12.5px] text-zinc-200 text-left"
-                  >
-                    <AgentLogo id={a.id} name={a.label} size={16} dim={missing} />
-                    <span className={`truncate ${missing ? 'text-zinc-600' : ''}`}>{a.label}</span>
-                    {missing && <span className="text-[10px] text-zinc-600">{isTr ? 'kurulu değil' : 'not installed'}</span>}
-                    {on && <Check size={13} className="ml-auto flex-shrink-0 text-emerald-400" />}
-                  </button>
-                  {on && (
-                    <select
-                      value={modelByAgent[a.id] || 'default'}
-                      onChange={(e) => onSelectModel(a.id, e.target.value)}
-                      className="mr-1 max-w-[130px] truncate rounded bg-white/[0.06] border border-white/[0.08] px-1 py-0.5 text-[11px] text-zinc-300 outline-none"
-                      title={isTr ? `${a.label} hangi modelle çalışsın` : `Model ${a.label} uses`}
+                <div key={a.id} className="rounded-md hover:bg-white/[0.04] transition-colors">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onToggle(a.id)}
+                      className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 text-[12.5px] text-zinc-200 text-left"
                     >
-                      <option value="default">{isTr ? 'Varsayılan' : 'Default'}</option>
-                      {list.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.label}
+                      <AgentLogo id={a.id} name={a.label} size={16} dim={missing} />
+                      <span className={`truncate ${missing ? 'text-zinc-600' : ''}`}>{a.label}</span>
+                      {missing && <span className="text-[10px] text-zinc-600">{isTr ? 'kurulu değil' : 'not installed'}</span>}
+                      {on && <Check size={13} className="ml-auto flex-shrink-0 text-emerald-400" />}
+                    </button>
+                    {on && (
+                      <span className="flex items-center gap-0.5 mr-1" title={isTr ? 'Bu ajandan kaç tane çalışsın' : 'How many of this agent'}>
+                        <button type="button" className={seatBtn} disabled={mine.length <= 1} onClick={() => onRemoveSeat(a.id)}>
+                          −
+                        </button>
+                        <span className="w-4 text-center text-[11px] text-zinc-400">{mine.length}</span>
+                        <button type="button" className={seatBtn} disabled={mine.length >= MAX_SEATS} onClick={() => onAddSeat(a.id)}>
+                          +
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                  {mine.map((st) => (
+                    <div key={st.key} className="flex items-center gap-2 pl-8 pr-1 pb-1">
+                      <span className="w-[74px] truncate font-mono text-[10.5px] text-zinc-500">{st.key.toUpperCase()}</span>
+                      <select
+                        value={modelByAgent[st.modelKey] || 'default'}
+                        onChange={(e) => onSelectModel(st.modelKey, e.target.value)}
+                        className="flex-1 min-w-0 truncate rounded bg-white/[0.06] border border-white/[0.08] px-1 py-0.5 text-[11px] text-zinc-300 outline-none"
+                        title={isTr ? `${st.key.toUpperCase()} hangi modelle çalışsın` : `Model ${st.key.toUpperCase()} uses`}
+                      >
+                        <option value="default">
+                          {isTr ? 'Varsayılan' : 'Default'}
+                          {fast ? ' ⚡' : ''}
                         </option>
-                      ))}
-                    </select>
-                  )}
+                        {list.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
                 </div>
               );
             })}
+            <button
+              type="button"
+              onClick={onToggleFast}
+              className="mt-1 w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left hover:bg-white/[0.06] transition-colors"
+            >
+              <span className={`mt-0.5 w-7 h-4 flex-shrink-0 rounded-full p-0.5 transition-colors ${fast ? 'bg-amber-400/80' : 'bg-white/[0.12]'}`}>
+                <span className={`block w-3 h-3 rounded-full bg-white transition-transform ${fast ? 'translate-x-3' : ''}`} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[12.5px] text-zinc-200">{isTr ? '⚡ Hızlı mod' : '⚡ Fast mode'}</span>
+                <span className="block text-[11px] leading-snug text-zinc-500">
+                  {isTr
+                    ? 'Varsayılan modeldeki ajanlar hızlı bir modelle çalışır (Cursor: Codex 5.3 Low Fast). Seçtiğin modellere dokunmaz.'
+                    : 'Agents on Default use a quick model (Cursor: Codex 5.3 Low Fast). Models you picked stay.'}
+                </span>
+              </span>
+            </button>
             <div className="px-2 pt-1.5 pb-1 text-[10.5px] leading-snug text-zinc-600">
               {isTr
-                ? 'Basit isteklerde tek ajan çalışır. Tartışma için mesajda iki ajanı etiketle: @claude @cursor …'
-                : 'Simple asks use one agent. To make them discuss, tag two agents: @claude @cursor …'}
+                ? 'Basit isteklerde tek ajan çalışır. Tartışma için mesajda ajanları etiketle: @claude @cursor ya da aynı ajandan iki tane: @claude @claude'
+                : 'Simple asks use one agent. To make them discuss, tag agents: @claude @cursor, or two of the same: @claude @claude'}
             </div>
           </div>
         </>
@@ -983,6 +1058,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       return Array.isArray(parsed) && parsed.length > 0 ? parsed : ['claude', 'codex'];
     })
   );
+  const [teamFast, setTeamFast] = useState<boolean>(() => readLocal('vulgr.teamFast', false, (r) => r === '1'));
   const [thinkingOpen, setThinkingOpen] = useState<boolean>(() =>
     readLocal('vulgr.chatThinkingOpen', true, (r) => r !== '0')
   );
@@ -1064,8 +1140,9 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       localStorage.setItem('vulgr.chatChangesOpen', changesOpen ? '1' : '0');
       localStorage.setItem('vulgr.chatThinkingOpen', thinkingOpen ? '1' : '0');
       localStorage.setItem('vulgr.chatApprovals', approvalMode);
+      localStorage.setItem('vulgr.teamFast', teamFast ? '1' : '0');
     } catch {}
-  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen, thinkingOpen, approvalMode]);
+  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen, thinkingOpen, approvalMode, teamFast]);
 
   const families = useMemo(() => {
     const out = {} as Record<ChatAgentId, ModelFamily[]>;
@@ -1175,6 +1252,8 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
             agent: event.agent,
             roleLabel: mode === 'team' ? event.roleLabel : undefined,
             replyTo: event.replyTo,
+            member: event.member,
+            replyToMember: event.replyToMember,
             model: event.model,
             text: '',
             streaming: true,
@@ -1328,9 +1407,9 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       const targetFamily = families[effectiveAgent]?.find((f) => f.id === (modelByAgent[effectiveAgent] || 'default'));
       const { model, effort: eff } = resolveModel(effectiveAgent, targetFamily, effort, flags);
       const teamModels: Record<string, { model: string; effort?: string }> = {};
-      for (const a of mentionedTeam ?? team) {
-        const fam = families[a]?.find((f) => f.id === (modelByAgent[a] || 'default'));
-        teamModels[a] = resolveModel(a, fam, effort, flags);
+      for (const seat of teamSeats(mentionedTeam ?? team)) {
+        const fam = families[seat.agent]?.find((f) => f.id === (modelByAgent[seat.modelKey] || 'default'));
+        teamModels[seat.key] = resolveModel(seat.agent, fam, effort, flags);
       }
       const id = `tc-${Date.now()}`;
       teamRunIdRef.current = id;
@@ -1344,12 +1423,13 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         soloEffort: eff,
         teamAgents: mentionedTeam ?? team,
         teamModels,
+        fast: teamFast,
         approvals: approvalMode,
         history,
         lang,
       });
     },
-    [attachments, running, mode, agent, sendToClaude, isTr, families, modelByAgent, effort, flags, api, chatCwd, team, lang, approvalMode]
+    [attachments, running, mode, agent, sendToClaude, isTr, families, modelByAgent, effort, flags, api, chatCwd, team, lang, approvalMode, teamFast]
   );
 
   useEffect(() => {
@@ -1569,7 +1649,22 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   }, []);
 
   const toggleTeamAgent = useCallback((id: ChatAgentId) => {
-    setTeam((prev) => (prev.includes(id) ? (prev.length > 1 ? prev.filter((a) => a !== id) : prev) : [...prev, id]));
+    setTeam((prev) => {
+      if (!prev.includes(id)) return [...prev, id];
+      const rest = prev.filter((a) => a !== id);
+      return rest.length > 0 ? rest : prev;
+    });
+  }, []);
+  /** Another seat for an agent already in the team (two Claudes, two Cursors...). */
+  const addTeamSeat = useCallback((id: ChatAgentId) => {
+    setTeam((prev) => (prev.filter((a) => a === id).length >= MAX_SEATS ? prev : [...prev, id]));
+  }, []);
+  const removeTeamSeat = useCallback((id: ChatAgentId) => {
+    setTeam((prev) => {
+      if (prev.filter((a) => a === id).length <= 1) return prev;
+      const i = prev.lastIndexOf(id);
+      return [...prev.slice(0, i), ...prev.slice(i + 1)];
+    });
   }, []);
 
   const items = useMemo(() => buildRenderItems(state.messages), [state.messages]);
@@ -1778,8 +1873,12 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
                 available={available}
                 families={families}
                 modelByAgent={modelByAgent}
+                fast={teamFast}
                 onToggle={toggleTeamAgent}
-                onSelectModel={(a, id) => setModelByAgent((prev) => ({ ...prev, [a]: id }))}
+                onAddSeat={addTeamSeat}
+                onRemoveSeat={removeTeamSeat}
+                onSelectModel={(key, id) => setModelByAgent((prev) => ({ ...prev, [key]: id }))}
+                onToggleFast={() => setTeamFast((v) => !v)}
                 isTr={isTr}
               />
             )}

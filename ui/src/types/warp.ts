@@ -278,6 +278,8 @@ export interface WarpConfig {
   notifyCommands: boolean;
   coAuthorVulgr: boolean;
   defaultVerifyCmd: string;
+  /** Primary workspace mode: 'cli' (terminal panes) or 'chat' (Antigravity-style solo & multi-agent chat). */
+  workspaceMode?: 'cli' | 'chat';
   /** Keyboard shortcuts the user changed: action id -> combo like 'Ctrl+Shift+T'. */
   shortcuts?: Record<string, string>;
   /** Per-project overrides, keyed by project folder; changed only through setProjectConfig. */
@@ -348,17 +350,18 @@ export interface ContextTelemetry {
 }
 
 /**
- * Structured chat messages derived from Claude Code's stream-json events.
- * Each event kind becomes its own bubble in the chat view.
+ * Structured chat messages derived from Claude Code's stream-json events
+ * and multi-agent TeamChat events.
  */
 export type ChatMessageKind =
   | 'user'        // the human prompt
-  | 'assistant'   // Claude's natural-language reply
-  | 'thinking'    // Claude's extended-thinking / reasoning block
-  | 'tool_use'    // Claude invoking a tool (Edit, Bash, Write, Read, ...)
+  | 'assistant'   // Agent's natural-language reply
+  | 'thinking'    // extended-thinking / reasoning block
+  | 'tool_use'    // invoking a tool (Edit, Bash, Write, Read, ...)
   | 'tool_result' // the tool's output
+  | 'task_plan'   // collaborative team task assignment card
   | 'result'      // final turn summary (cost, duration)
-  | 'system'      // session init / metadata
+  | 'system'      // session init / quota-saver notice
   | 'error';      // stderr / fatal / max-turns
 
 /** One step an agent took while answering, merged by id as it starts and finishes. */
@@ -375,6 +378,23 @@ export interface ChatMessage {
   kind: ChatMessageKind;
   /** Primary text body (already normalized to a string). */
   text: string;
+  /** Which CLI agent produced this message ('claude' | 'agy' | 'codex' | 'cursor' | 'opencode' | 'gemini'). */
+  agent?: string;
+  /** Role badge shown on the bubble (e.g. 'Mimar & Planlayıcı', 'Solo Agent'). */
+  roleLabel?: string;
+  /** Model badge if non-default. */
+  model?: string;
+  /** Tokens consumed by this turn, if reported. */
+  tokensUsed?: number;
+  /** Cost in USD for this turn, if reported. */
+  costUsd?: number;
+  /** In a team chat: the agent this message answers. */
+  replyTo?: string;
+  /** In a team chat with the same agent twice: this seat (CLAUDE-2) and the seat it answers. */
+  member?: string;
+  replyToMember?: string;
+  /** For task_plan messages: the assigned sub-tasks across agents. */
+  tasks?: Array<{ id: string; agent: string; roleLabel: string; title: string }>;
   /** For tool_use: the tool name (e.g. "Bash", "Edit"). */
   toolName?: string;
   /** For tool_use: a short human-readable summary of the input. */

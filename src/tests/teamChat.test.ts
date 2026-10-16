@@ -6,6 +6,7 @@ import {
   extractMentionedAgent,
   extractMentionedAgents,
   isUsageLimitReply,
+  buildTeamMembers,
   parseTurnControl,
   stripTurnControl,
   pickQuotaBalancedAgents,
@@ -263,5 +264,73 @@ describe('TeamChatCoordinator Suite', () => {
     assert.ok(isUsageLimitReply("You've hit your session limit · resets 8:30pm (Europe/Istanbul)"));
     assert.ok(!isUsageLimitReply('Rate limiter now handles the session limit option.\n' + 'x'.repeat(400)));
     assert.ok(!isUsageLimitReply('CURSOR, I agree with the limit semantics.'));
+  });
+
+  it('numbers the seats of an agent that is in the team twice', () => {
+    assert.deepStrictEqual(
+      buildTeamMembers(['claude', 'cursor', 'claude']).map((m) => m.key),
+      ['claude-1', 'cursor', 'claude-2']
+    );
+    assert.deepStrictEqual(parseTurnControl('ok\nNEXT: CLAUDE-2', ['claude-1', 'claude-2']), {
+      next: 'claude-2',
+      done: false,
+    });
+    assert.deepStrictEqual(extractMentionedAgents('@claude @claude bunu tartışın').agents, ['claude', 'claude']);
+  });
+
+  it('runs two seats of the same agent, each with its own model, and tells each about its twin', async () => {
+    const calls: Array<{ extraArgs: string[]; prompt: string }> = [];
+    AdapterFactory.registerAdapter('claude', (opts?: any) => {
+      const mock = new MockCliAdapter('claude');
+      mock.execute = async (prompt: string) => {
+        calls.push({ extraArgs: opts?.extraArgs ?? [], prompt });
+        return { exitCode: 0, stdout: 'görüşüm\nDONE', stderr: '', executionTimeMs: 1, timedOut: false };
+      };
+      return mock;
+    });
+    const events: TeamChatEvent[] = [];
+    await new TeamChatCoordinator().run({
+      id: 't-twins',
+      prompt: '@claude @claude cache katmanını tasarlayın',
+      cwd: process.cwd(),
+      mode: 'team',
+      teamModels: { 'claude-1': { model: 'opus' }, 'claude-2': { model: 'sonnet' } },
+      onEvent: (e) => events.push(e),
+    });
+    assert.deepStrictEqual(calls.slice(0, 2).map((c) => c.extraArgs), [['--model', 'opus'], ['--model', 'sonnet']]);
+    assert.match(calls[0].prompt, /Sen CLAUDE-1'sin/);
+    assert.match(calls[0].prompt, /CLAUDE-2 seninle aynı ajan/);
+    const starts = events.filter((e): e is Extract<TeamChatEvent, { type: 'agent_start' }> => e.type === 'agent_start');
+    assert.deepStrictEqual(starts.slice(0, 2).map((e) => [e.member, e.replyToMember]), [
+      ['CLAUDE-1', undefined],
+      ['CLAUDE-2', 'CLAUDE-1'],
+    ]);
+  });
+
+  it('gives agents left on default a fast model in fast mode, keeping explicit picks', async () => {
+    const calls: Array<{ agent: string; extraArgs: string[] }> = [];
+    for (const id of ['claude', 'cursor'] as const) {
+      AdapterFactory.registerAdapter(id, (opts?: any) => {
+        const mock = new MockCliAdapter(id);
+        mock.execute = async () => {
+          calls.push({ agent: id, extraArgs: opts?.extraArgs ?? [] });
+          return { exitCode: 0, stdout: 'tamam\nDONE', stderr: '', executionTimeMs: 1, timedOut: false };
+        };
+        return mock;
+      });
+    }
+    await new TeamChatCoordinator().run({
+      id: 't-fast',
+      prompt: '@claude @cursor fix it',
+      cwd: process.cwd(),
+      mode: 'team',
+      fast: true,
+      teamModels: { claude: { model: 'opus' } },
+      onEvent: () => {},
+    });
+    assert.deepStrictEqual(calls.slice(0, 2), [
+      { agent: 'claude', extraArgs: ['--model', 'opus'] },
+      { agent: 'cursor', extraArgs: ['--model', 'gpt-5.3-codex-low-fast'] },
+    ]);
   });
 });

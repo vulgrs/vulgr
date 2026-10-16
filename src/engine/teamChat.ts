@@ -36,8 +36,13 @@ export interface TeamChatOptions {
   soloEffort?: string;
   /** For team mode: which agents the user allowed to collaborate. Empty = auto-pick from installed. */
   teamAgents?: ChatAgentId[];
-  /** For team mode: the model + effort the user picked for each agent. Missing = the CLI's default. */
-  teamModels?: Partial<Record<ChatAgentId, AgentModelChoice>>;
+  /**
+   * For team mode: the model + effort the user picked, keyed by team member
+   * (`claude`, or `claude-2` for a second Claude) or by agent. Missing = default.
+   */
+  teamModels?: Record<string, AgentModelChoice>;
+  /** For team mode: agents left on their default model use a faster one. */
+  fast?: boolean;
   /** Previous compact conversation turns for continuity (automatically trimmed to save tokens). */
   history?: TeamChatTurn[];
   /** Optional weekly usage summary from UsageLedger to balance load across subscriptions. */
@@ -72,6 +77,9 @@ export type TeamChatEvent =
       model?: string;
       /** The teammate this turn answers, in a team discussion. */
       replyTo?: ChatAgentId;
+      /** Seat names when the same agent is in the team twice (CLAUDE-2), for the speaker and the one answered. */
+      member?: string;
+      replyToMember?: string;
     }
   | {
       type: 'agent_chunk';
@@ -154,6 +162,36 @@ export function buildModelExtraArgs(agent: ChatAgentId, model?: string, effort?:
   return args;
 }
 
+/** Quick models for team turns in fast mode; agents not listed keep their default. */
+export const FAST_MODELS: Partial<Record<ChatAgentId, string>> = {
+  cursor: 'gpt-5.3-codex-low-fast',
+  codex: 'gpt-5.4-mini',
+  agy: 'gemini-3.8-flash-high',
+  gemini: 'gemini-3.8-flash-high',
+};
+
+/** One seat in a team chat. The same agent can sit twice (`claude`, `claude-2`). */
+export interface TeamMember {
+  /** Stable id: the agent id, or `agent-N` when the agent is in the team more than once. */
+  key: string;
+  agent: ChatAgentId;
+  /** How the team calls it: CLAUDE, or CLAUDE-1 / CLAUDE-2. */
+  name: string;
+}
+
+/** Seats for a team list; a repeated agent gets numbered seats. */
+export function buildTeamMembers(agents: ChatAgentId[]): TeamMember[] {
+  const total = new Map<ChatAgentId, number>();
+  for (const a of agents) total.set(a, (total.get(a) ?? 0) + 1);
+  const seen = new Map<ChatAgentId, number>();
+  return agents.map((agent) => {
+    const n = (seen.get(agent) ?? 0) + 1;
+    seen.set(agent, n);
+    const key = (total.get(agent) ?? 1) > 1 ? `${agent}-${n}` : agent;
+    return { key, agent, name: key.toUpperCase() };
+  });
+}
+
 /** Classifies whether a user prompt is a quick/simple turn vs. a multi-step engineering build. */
 export function classifyPromptComplexity(prompt: string): 'simple' | 'collaborative' {
   const clean = prompt.trim();
@@ -233,7 +271,7 @@ export function isUsageLimitReply(text: string): boolean {
 /** Removes the closing `NEXT: <agent>` / `DONE` line an agent uses to pass the turn. */
 export function stripTurnControl(text: string): string {
   return text
-    .replace(/\s*(NEXT|SIRA)\s*:\s*[a-zA-Z_-]+\s*$/i, '')
+    .replace(/\s*(NEXT|SIRA)\s*:\s*[a-zA-Z0-9_-]+\s*$/i, '')
     .replace(/\s*(DONE|TAMAM|BİTTİ)\s*\.?\s*$/i, '')
     .trim();
 }
@@ -241,16 +279,16 @@ export function stripTurnControl(text: string): string {
 /** Reads who the agent handed the turn to, or whether it called the work done. */
 export function parseTurnControl(
   text: string,
-  team: ChatAgentId[]
-): { next?: ChatAgentId; done: boolean } {
+  team: string[]
+): { next?: string; done: boolean } {
   const tail = text.trim().split(/\r?\n/).slice(-3).join('\n');
   const done = /(^|\n)\s*(DONE|TAMAM|BİTTİ)\s*\.?\s*$/i.test(tail);
-  const m = tail.match(/(NEXT|SIRA)\s*:\s*([a-zA-Z_-]+)/i);
-  const named = m?.[2]?.toLowerCase() as ChatAgentId | undefined;
+  const m = tail.match(/(NEXT|SIRA)\s*:\s*([a-zA-Z0-9_-]+)/i);
+  const named = m?.[2]?.toLowerCase();
   return { next: named && team.includes(named) ? named : undefined, done };
 }
 
-function nextSpeaker(team: ChatAgentId[], current: ChatAgentId): ChatAgentId {
+function nextSpeaker(team: string[], current: string): string {
   const i = team.indexOf(current);
   return team[(i + 1) % team.length];
 }
@@ -261,13 +299,17 @@ export function buildConversationPrompt(p: {
   request: string;
   rules: string;
   history: string;
-  team: ChatAgentId[];
-  speaker: ChatAgentId;
-  conversation: Array<{ agent: ChatAgentId; text: string; files: string[] }>;
+  /** Member keys (`claude`, `claude-2`...). */
+  team: string[];
+  speaker: string;
+  conversation: Array<{ agent: string; text: string; files: string[] }>;
   lastTurn: boolean;
+  /** Keys of teammates that are the same agent as the speaker. */
+  twins?: string[];
 }): string {
   const me = p.speaker.toUpperCase();
   const others = p.team.filter((a) => a !== p.speaker);
+  const twins = (p.twins ?? []).map((t) => t.toUpperCase()).join(', ');
   // Recent turns in full, older ones shortened, so long talks stay affordable.
   const lines = p.conversation.map((t, i) => {
     const recent = i >= p.conversation.length - 4;
@@ -281,6 +323,9 @@ export function buildConversationPrompt(p: {
     return [
       `Bir yazılım ekibinin sohbetindesin. Ekip: ${p.team.map((a) => a.toUpperCase()).join(', ')}. Sen ${me}'sin.`,
       `Kullanıcının isteği: "${p.request}"`,
+      twins
+        ? `${twins} seninle aynı ajan ama ayrı bir ekip üyesi. Ona uymak zorunda değilsin: bağımsız düşün, onun kör noktalarını ve kaçırdığı seçenekleri ara.`
+        : '',
       p.rules ? `Proje kuralları: ${p.rules}` : '',
       p.history ? `Önceki sohbet:\n${p.history}` : '',
       lines.length ? `Ekip sohbeti şu ana kadar:\n\n${lines.join('\n\n')}` : '',
@@ -299,6 +344,9 @@ export function buildConversationPrompt(p: {
   return [
     `You are in a software team's chat. Team: ${p.team.map((a) => a.toUpperCase()).join(', ')}. You are ${me}.`,
     `The user's request: "${p.request}"`,
+    twins
+      ? `${twins} is the same agent as you but a separate team member. You don't have to go along with it: think independently and look for its blind spots and the options it missed.`
+      : '',
     p.rules ? `Project rules: ${p.rules}` : '',
     p.history ? `Earlier chat:\n${p.history}` : '',
     lines.length ? `Team conversation so far:\n\n${lines.join('\n\n')}` : '',
@@ -327,9 +375,10 @@ const MENTION_ALIASES: Record<string, ChatAgentId> = {
 };
 
 /**
- * Reads every `@agent` in a prompt, in order and without repeats. Leading
- * mentions (`@claude @cursor …`) are cut from the prompt and returned in
- * `leading`; ones inside the sentence stay, since they are part of the ask.
+ * Reads every `@agent` in a prompt, in order. Leading mentions
+ * (`@claude @cursor …`) are cut from the prompt and returned in `leading`; a
+ * repeated one there (`@claude @claude`) means two seats for that agent. Ones
+ * inside the sentence stay in the prompt and are counted once.
  */
 export function extractMentionedAgents(
   prompt: string,
@@ -349,7 +398,8 @@ export function extractMentionedAgents(
     const m = rest.match(/^\s*@([a-zA-Z0-9_-]+)(?:\s*[:,&+]|\s+(?:ve|and|ile)\b)?\s*/i);
     const target = m ? known(m[1]) : undefined;
     if (!m || !target) break;
-    add(target);
+    // A repeated leading tag (`@claude @claude`) asks for a second seat.
+    agents.push(target);
     rest = rest.slice(m[0].length);
   }
   const leading = [...agents];
@@ -392,7 +442,12 @@ export class TeamChatCoordinator {
     const mentioned = { agent: mentions.leading[0] };
     const effectivePrompt = mentions.cleanPrompt;
     const mentionedTeam = mentions.agents.length >= 2 ? mentions.agents : undefined;
-    const modelFor = (a: ChatAgentId): AgentModelChoice => opts.teamModels?.[a] ?? {};
+    /** The user's pick for a seat (or its agent); in fast mode a quick model replaces "default". */
+    const modelFor = (a: ChatAgentId, key: string = a): AgentModelChoice => {
+      const picked = opts.teamModels?.[key] ?? opts.teamModels?.[a] ?? {};
+      const isDefault = !picked.model || picked.model === 'default';
+      return opts.fast && isDefault && FAST_MODELS[a] ? { ...picked, model: FAST_MODELS[a] } : picked;
+    };
 
     // Compact recent history (last 4 turns, max 160 chars each) so context never explodes
     const compactHistory = (opts.history ?? [])
@@ -526,49 +581,61 @@ export class TeamChatCoordinator {
     // Multi-agent collaborative workflow: an open conversation. Each agent
     // answers the previous speaker, raises security or design points, does its
     // share of the work, and picks who speaks next; the team stops when it agrees.
-    const leadAgent = balancedAgents[0];
-    const thirdAgent = balancedAgents[2] ?? balancedAgents[0];
+    const members = buildTeamMembers(balancedAgents);
+    const keys = members.map((m) => m.key);
+    const byKey = new Map(members.map((m) => [m.key, m]));
+    const fixer = members[2] ?? members[0];
+    const thirdAgent = fixer.agent;
+    // Numbered seats only matter when an agent sits twice; otherwise the agent's name is enough.
+    const seatName = (m: TeamMember) => (m.key === m.agent ? undefined : m.name);
 
     opts.onEvent({
       type: 'system_note',
       badge: isTr ? '🤝 Ortak Çalışma' : '🤝 Team Chat',
       text: isTr
-        ? `Takım: ${balancedAgents.map((a) => a.toUpperCase()).join(' · ')}. Ajanlar konuşarak ilerleyecek.`
-        : `Team: ${balancedAgents.map((a) => a.toUpperCase()).join(' · ')}. The agents will work it out by talking.`,
+        ? `Takım: ${members.map((m) => m.name).join(' · ')}. Ajanlar konuşarak ilerleyecek.`
+        : `Team: ${members.map((m) => m.name).join(' · ')}. The agents will work it out by talking.`,
     });
 
-    const conversation: Array<{ agent: ChatAgentId; text: string; files: string[] }> = [];
-    const maxTurns = Math.min(10, 3 + balancedAgents.length * 2);
-    const spoken = new Set<ChatAgentId>();
-    let speaker: ChatAgentId = leadAgent;
+    const conversation: Array<{ agent: string; text: string; files: string[] }> = [];
+    const maxTurns = Math.min(10, 3 + members.length * 2);
+    const spoken = new Set<string>();
+    let speakerKey = keys[0];
 
     for (let turn = 0; turn < maxTurns; turn++) {
       if (this.aborted) return;
+      const seat = byKey.get(speakerKey)!;
+      const speaker = seat.agent;
       const previous = conversation[conversation.length - 1];
+      const prevSeat = previous ? byKey.get(previous.agent) : undefined;
       const prompt = buildConversationPrompt({
         isTr,
         request: effectivePrompt,
         rules: memorySnippet,
         history: compactHistory,
-        team: balancedAgents,
-        speaker,
+        team: keys,
+        speaker: seat.key,
         conversation,
         lastTurn: turn === maxTurns - 1,
+        twins: members.filter((m) => m.agent === seat.agent && m.key !== seat.key).map((m) => m.key),
       });
 
       const filesBefore = new Set(await gitUtils.getChangedFilesAsync());
+      const choice = modelFor(speaker, seat.key);
       const reply = await this.runSingleAgentTurn({
         agent: speaker,
-        model: modelFor(speaker).model,
-        effort: modelFor(speaker).effort,
-        roleLabel: previous
+        member: seatName(seat),
+        model: choice.model,
+        effort: choice.effort,
+        roleLabel: prevSeat
           ? isTr
-            ? `${previous.agent.toUpperCase()}'a yanıt`
-            : `to ${previous.agent.toUpperCase()}`
+            ? `${prevSeat.name}'a yanıt`
+            : `to ${prevSeat.name}`
           : isTr
           ? 'Konuşmayı açıyor'
           : 'Opens the discussion',
-        replyTo: previous?.agent,
+        replyTo: prevSeat?.agent,
+        replyToMember: prevSeat ? seatName(prevSeat) : undefined,
         prompt,
         display: stripTurnControl,
         cwd: opts.cwd,
@@ -584,8 +651,8 @@ export class TeamChatCoordinator {
           type: 'tool_card',
           agent: speaker,
           title: isTr
-            ? `${speaker.toUpperCase()} kullanım limitine takıldı; ekip sohbeti burada durdu`
-            : `${speaker.toUpperCase()} hit its usage limit; the team chat stopped here`,
+            ? `${seat.name} kullanım limitine takıldı; ekip sohbeti burada durdu`
+            : `${seat.name} hit its usage limit; the team chat stopped here`,
           detail: reply.trim().slice(0, 200),
           isError: true,
         });
@@ -599,19 +666,19 @@ export class TeamChatCoordinator {
           type: 'tool_card',
           agent: speaker,
           title: isTr
-            ? `${speaker.toUpperCase()} → ${touched.length} dosya üzerinde çalıştı`
-            : `${speaker.toUpperCase()} → updated ${touched.length} file(s)`,
+            ? `${seat.name} → ${touched.length} dosya üzerinde çalıştı`
+            : `${seat.name} → updated ${touched.length} file(s)`,
           detail: touched.join(', '),
         });
       }
 
-      conversation.push({ agent: speaker, text: stripTurnControl(reply), files: touched });
-      spoken.add(speaker);
+      conversation.push({ agent: seat.key, text: stripTurnControl(reply), files: touched });
+      spoken.add(seat.key);
 
-      const control = parseTurnControl(reply, balancedAgents);
+      const control = parseTurnControl(reply, keys);
       // Only stop once everyone has had a say, so no agent's objection is skipped.
-      if (control.done && balancedAgents.every((a) => spoken.has(a))) break;
-      speaker = control.next && control.next !== speaker ? control.next : nextSpeaker(balancedAgents, speaker);
+      if (control.done && keys.every((k) => spoken.has(k))) break;
+      speakerKey = control.next && control.next !== seat.key ? control.next : nextSpeaker(keys, seat.key);
     }
 
     if (this.aborted) return;
@@ -648,8 +715,9 @@ export class TeamChatCoordinator {
             : `After team changes, "${testCmd}" failed with:\n${compressedErr}\n\nApply the minimal fix and explain in 2 sentences.`;
           await this.runSingleAgentTurn({
             agent: thirdAgent,
-            model: modelFor(thirdAgent).model,
-            effort: modelFor(thirdAgent).effort,
+            member: seatName(fixer),
+            model: modelFor(thirdAgent, fixer.key).model,
+            effort: modelFor(thirdAgent, fixer.key).effort,
             roleLabel: isTr ? 'Onarım & Doğrulama' : 'Surgical Fixer',
             prompt: fixPrompt,
             cwd: opts.cwd,
@@ -677,6 +745,8 @@ export class TeamChatCoordinator {
     isTr: boolean;
     display?: (text: string) => string;
     replyTo?: ChatAgentId;
+    member?: string;
+    replyToMember?: string;
   }): Promise<string> {
     const shown = params.display ?? ((t: string) => t);
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -695,6 +765,8 @@ export class TeamChatCoordinator {
       roleLabel: params.roleLabel,
       model: modelLabel,
       replyTo: params.replyTo,
+      member: params.member,
+      replyToMember: params.replyToMember,
     });
 
     const extraArgs = buildModelExtraArgs(params.agent, params.model, params.effort);

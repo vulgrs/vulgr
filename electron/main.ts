@@ -722,6 +722,7 @@ function setupIpcHandlers() {
         soloEffort: typeof payload.soloEffort === 'string' ? payload.soloEffort : undefined,
         teamAgents: Array.isArray(payload.teamAgents) ? payload.teamAgents : undefined,
         teamModels: payload.teamModels && typeof payload.teamModels === 'object' ? payload.teamModels : undefined,
+        fast: payload.fast === true,
         history: Array.isArray(payload.history) ? payload.history : [],
         weeklyUsage,
         lang: payload.lang || 'tr',
