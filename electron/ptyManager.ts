@@ -190,10 +190,9 @@ export class PtyManager {
         : [];
 
       if (isWindows) {
-        let invocation = options.command;
-        if (claudeFlags.length > 0) {
-          invocation = `claude ${claudeFlags.join(' ')}`;
-        }
+        const psQuote = (s: string) => `'${String(s).replace(/'/g, "''")}'`;
+        const allArgs = [...claudeFlags, ...args].map(psQuote);
+        const invocation = `& ${psQuote(file)}${allArgs.length > 0 ? ' ' + allArgs.join(' ') : ''}`;
         file = 'powershell.exe';
         args = ['-NoLogo', '-NoExit', '-Command', invocation];
       } else if (options.command === 'claude' && claudeFlags.length > 0) {
@@ -330,7 +329,11 @@ export class PtyManager {
   write(id: string, data: string) {
     const term = this.terminals.get(id);
     if (term) {
-      term.write(data);
+      try {
+        term.write(data);
+      } catch (err) {
+        console.warn(`[PtyManager] write error on ${id}:`, err);
+      }
     }
   }
 
