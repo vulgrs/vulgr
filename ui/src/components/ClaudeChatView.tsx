@@ -21,6 +21,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Info,
+  CornerDownRight,
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer.js';
 import { AgentLogo } from './AgentLogo.js';
@@ -126,26 +127,34 @@ function countDiffFiles(diff: string): number {
 // Transcript pieces
 // ---------------------------------------------------------------------------
 
-const ThinkingBlock: React.FC<{ message: ChatMessage; isTr: boolean }> = ({ message, isTr }) => {
-  const [open, setOpen] = useState(false);
+/** Reasoning shown inline; the small chevron next to the label folds it. */
+const ThinkingBlock: React.FC<{ message: ChatMessage; isTr: boolean; openAll: boolean; openAllVersion: number }> = ({
+  message,
+  isTr,
+  openAll,
+  openAllVersion,
+}) => {
+  const [open, setOpen] = useState(openAll);
+  useEffect(() => setOpen(openAll), [openAll, openAllVersion]);
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-white/[0.03] text-left"
-      >
-        <Brain size={13} className={`flex-shrink-0 ${message.streaming ? 'text-violet-400 animate-pulse' : 'text-zinc-500'}`} />
-        <span className="text-[12px] font-medium text-zinc-400">
+    <div className="px-0.5">
+      <div className="flex items-center gap-1.5 text-[12px] text-zinc-500">
+        <Brain size={13} className={`flex-shrink-0 ${message.streaming ? 'text-violet-400 animate-pulse' : ''}`} />
+        <span className={message.streaming ? 'text-zinc-300' : ''}>
           {message.streaming ? (isTr ? 'Düşünüyor…' : 'Thinking…') : isTr ? 'Düşünce süreci' : 'Thought process'}
         </span>
-        {message.agent && message.agent !== 'claude' && (
-          <span className="text-[11px] text-zinc-600">· {agentLabel(message.agent)}</span>
-        )}
-        <ChevronRight size={13} className={`ml-auto text-zinc-600 transition-transform ${open ? 'rotate-90' : ''}`} />
-      </button>
+        {message.agent && <span className="text-zinc-600">· {agentLabel(message.agent)}</span>}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="p-0.5 rounded text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors"
+          title={open ? (isTr ? 'Düşünceyi gizle' : 'Hide thinking') : isTr ? 'Düşünceyi göster' : 'Show thinking'}
+        >
+          <ChevronRight size={12} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
+        </button>
+      </div>
       {open && (
-        <div className="border-t border-white/[0.06] px-3 py-2 text-[12.5px] text-zinc-400 leading-relaxed whitespace-pre-wrap break-words">
+        <div className="mt-1 ml-[6px] pl-3 border-l border-white/[0.08] text-[12.5px] text-zinc-500 leading-relaxed whitespace-pre-wrap break-words">
           {message.text}
         </div>
       )}
@@ -161,7 +170,15 @@ const AssistantBubble: React.FC<{ message: ChatMessage; isTr: boolean }> = ({ me
       <div className="flex flex-wrap items-center gap-1.5 mb-1 text-[11px] text-zinc-500">
         <AgentLogo id={agent} name={agentLabel(agent)} size={16} />
         <span className="font-semibold text-zinc-300">{agentLabel(agent)}</span>
-        {message.roleLabel && <span>· {message.roleLabel}</span>}
+        {message.replyTo ? (
+          <span className="inline-flex items-center gap-1 text-zinc-500" title={isTr ? 'Yanıt verdiği ajan' : 'Replying to'}>
+            <CornerDownRight size={11} />
+            <AgentLogo id={message.replyTo} name={agentLabel(message.replyTo)} size={14} />
+            {agentLabel(message.replyTo)}
+          </span>
+        ) : (
+          message.roleLabel && <span>· {message.roleLabel}</span>
+        )}
         {message.model && <span className="font-mono text-[10.5px] text-zinc-600">{message.model}</span>}
         {message.tokensUsed != null && (
           <span className="font-mono text-[10.5px] text-zinc-600">· {message.tokensUsed.toLocaleString()} tok</span>
@@ -262,7 +279,12 @@ function buildRenderItems(messages: ChatMessage[]): RenderItem[] {
   return items;
 }
 
-const TranscriptItem: React.FC<{ item: RenderItem; isTr: boolean }> = ({ item, isTr }) => {
+const TranscriptItem: React.FC<{ item: RenderItem; isTr: boolean; openAll: boolean; openAllVersion: number }> = ({
+  item,
+  isTr,
+  openAll,
+  openAllVersion,
+}) => {
   if (item.kind === 'tool') return <ToolCall call={item.call} result={item.result} />;
   const m = item.message;
   switch (m.kind) {
@@ -271,7 +293,7 @@ const TranscriptItem: React.FC<{ item: RenderItem; isTr: boolean }> = ({ item, i
     case 'assistant':
       return <AssistantBubble message={m} isTr={isTr} />;
     case 'thinking':
-      return <ThinkingBlock message={m} isTr={isTr} />;
+      return <ThinkingBlock message={m} isTr={isTr} openAll={openAll} openAllVersion={openAllVersion} />;
     case 'system':
       return <NoteRow message={m} />;
     case 'task_plan':
@@ -573,6 +595,11 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       return Array.isArray(parsed) && parsed.length > 0 ? parsed : ['claude', 'codex'];
     })
   );
+  const [thinkingOpen, setThinkingOpen] = useState<boolean>(() =>
+    readLocal('vulgr.chatThinkingOpen', true, (r) => r !== '0')
+  );
+  /** Bumped by the header toggle so every block follows it, even ones folded by hand. */
+  const [thinkingVersion, setThinkingVersion] = useState(0);
   const [changesOpen, setChangesOpen] = useState<boolean>(() =>
     readLocal('vulgr.chatChangesOpen', true, (r) => r !== '0')
   );
@@ -589,6 +616,42 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   stateRef.current = state;
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+
+  const filteredMentionAgents = useMemo(() => {
+    if (mentionQuery === null) return [];
+    return AGENTS.filter(
+      (a) =>
+        a.id.toLowerCase().includes(mentionQuery) ||
+        a.label.toLowerCase().includes(mentionQuery)
+    );
+  }, [mentionQuery]);
+
+  const insertMention = useCallback(
+    (targetAgent: AgentInfo) => {
+      const textarea = textareaRef.current;
+      const cursor = textarea?.selectionStart ?? input.length;
+      const textBefore = input.slice(0, cursor);
+      const textAfter = input.slice(cursor);
+      const replacedBefore = textBefore.replace(/@([a-zA-Z0-9_-]*)$/, `@${targetAgent.id} `);
+      const nextText = replacedBefore + textAfter;
+      setInput(nextText);
+      setMentionQuery(null);
+      if (mode === 'solo') {
+        setAgent(targetAgent.id);
+      }
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const newPos = replacedBefore.length;
+          textareaRef.current.setSelectionRange(newPos, newPos);
+        }
+      }, 0);
+    },
+    [input, mode]
+  );
 
   useEffect(() => {
     try {
@@ -599,8 +662,9 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       localStorage.setItem('vulgr.chatModelFlags', JSON.stringify(flags));
       localStorage.setItem('vulgr.teamAgents', JSON.stringify(team));
       localStorage.setItem('vulgr.chatChangesOpen', changesOpen ? '1' : '0');
+      localStorage.setItem('vulgr.chatThinkingOpen', thinkingOpen ? '1' : '0');
     } catch {}
-  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen]);
+  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen, thinkingOpen]);
 
   const families = useMemo(() => {
     const out = {} as Record<ChatAgentId, ModelFamily[]>;
@@ -709,6 +773,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
             kind: 'assistant',
             agent: event.agent,
             roleLabel: mode === 'team' ? event.roleLabel : undefined,
+            replyTo: event.replyTo,
             model: event.model,
             text: '',
             streaming: true,
@@ -821,11 +886,31 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       const previews = attachments.map((a) => a.previewUrl);
       setInput('');
       setAttachments([]);
+      setMentionQuery(null);
       setState((prev) => appendUserMessage(prev, text, previews));
       setRunning(true);
 
-      if (mode === 'solo' && agent === 'claude') {
-        sendToClaude(text, images);
+      const mentionMatch = text.match(/^\s*@([a-zA-Z0-9_-]+)[:,\s]?\s*/i);
+      const mentionedRaw = mentionMatch?.[1]?.toLowerCase();
+      const aliasMap: Record<string, ChatAgentId> = {
+        claude: 'claude',
+        claudecode: 'claude',
+        codex: 'codex',
+        agy: 'agy',
+        antigravity: 'agy',
+        cursor: 'cursor',
+        opencode: 'opencode',
+        gemini: 'gemini',
+      };
+      const mentionedAgent = mentionedRaw ? aliasMap[mentionedRaw] : undefined;
+      const effectiveAgent = (mode === 'solo' && mentionedAgent) ? mentionedAgent : agent;
+      if (mentionedAgent && mode === 'solo' && mentionedAgent !== agent) {
+        setAgent(mentionedAgent);
+      }
+
+      if (mode === 'solo' && effectiveAgent === 'claude') {
+        const promptWithoutMention = text.replace(mentionMatch?.[0] || '', '').trim() || text;
+        sendToClaude(promptWithoutMention, images);
         return;
       }
 
@@ -835,7 +920,8 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         .map((m) => ({ role: (m.kind === 'user' ? 'user' : 'agent') as 'user' | 'agent', agent: m.agent, text: m.text }));
       foreignTurnsRef.current.push(`${isTr ? 'Kullanıcı' : 'User'}: ${text}`);
 
-      const { model, effort: eff } = resolveModel(agent, family, effort, flags);
+      const targetFamily = families[effectiveAgent]?.find((f) => f.id === (modelByAgent[effectiveAgent] || 'default'));
+      const { model, effort: eff } = resolveModel(effectiveAgent, targetFamily, effort, flags);
       const id = `tc-${Date.now()}`;
       teamRunIdRef.current = id;
       void api?.runTeamChat?.({
@@ -843,7 +929,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         prompt: text,
         cwd: chatCwd,
         mode,
-        soloAgent: agent,
+        soloAgent: effectiveAgent,
         soloModel: model,
         soloEffort: eff,
         teamAgents: team,
@@ -851,7 +937,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         lang,
       });
     },
-    [attachments, running, mode, agent, sendToClaude, isTr, family, effort, flags, api, chatCwd, team, lang]
+    [attachments, running, mode, agent, sendToClaude, isTr, families, modelByAgent, effort, flags, api, chatCwd, team, lang]
   );
 
   useEffect(() => {
@@ -945,20 +1031,50 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
     ? isTr
       ? 'Ajan çalışıyor…'
       : 'Agent is working…'
-    : mode === 'team'
-    ? isTr
-      ? 'Ne yapılsın? Ajanlar işi aralarında bölüşür…'
-      : 'What should the team build?'
-    : empty
-    ? isTr
-      ? 'Ne yapmak istiyorsun?'
-      : 'What do you want to do?'
     : isTr
-    ? 'Yanıtla…'
-    : 'Reply…';
+    ? 'Mesaj yaz veya @ ile ajan ata (@claude, @cursor, @agy...)'
+    : 'Type a message or use @ to assign (@claude, @cursor, @agy...)';
 
   const composer = (
-    <div className="rounded-2xl border border-white/10 bg-[#151517] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_40px_-12px_rgba(0,0,0,0.7)] focus-within:border-white/20 transition-colors">
+    <div className="relative rounded-2xl border border-white/10 bg-[#151517] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_40px_-12px_rgba(0,0,0,0.7)] focus-within:border-white/20 transition-colors">
+      {mentionQuery !== null && filteredMentionAgents.length > 0 && (
+        <div className="absolute bottom-full left-3 mb-2 z-50 min-w-[240px] max-w-[320px] rounded-xl border border-white/10 bg-[#18181b] p-1.5 shadow-2xl backdrop-blur-md">
+          <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 border-b border-white/[0.06] mb-1 flex items-center justify-between">
+            <span>{isTr ? 'Ajan Ata' : 'Assign Agent'}</span>
+            <span className="text-[10px] text-zinc-500 font-normal">↑↓ Gezin · ↵ Seç</span>
+          </div>
+          <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto">
+            {filteredMentionAgents.map((a, idx) => {
+              const active = idx === mentionIndex;
+              const isMissing = available[a.id] === false;
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertMention(a);
+                  }}
+                  className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors text-left ${
+                    active ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.05]'
+                  } ${isMissing ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AgentLogo id={a.id} name={a.label} size={16} />
+                    <span className="font-semibold text-emerald-400">@{a.id}</span>
+                    <span className="text-zinc-400 text-[12px] truncate">{a.label}</span>
+                  </div>
+                  {isMissing && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 flex-shrink-0">
+                      {isTr ? 'Yüklü Değil' : 'Not Installed'}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-3 pt-3">
           {attachments.map((a) => (
@@ -975,10 +1091,46 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         </div>
       )}
       <textarea
+        ref={textareaRef}
         autoFocus
         value={input}
-        onChange={(e) => setInput(e.target.value)}
+        onChange={(e) => {
+          const val = e.target.value;
+          setInput(val);
+          const cursor = e.target.selectionStart ?? val.length;
+          const textBefore = val.slice(0, cursor);
+          const match = textBefore.match(/(?:^|\s)@([a-zA-Z0-9_-]*)$/);
+          if (match) {
+            setMentionQuery(match[1].toLowerCase());
+            setMentionIndex(0);
+          } else {
+            setMentionQuery(null);
+          }
+        }}
         onKeyDown={(e) => {
+          if (mentionQuery !== null && filteredMentionAgents.length > 0) {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setMentionIndex((i) => (i + 1) % filteredMentionAgents.length);
+              return;
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setMentionIndex((i) => (i - 1 + filteredMentionAgents.length) % filteredMentionAgents.length);
+              return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+              e.preventDefault();
+              const target = filteredMentionAgents[mentionIndex] ?? filteredMentionAgents[0];
+              if (target) insertMention(target);
+              return;
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              setMentionQuery(null);
+              return;
+            }
+          }
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendPrompt(input);
@@ -1111,6 +1263,26 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
             )}
             <div className="w-px h-4 bg-white/[0.08]" />
             <button
+              onClick={() => {
+                setThinkingOpen((v) => !v);
+                setThinkingVersion((v) => v + 1);
+              }}
+              className={`p-1.5 rounded-md transition-colors ${
+                thinkingOpen ? 'text-violet-300 bg-white/[0.06]' : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05]'
+              }`}
+              title={
+                thinkingOpen
+                  ? isTr
+                    ? 'Tüm düşünce süreçlerini kapat'
+                    : 'Fold all thinking'
+                  : isTr
+                  ? 'Tüm düşünce süreçlerini aç'
+                  : 'Show all thinking'
+              }
+            >
+              <Brain size={14} />
+            </button>
+            <button
               onClick={handleNewChat}
               className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05]"
               title={t.terminal.newChatHint}
@@ -1178,6 +1350,8 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
                     key={item.kind === 'tool' ? item.call.id : item.message.id}
                     item={item}
                     isTr={isTr}
+                    openAll={thinkingOpen}
+                    openAllVersion={thinkingVersion}
                   />
                 ))}
                 {running && !state.messages.some((m) => m.streaming) && (

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   buildModelExtraArgs,
   classifyPromptComplexity,
-  stripTaskLines,
+  extractMentionedAgent,
+  parseTurnControl,
+  stripTurnControl,
   pickQuotaBalancedAgents,
   TeamChatCoordinator,
   type TeamChatEvent,
@@ -87,25 +89,40 @@ describe('TeamChatCoordinator Suite', () => {
     assert.ok(events.some((e) => e.type === 'done'));
   });
 
-  it('divides tasks and coordinates multiple agents on collaborative prompts in Team mode', async () => {
-    AdapterFactory.registerAdapter('claude', () => new MockCliAdapter('claude'));
-    AdapterFactory.registerAdapter('agy', () => new MockCliAdapter('agy'));
+  it('lets the agents talk: each turn answers the previous speaker and the team stops on DONE', async () => {
+    const said: string[] = [];
+    class TalkingMock extends MockCliAdapter {
+      override async execute(prompt: string, options: { onStdout?: (c: string) => void } = {}) {
+        said.push(`${this.name}:${prompt.includes('CURSOR:') || prompt.includes('CLAUDE:') ? 'saw-chat' : 'opens'}`);
+        const out =
+          this.name === 'claude'
+            ? 'Plan: add the module. NEXT: cursor'
+            : 'It would be better if inputs were validated. Done on my side.\nDONE';
+        options.onStdout?.(out);
+        return { exitCode: 0, stdout: out, stderr: '', executionTimeMs: 1, timedOut: false };
+      }
+    }
+    AdapterFactory.registerAdapter('claude', () => new TalkingMock('claude'));
+    AdapterFactory.registerAdapter('cursor', () => new TalkingMock('cursor'));
     const coordinator = new TeamChatCoordinator();
     const events: TeamChatEvent[] = [];
 
     await coordinator.run({
-      id: 'test-team-collab',
+      id: 'test-team-talk',
       prompt: 'Kullanıcı profili için backend API servisi ve React arayüz modülünü baştan sona oluştur',
       cwd: process.cwd(),
       mode: 'team',
-      teamAgents: ['claude', 'agy'],
+      teamAgents: ['claude', 'cursor'],
       lang: 'tr',
       onEvent: (e) => events.push(e),
     });
 
-    assert.ok(events.some((e) => e.type === 'task_plan'), 'Should emit a task_plan event');
-    const agentDones = events.filter((e) => e.type === 'agent_done');
-    assert.ok(agentDones.length >= 3, 'Should include architect plan, peer alignment, and sub-task executions');
+    const starts = events.filter((e) => e.type === 'agent_start');
+    assert.strictEqual(starts.length, 2, 'claude opens, cursor answers and closes with DONE');
+    assert.ok(starts[1].type === 'agent_start' && starts[1].replyTo === 'claude');
+    assert.deepStrictEqual(said, ['claude:opens', 'cursor:saw-chat']);
+    const done = events.filter((e) => e.type === 'agent_done');
+    assert.ok(done.every((e) => e.type === 'agent_done' && !/NEXT:|DONE$/.test(e.text)));
     assert.ok(events.some((e) => e.type === 'done'));
   });
 
@@ -169,8 +186,23 @@ describe('TeamChatCoordinator Suite', () => {
     assert.deepStrictEqual(buildModelExtraArgs('claude', 'default', 'bogus; rm'), []);
   });
 
-  it('keeps the plan text but drops the TASK lines shown in the task card', () => {
-    const plan = 'Approach: split it.\n\nTASK: cursor | ESM | add type module\nTASK: claude | math | write src/math.js';
-    assert.strictEqual(stripTaskLines(plan), 'Approach: split it.');
+  it('extracts mentioned agent from prompt start and cleans the prompt', () => {
+    assert.deepStrictEqual(extractMentionedAgent('@cursor fix the button styles'), {
+      agent: 'cursor',
+      cleanPrompt: 'fix the button styles',
+    });
+    assert.deepStrictEqual(extractMentionedAgent('@claude: write tests'), {
+      agent: 'claude',
+      cleanPrompt: 'write tests',
+    });
+    assert.deepStrictEqual(extractMentionedAgent('@agy refactor this module'), {
+      agent: 'agy',
+      cleanPrompt: 'refactor this module',
+    });
+    assert.deepStrictEqual(extractMentionedAgent('just a normal message without mention'), {
+      agent: undefined,
+      cleanPrompt: 'just a normal message without mention',
+    });
   });
 });
+

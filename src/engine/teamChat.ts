@@ -60,6 +60,8 @@ export type TeamChatEvent =
       agent: ChatAgentId;
       roleLabel: string;
       model?: string;
+      /** The teammate this turn answers, in a team discussion. */
+      replyTo?: ChatAgentId;
     }
   | {
       type: 'agent_chunk';
@@ -189,12 +191,113 @@ async function runZeroTokenVerify(cmd: string, cwd: string): Promise<{ ok: boole
   }
 }
 
-/** Removes the plan's `TASK: agent | title | instruction` lines (also when several share one line). */
-export function stripTaskLines(text: string): string {
+/** Removes the closing `NEXT: <agent>` / `DONE` line an agent uses to pass the turn. */
+export function stripTurnControl(text: string): string {
   return text
-    .replace(/\s*TASK:[^\n]*/gi, '')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\s*(NEXT|SIRA)\s*:\s*[a-zA-Z_-]+\s*$/i, '')
+    .replace(/\s*(DONE|TAMAM|BİTTİ)\s*\.?\s*$/i, '')
     .trim();
+}
+
+/** Reads who the agent handed the turn to, or whether it called the work done. */
+export function parseTurnControl(
+  text: string,
+  team: ChatAgentId[]
+): { next?: ChatAgentId; done: boolean } {
+  const tail = text.trim().split(/\r?\n/).slice(-3).join('\n');
+  const done = /(^|\n)\s*(DONE|TAMAM|BİTTİ)\s*\.?\s*$/i.test(tail);
+  const m = tail.match(/(NEXT|SIRA)\s*:\s*([a-zA-Z_-]+)/i);
+  const named = m?.[2]?.toLowerCase() as ChatAgentId | undefined;
+  return { next: named && team.includes(named) ? named : undefined, done };
+}
+
+function nextSpeaker(team: ChatAgentId[], current: ChatAgentId): ChatAgentId {
+  const i = team.indexOf(current);
+  return team[(i + 1) % team.length];
+}
+
+/** The prompt for one turn of the team conversation. */
+export function buildConversationPrompt(p: {
+  isTr: boolean;
+  request: string;
+  rules: string;
+  history: string;
+  team: ChatAgentId[];
+  speaker: ChatAgentId;
+  conversation: Array<{ agent: ChatAgentId; text: string; files: string[] }>;
+  lastTurn: boolean;
+}): string {
+  const me = p.speaker.toUpperCase();
+  const others = p.team.filter((a) => a !== p.speaker);
+  // Recent turns in full, older ones shortened, so long talks stay affordable.
+  const lines = p.conversation.map((t, i) => {
+    const recent = i >= p.conversation.length - 4;
+    const body = recent ? t.text.slice(0, 1800) : `${t.text.replace(/\s+/g, ' ').slice(0, 240)}…`;
+    const files = t.files.length ? ` [${p.isTr ? 'değiştirdi' : 'changed'}: ${t.files.join(', ')}]` : '';
+    return `${t.agent.toUpperCase()}${files}:\n${body}`;
+  });
+  const last = p.conversation[p.conversation.length - 1];
+
+  if (p.isTr) {
+    return [
+      `Bir yazılım ekibinin sohbetindesin. Ekip: ${p.team.map((a) => a.toUpperCase()).join(', ')}. Sen ${me}'sin.`,
+      `Kullanıcının isteği: "${p.request}"`,
+      p.rules ? `Proje kuralları: ${p.rules}` : '',
+      p.history ? `Önceki sohbet:\n${p.history}` : '',
+      lines.length ? `Ekip sohbeti şu ana kadar:\n\n${lines.join('\n\n')}` : '',
+      last
+        ? `Doğrudan ${last.agent.toUpperCase()}'a yanıt ver. Katıldığın yerde bunu söyle, katılmadığın yerde nedenini açıkla. Güvenlik açığı (doğrulanmamış girdi, enjeksiyon, gizli bilgi, yetki), hata ya da daha iyi bir tasarım görürsen "Şöyle olsa daha iyi olur: …" diye öner. Ekip arkadaşının değiştirdiği dosyalara bakıp incele.`
+        : `Konuşmayı sen açıyorsun: isteği nasıl ele alacağınızı öner, işi kimin hangi kısmını yapacağını teklif et ve uygun gördüğün kısmı yapmaya başla.`,
+      'Yapılması gereken ve senin üstlendiğin bir iş varsa dosyalarda doğrudan uygula; ne yaptığını kısaca anlat. Sadece konuşmak yeterliyse dosyalara dokunma.',
+      p.lastTurn
+        ? 'Bu son tur: açık kalan bir şey varsa kullanıcıya kısaca söyle ve son satıra DONE yaz.'
+        : `Son satıra tek başına ya sözü devrettiğin ajanı (NEXT: ${others.join(' | ') || p.speaker}) ya da iş bittiyse ve ekip hemfikirse DONE yaz.`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+  }
+  return [
+    `You are in a software team's chat. Team: ${p.team.map((a) => a.toUpperCase()).join(', ')}. You are ${me}.`,
+    `The user's request: "${p.request}"`,
+    p.rules ? `Project rules: ${p.rules}` : '',
+    p.history ? `Earlier chat:\n${p.history}` : '',
+    lines.length ? `Team conversation so far:\n\n${lines.join('\n\n')}` : '',
+    last
+      ? `Reply directly to ${last.agent.toUpperCase()}. Say where you agree; where you don't, say why. If you see a security hole (unvalidated input, injection, secrets, authorization), a bug or a better design, propose it as "It would be better if …". Look over the files your teammate changed.`
+      : 'You open the conversation: propose how to approach the request, offer who does which part, and start on the part you take.',
+    'If there is work you take on, apply it in the files directly and say briefly what you did. If talking is enough, leave the files alone.',
+    p.lastTurn
+      ? 'This is the last turn: tell the user briefly about anything left open and end with DONE.'
+      : `End with a line that is either the agent you hand over to (NEXT: ${others.join(' | ') || p.speaker}) or DONE if the work is finished and the team agrees.`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+/** Detects `@agent` mention at the start of a prompt to route tasks directly. */
+export function extractMentionedAgent(
+  prompt: string,
+  allowedAgents?: ChatAgentId[]
+): { agent?: ChatAgentId; cleanPrompt: string } {
+  const match = prompt.match(/^\s*@([a-zA-Z0-9_-]+)[:,\s]?\s*/);
+  if (!match) return { agent: undefined, cleanPrompt: prompt };
+  const raw = match[1].toLowerCase();
+  const aliasMap: Record<string, ChatAgentId> = {
+    claude: 'claude',
+    claudecode: 'claude',
+    codex: 'codex',
+    agy: 'agy',
+    antigravity: 'agy',
+    cursor: 'cursor',
+    opencode: 'opencode',
+    gemini: 'gemini',
+  };
+  const target = aliasMap[raw];
+  if (target && (!allowedAgents || allowedAgents.includes(target))) {
+    const cleanPrompt = prompt.slice(match[0].length).trim();
+    return { agent: target, cleanPrompt: cleanPrompt || prompt };
+  }
+  return { agent: undefined, cleanPrompt: prompt };
 }
 
 export class TeamChatCoordinator {
@@ -214,6 +317,10 @@ export class TeamChatCoordinator {
     const memorySnippet = memory.toPromptSnippet().slice(0, 500);
     const gitUtils = new GitUtils(opts.cwd);
 
+    // Check for @agent mention at prompt start
+    const mentioned = extractMentionedAgent(opts.prompt);
+    const effectivePrompt = mentioned.cleanPrompt;
+
     // Compact recent history (last 4 turns, max 160 chars each) so context never explodes
     const compactHistory = (opts.history ?? [])
       .slice(-4)
@@ -221,7 +328,16 @@ export class TeamChatCoordinator {
       .join('\n');
 
     if (opts.mode === 'solo') {
-      const agent: ChatAgentId = opts.soloAgent || 'claude';
+      const agent: ChatAgentId = mentioned.agent || opts.soloAgent || 'claude';
+      if (mentioned.agent && mentioned.agent !== opts.soloAgent) {
+        opts.onEvent({
+          type: 'system_note',
+          badge: `@${mentioned.agent.toUpperCase()}`,
+          text: isTr
+            ? `Görev kullanıcı isteği üzerine @${mentioned.agent.toUpperCase()} ajanına yönlendirildi.`
+            : `Task routed to @${mentioned.agent.toUpperCase()} per user request.`,
+        });
+      }
       const roleLabel = isTr ? 'Tekli Ajan' : 'Solo Agent';
       await this.runSingleAgentTurn({
         agent,
@@ -231,7 +347,7 @@ export class TeamChatCoordinator {
         prompt: [
           memorySnippet ? `[Workspace Rules]\n${memorySnippet}` : '',
           compactHistory ? `[Recent Context]\n${compactHistory}` : '',
-          opts.prompt,
+          effectivePrompt,
         ]
           .filter(Boolean)
           .join('\n\n'),
@@ -246,7 +362,24 @@ export class TeamChatCoordinator {
 
     // ---- TEAM MODE (Quota-Aware Autonomous Collaboration) ----
     const balancedAgents = await pickQuotaBalancedAgents(opts.teamAgents, opts.weeklyUsage);
-    const complexity = classifyPromptComplexity(opts.prompt);
+    if (mentioned.agent) {
+      const idx = balancedAgents.indexOf(mentioned.agent);
+      if (idx > -1) {
+        balancedAgents.splice(idx, 1);
+        balancedAgents.unshift(mentioned.agent);
+      } else {
+        balancedAgents.unshift(mentioned.agent);
+      }
+      opts.onEvent({
+        type: 'system_note',
+        badge: `@${mentioned.agent.toUpperCase()}`,
+        text: isTr
+          ? `Görevi başlatması ve koordine etmesi için @${mentioned.agent.toUpperCase()} seçildi.`
+          : `Assigned to @${mentioned.agent.toUpperCase()} to lead and coordinate.`,
+      });
+    }
+
+    const complexity = classifyPromptComplexity(effectivePrompt);
     const quotaBreakdown = balancedAgents
       .map((a) => {
         const used = opts.weeklyUsage?.byAgent?.[a]?.tokens ?? 0;
@@ -289,7 +422,7 @@ export class TeamChatCoordinator {
         prompt: [
           memorySnippet ? `[Workspace Rules]\n${memorySnippet}` : '',
           compactHistory ? `[Recent Context]\n${compactHistory}` : '',
-          opts.prompt,
+          effectivePrompt,
         ]
           .filter(Boolean)
           .join('\n\n'),
@@ -302,158 +435,79 @@ export class TeamChatCoordinator {
       return;
     }
 
-    // Multi-agent collaborative workflow
+    // Multi-agent collaborative workflow: an open conversation. Each agent
+    // answers the previous speaker, raises security or design points, does its
+    // share of the work, and picks who speaks next; the team stops when it agrees.
     const leadAgent = balancedAgents[0];
-    const secondAgent = balancedAgents[1] ?? balancedAgents[0];
     const thirdAgent = balancedAgents[2] ?? balancedAgents[0];
 
     opts.onEvent({
       type: 'system_note',
-      badge: isTr ? '🤝 Ortak Çalışma & Kota Dengeleme' : '🤝 Team Mode & Quota Balancer',
+      badge: isTr ? '🤝 Ortak Çalışma' : '🤝 Team Chat',
       text: isTr
-        ? `Aktif takım: ${balancedAgents.map((a) => a.toUpperCase()).join(' · ')}. Haftalık kotaları korumak için mikro-özet aktarımı etkin.`
-        : `Active team: ${balancedAgents.map((a) => a.toUpperCase()).join(' · ')}. Micro-context handoff enabled to save tokens.`,
+        ? `Takım: ${balancedAgents.map((a) => a.toUpperCase()).join(' · ')}. Ajanlar konuşarak ilerleyecek.`
+        : `Team: ${balancedAgents.map((a) => a.toUpperCase()).join(' · ')}. The agents will work it out by talking.`,
     });
 
-    if (this.aborted) return;
+    const conversation: Array<{ agent: ChatAgentId; text: string; files: string[] }> = [];
+    const maxTurns = Math.min(10, 3 + balancedAgents.length * 2);
+    const spoken = new Set<ChatAgentId>();
+    let speaker: ChatAgentId = leadAgent;
 
-    // 1. Lead Architect proposes brief plan and divides work among balancedAgents
-    const teamListStr = balancedAgents.join(', ');
-    const planPrompt = isTr
-      ? [
-          `Sen bu projenin Mimar ve Koordinatör ajanısın (${leadAgent.toUpperCase()}).`,
-          `Takımdaki ajanlar: [${teamListStr}].`,
-          `Kullanıcı İsteği: "${opts.prompt}"`,
-          memorySnippet ? `Proje Kuralları: ${memorySnippet}` : '',
-          'Önce <think>...</think> etiketleri içinde mimari analizini ve görevleri neden hangi ajana verdiğini 2-3 maddede düşün.',
-          'Ardından çok kısa (en fazla 3-4 cümle) yaklaşımını açıkla ve işi takımdaki ajanlara 2 veya 3 somut alt görev olarak böl.',
-          'Yanıtının en sonuna mutlaka şu formatta görev satırları ekle (kod yazma, sadece planla):',
-          'TASK: <ajan_adi> | <kısa görev başlığı> | <yapılacak somut teknik iş>',
-        ]
-          .filter(Boolean)
-          .join('\n')
-      : [
-          `You are the Lead Architect (${leadAgent.toUpperCase()}) coordinating team [${teamListStr}].`,
-          `User Request: "${opts.prompt}"`,
-          memorySnippet ? `Workspace Rules: ${memorySnippet}` : '',
-          'Briefly explain the approach in 3-4 sentences and divide the work into 2 or 3 concrete tasks across the team.',
-          'End your response with lines in this exact format (do not write code yet):',
-          'TASK: <agent_name> | <short task title> | <concrete technical instruction>',
-        ]
-          .filter(Boolean)
-          .join('\n');
-
-    const planOutput = await this.runSingleAgentTurn({
-      agent: leadAgent,
-      roleLabel: isTr ? 'Mimar & Planlayıcı' : 'Lead Architect',
-      prompt: planPrompt,
-      // The TASK lines become the task-split card; the reply keeps only the approach.
-      display: stripTaskLines,
-      cwd: opts.cwd,
-      allowEdits: false,
-      onEvent: opts.onEvent,
-      isTr,
-    });
-
-    if (this.aborted) return;
-
-    // Parse TASK lines or build a sensible 2-step fallback division
-    const parsedTasks = this.parseTasks(planOutput, balancedAgents, opts.prompt, isTr);
-
-    opts.onEvent({
-      type: 'task_plan',
-      tasks: parsedTasks.map((t, i) => ({
-        id: `task-${i + 1}`,
-        agent: t.agent,
-        roleLabel: t.roleLabel,
-        title: t.title,
-      })),
-    });
-
-    // 2. Quick peer review / alignment comment from the second agent (strictly capped to 2 sentences)
-    if (secondAgent !== leadAgent && !this.aborted) {
-      const alignPrompt = isTr
-        ? [
-            `${leadAgent.toUpperCase()} şu iş bölümünü önerdi:\n${parsedTasks.map((t) => `- ${t.agent}: ${t.title}`).join('\n')}`,
-            `Sen ${secondAgent.toUpperCase()} ajanısın. Kendi görevin ve dikkat edilmesi gereken 1 kritik teknik nokta hakkında 2 cümlelik çok kısa bir ekip mesajı yaz (dosya değiştirme).`,
-          ].join('\n')
-        : [
-            `${leadAgent.toUpperCase()} proposed this task breakdown:\n${parsedTasks.map((t) => `- ${t.agent}: ${t.title}`).join('\n')}`,
-            `You are ${secondAgent.toUpperCase()}. Reply in 2 short sentences confirming your part and 1 key technical detail to watch out for (do not edit files yet).`,
-          ].join('\n');
-
-      await this.runSingleAgentTurn({
-        agent: secondAgent,
-        model: secondAgent === 'claude' ? 'haiku' : secondAgent === 'agy' ? 'gemini-2.5-flash' : undefined,
-        roleLabel: isTr ? 'Teknik Görüş' : 'Peer Alignment',
-        prompt: alignPrompt,
-        cwd: opts.cwd,
-        allowEdits: false,
-        onEvent: opts.onEvent,
-        isTr,
-      });
-    }
-
-    // 3. Execute each sub-task with micro-context handoff (no full chat history repetition!)
-    const completedSummaries: string[] = [];
-    for (let i = 0; i < parsedTasks.length; i++) {
+    for (let turn = 0; turn < maxTurns; turn++) {
       if (this.aborted) return;
-      const task = parsedTasks[i];
-      const priorHandoff =
-        completedSummaries.length > 0
-          ? isTr
-            ? `Önceki ekip arkadaşlarının tamamladığı özet:\n${completedSummaries.join('\n')}`
-            : `Completed by teammates so far:\n${completedSummaries.join('\n')}`
-          : '';
-
-      const execPrompt = isTr
-        ? [
-            `Ana Hedef: "${opts.prompt}"`,
-            `Senin Görevin (${task.agent.toUpperCase()} - ${task.title}): ${task.instruction}`,
-            priorHandoff,
-            'Gerekli dosya değişikliklerini doğrudan uygula ve sonunda ne yaptığını 2-3 cümleyle ekip arkadaşlarına özetle.',
-          ]
-            .filter(Boolean)
-            .join('\n\n')
-        : [
-            `Overall Goal: "${opts.prompt}"`,
-            `Your Assigned Task (${task.agent.toUpperCase()} - ${task.title}): ${task.instruction}`,
-            priorHandoff,
-            'Apply the necessary code changes directly and summarize what you changed in 2-3 sentences for your teammates.',
-          ]
-            .filter(Boolean)
-            .join('\n\n');
+      const previous = conversation[conversation.length - 1];
+      const prompt = buildConversationPrompt({
+        isTr,
+        request: effectivePrompt,
+        rules: memorySnippet,
+        history: compactHistory,
+        team: balancedAgents,
+        speaker,
+        conversation,
+        lastTurn: turn === maxTurns - 1,
+      });
 
       const filesBefore = new Set(await gitUtils.getChangedFilesAsync());
       const reply = await this.runSingleAgentTurn({
-        agent: task.agent,
-        roleLabel: `${task.roleLabel} · ${task.title}`,
-        prompt: execPrompt,
+        agent: speaker,
+        roleLabel: previous
+          ? isTr
+            ? `${previous.agent.toUpperCase()}'a yanıt`
+            : `to ${previous.agent.toUpperCase()}`
+          : isTr
+          ? 'Konuşmayı açıyor'
+          : 'Opens the discussion',
+        replyTo: previous?.agent,
+        prompt,
+        display: stripTurnControl,
         cwd: opts.cwd,
         allowEdits: true,
         onEvent: opts.onEvent,
         isTr,
       });
+      if (this.aborted) return;
 
       const afterFiles = await gitUtils.getChangedFilesAsync();
       const touched = afterFiles.filter((f: string) => !filesBefore.has(f));
-      const changedList = touched.length > 0 ? touched : afterFiles.slice(0, 5);
-      if (changedList.length > 0) {
+      if (touched.length > 0) {
         opts.onEvent({
           type: 'tool_card',
-          agent: task.agent,
+          agent: speaker,
           title: isTr
-            ? `${task.agent.toUpperCase()} → ${changedList.length} dosya üzerinde çalıştı`
-            : `${task.agent.toUpperCase()} → updated ${changedList.length} file(s)`,
-          detail: changedList.join(', '),
+            ? `${speaker.toUpperCase()} → ${touched.length} dosya üzerinde çalıştı`
+            : `${speaker.toUpperCase()} → updated ${touched.length} file(s)`,
+          detail: touched.join(', '),
         });
       }
 
-      // Micro-summary (max 220 chars) for the next agent to save tokens
-      const micro = reply.replace(/\s+/g, ' ').trim().slice(0, 220);
-      completedSummaries.push(
-        `- [${task.agent.toUpperCase()}] ${task.title}: ${micro}${changedList.length ? ` (Files: ${changedList.join(', ')})` : ''}`
-      );
+      conversation.push({ agent: speaker, text: stripTurnControl(reply), files: touched });
+      spoken.add(speaker);
+
+      const control = parseTurnControl(reply, balancedAgents);
+      // Only stop once everyone has had a say, so no agent's objection is skipped.
+      if (control.done && balancedAgents.every((a) => spoken.has(a))) break;
+      speaker = control.next && control.next !== speaker ? control.next : nextSpeaker(balancedAgents, speaker);
     }
 
     if (this.aborted) return;
@@ -501,60 +555,8 @@ export class TeamChatCoordinator {
       }
     }
 
-    const savedEst = Math.max(1800, parsedTasks.length * 1450 + ContextOptimizer.getTelemetry().savedTokensTotal);
+    const savedEst = Math.max(1800, ContextOptimizer.getTelemetry().savedTokensTotal);
     opts.onEvent({ type: 'done', savedTokensEstimate: savedEst });
-  }
-
-  private parseTasks(
-    planOutput: string,
-    availableAgents: ChatAgentId[],
-    originalPrompt: string,
-    isTr: boolean
-  ): Array<{ agent: ChatAgentId; roleLabel: string; title: string; instruction: string }> {
-    const lines = planOutput.split(/\r?\n/);
-    const out: Array<{ agent: ChatAgentId; roleLabel: string; title: string; instruction: string }> = [];
-
-    for (const line of lines) {
-      const m = line.match(/^\s*[-*]*\s*TASK:\s*([a-zA-Z0-9_-]+)\s*\|\s*([^|]+)\|\s*(.+)$/i);
-      if (m) {
-        const rawAgent = m[1].toLowerCase().trim() as ChatAgentId;
-        const agent = availableAgents.includes(rawAgent)
-          ? rawAgent
-          : availableAgents[out.length % availableAgents.length];
-        const title = m[2].trim();
-        const instruction = m[3].trim();
-        out.push({
-          agent,
-          roleLabel: isTr ? `Uygulayıcı (#${out.length + 1})` : `Builder (#${out.length + 1})`,
-          title,
-          instruction,
-        });
-      }
-    }
-
-    if (out.length > 0) return out.slice(0, 3);
-
-    // Fallback 2-part split across the top 2 quota-balanced agents
-    const a1 = availableAgents[0];
-    const a2 = availableAgents[1] ?? availableAgents[0];
-    return [
-      {
-        agent: a1,
-        roleLabel: isTr ? 'Çekirdek & Mantık' : 'Core Implementation',
-        title: isTr ? 'Temel mantık ve veri katmanı' : 'Core logic & data layer',
-        instruction: isTr
-          ? `"${originalPrompt}" isteğinin çekirdek/servis mantığını uygula.`
-          : `Implement the core logic for: "${originalPrompt}".`,
-      },
-      {
-        agent: a2,
-        roleLabel: isTr ? 'Arayüz & Entegrasyon' : 'Integration & Polish',
-        title: isTr ? 'Entegrasyon ve uç durum kontrolü' : 'Integration & edge-case review',
-        instruction: isTr
-          ? `"${originalPrompt}" için yapılan değişiklikleri tamamla, arayüz/entegrasyon bağlantılarını ve uç durumları kontrol et.`
-          : `Complete integration and verify edge cases for: "${originalPrompt}".`,
-      },
-    ];
   }
 
   private async runSingleAgentTurn(params: {
@@ -568,6 +570,7 @@ export class TeamChatCoordinator {
     onEvent: (event: TeamChatEvent) => void;
     isTr: boolean;
     display?: (text: string) => string;
+    replyTo?: ChatAgentId;
   }): Promise<string> {
     const shown = params.display ?? ((t: string) => t);
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -585,19 +588,11 @@ export class TeamChatCoordinator {
       agent: params.agent,
       roleLabel: params.roleLabel,
       model: modelLabel,
+      replyTo: params.replyTo,
     });
 
     const extraArgs = buildModelExtraArgs(params.agent, params.model, params.effort);
     const adapter = AdapterFactory.getAdapter(params.agent, { extraArgs });
-
-    // Claude reasons natively; the other CLIs are asked to put a short
-    // reasoning note in <think> tags so the chat can fold it away.
-    const promptWithThinkingHint =
-      params.agent === 'claude' || params.prompt.includes('<think>')
-        ? params.prompt
-        : params.isTr
-        ? `Yanıtına başlamadan önce <think>...</think> etiketleri içinde kısaca nasıl düşündüğünü yaz.\n\n${params.prompt}`
-        : `Before your main response, briefly note your reasoning inside <think>...</think> tags.\n\n${params.prompt}`;
 
     const extractThinkingAndClean = (raw: string): { thinking: string; clean: string } => {
       const thinkBlocks: string[] = [];
@@ -618,7 +613,7 @@ export class TeamChatCoordinator {
     };
 
     let liveAccumulated = '';
-    const res = await adapter.execute(promptWithThinkingHint, {
+    const res = await adapter.execute(params.prompt, {
       cwd: params.cwd,
       allowEdits: params.allowEdits,
       usageTag: 'chat',
