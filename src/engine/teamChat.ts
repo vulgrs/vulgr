@@ -224,6 +224,12 @@ async function runZeroTokenVerify(cmd: string, cwd: string): Promise<{ ok: boole
   }
 }
 
+/** A CLI's "out of quota" notice, which it prints in place of an answer. */
+export function isUsageLimitReply(text: string): boolean {
+  const t = text.trim();
+  return t.length < 300 && /(hit your (session|usage|weekly) limit|usage limit reached|rate limit exceeded|quota exceeded)/i.test(t);
+}
+
 /** Removes the closing `NEXT: <agent>` / `DONE` line an agent uses to pass the turn. */
 export function stripTurnControl(text: string): string {
   return text
@@ -282,6 +288,7 @@ export function buildConversationPrompt(p: {
         ? `Doğrudan ${last.agent.toUpperCase()}'a yanıt ver. Katıldığın yerde bunu söyle, katılmadığın yerde nedenini açıkla. Güvenlik açığı (doğrulanmamış girdi, enjeksiyon, gizli bilgi, yetki), hata ya da daha iyi bir tasarım görürsen "Şöyle olsa daha iyi olur: …" diye öner. Ekip arkadaşının değiştirdiği dosyalara bakıp incele.`
         : `Konuşmayı sen açıyorsun: isteği nasıl ele alacağınızı öner, işi kimin hangi kısmını yapacağını teklif et ve uygun gördüğün kısmı yapmaya başla.`,
       'Yapılması gereken ve senin üstlendiğin bir iş varsa dosyalarda doğrudan uygula; ne yaptığını kısaca anlat. Sadece konuşmak yeterliyse dosyalara dokunma.',
+      'Bu turu kısa tut: birkaç dakikada bitecek bir parça üstlen, dosyaları baştan yazmak yerine küçük düzenlemeler yap, kalanı sonraki tura bırak.',
       p.lastTurn
         ? 'Bu son tur: açık kalan bir şey varsa kullanıcıya kısaca söyle ve son satıra DONE yaz.'
         : `Son satıra tek başına ya sözü devrettiğin ajanı (NEXT: ${others.join(' | ') || p.speaker}) ya da iş bittiyse ve ekip hemfikirse DONE yaz.`,
@@ -299,6 +306,7 @@ export function buildConversationPrompt(p: {
       ? `Reply directly to ${last.agent.toUpperCase()}. Say where you agree; where you don't, say why. If you see a security hole (unvalidated input, injection, secrets, authorization), a bug or a better design, propose it as "It would be better if …". Look over the files your teammate changed.`
       : 'You open the conversation: propose how to approach the request, offer who does which part, and start on the part you take.',
     'If there is work you take on, apply it in the files directly and say briefly what you did. If talking is enough, leave the files alone.',
+    'Keep this turn short: take a piece that fits in a few minutes, make small edits instead of rewriting files, and leave the rest for a later turn.',
     p.lastTurn
       ? 'This is the last turn: tell the user briefly about anything left open and end with DONE.'
       : `End with a line that is either the agent you hand over to (NEXT: ${others.join(' | ') || p.speaker}) or DONE if the work is finished and the team agrees.`,
@@ -569,6 +577,20 @@ export class TeamChatCoordinator {
         isTr,
       });
       if (this.aborted) return;
+
+      // Out of quota: the reply isn't an answer, and talking on would only repeat it.
+      if (isUsageLimitReply(reply)) {
+        opts.onEvent({
+          type: 'tool_card',
+          agent: speaker,
+          title: isTr
+            ? `${speaker.toUpperCase()} kullanım limitine takıldı; ekip sohbeti burada durdu`
+            : `${speaker.toUpperCase()} hit its usage limit; the team chat stopped here`,
+          detail: reply.trim().slice(0, 200),
+          isError: true,
+        });
+        break;
+      }
 
       const afterFiles = await gitUtils.getChangedFilesAsync();
       const touched = afterFiles.filter((f: string) => !filesBefore.has(f));

@@ -5,6 +5,7 @@ import {
   classifyPromptComplexity,
   extractMentionedAgent,
   extractMentionedAgents,
+  isUsageLimitReply,
   parseTurnControl,
   stripTurnControl,
   pickQuotaBalancedAgents,
@@ -257,5 +258,10 @@ describe('TeamChatCoordinator Suite', () => {
     assert.deepStrictEqual(calls[1].extraArgs, ['--model', 'gpt-5.3-codex']);
     assert.ok(!events.some((e) => e.type === 'system_note' && /Kota Koruma/.test(e.badge ?? '')));
   });
-});
 
+  it('recognises a CLI quota notice so the team stops instead of talking on', () => {
+    assert.ok(isUsageLimitReply("You've hit your session limit · resets 8:30pm (Europe/Istanbul)"));
+    assert.ok(!isUsageLimitReply('Rate limiter now handles the session limit option.\n' + 'x'.repeat(400)));
+    assert.ok(!isUsageLimitReply('CURSOR, I agree with the limit semantics.'));
+  });
+});
