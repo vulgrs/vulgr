@@ -1,7 +1,29 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import type { UpdateNotice, UpdateStatus } from './updater.js';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { contextBridge, ipcRenderer } = require('electron') as {
+  contextBridge: { exposeInMainWorld: (apiKey: string, api: unknown) => void };
+  ipcRenderer: {
+    invoke: (channel: string, ...args: any[]) => Promise<any>;
+    send: (channel: string, ...args: any[]) => void;
+    on: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
+    removeListener: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
+  };
+};
 
-export interface PtyCreateOptions {
+type UpdateNotice =
+  | { kind: 'available'; version: string; url: string }
+  | { kind: 'downloaded'; version: string };
+
+interface UpdateStatus {
+  state: 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'error' | 'unsupported';
+  currentVersion: string;
+  version?: string;
+  percent?: number;
+  error?: string;
+  checkedAt?: number;
+  notes?: string[];
+}
+
+interface PtyCreateOptions {
   id: string;
   command?: string;
   args?: string[];
@@ -10,14 +32,14 @@ export interface PtyCreateOptions {
   rows?: number;
 }
 
-export interface GitHubUser {
+interface GitHubUser {
   login: string;
   name: string | null;
   avatarUrl: string;
   htmlUrl: string;
 }
 
-export interface WarpApi {
+interface WarpApi {
   platform: 'darwin' | 'win32' | 'linux';
 
   // PTY Interactive Terminal
@@ -28,12 +50,26 @@ export interface WarpApi {
   onTerminalData: (callback: (event: { id: string; data: string }) => void) => () => void;
   onTerminalExit: (callback: (event: { id: string; exitCode: number; signal?: number }) => void) => () => void;
 
-  // Structured Claude Code Chat (stream-json)
+  // Structured Claude Code Chat (stream-json) & Unified Solo/Team Multi-Agent Chat
   startClaudeChat: (options: { id: string; prompt: string; cwd?: string; model?: string; effort?: string; images?: Array<{ mediaType: string; data: string }>; resumeSessionId?: string }) => Promise<{ id: string; pid: number; error?: string }>;
   sendClaudeChat: (id: string, text: string, images?: Array<{ mediaType: string; data: string }>) => void;
   stopClaudeChat: (id: string) => void;
   onClaudeChatEvent: (callback: (payload: { id: string; event: any }) => void) => () => void;
   onClaudeChatExit: (callback: (payload: { id: string; code: number }) => void) => () => void;
+  runTeamChat: (options: {
+    id: string;
+    prompt: string;
+    cwd?: string;
+    mode: 'solo' | 'team';
+    soloAgent?: string;
+    soloModel?: string;
+    soloEffort?: string;
+    teamAgents?: string[];
+    history?: Array<{ role: 'user' | 'agent'; agent?: string; text: string }>;
+    lang?: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  stopTeamChat: () => Promise<boolean>;
+  onTeamChatEvent: (callback: (payload: { id: string; event: any }) => void) => () => void;
 
   // Deterministic System 1 JSON compiler
   runSystemOne: (options: { taskId?: string; targetFile: string; prompt: string; slot: number; rules: string; model?: string }) => Promise<{ ok: boolean; result?: any; error?: string }>;
@@ -115,6 +151,7 @@ export interface WarpApi {
   reviseOrchestra: (feedback: string) => Promise<any>;
   onOrchestraEvent: (callback: (event: any) => void) => () => void;
   getAvailableAgents: () => Promise<Record<string, boolean>>;
+  getAgentModels: (forceRefresh?: boolean) => Promise<Record<string, Array<{ id: string; label: string; thinking?: boolean; fast?: boolean; source?: string }>>>;
   getAgentStatus: () => Promise<any[]>;
   installAgent: (id: string) => Promise<{ ok: boolean; code: number | null; error?: string }>;
   cancelAgentInstall: (id: string) => Promise<void>;
@@ -203,6 +240,7 @@ export interface WarpApi {
   openProjectFolder: () => Promise<{ path: string; name: string; recentProjects: string[] } | null>;
   setProjectFolder: (dir: string) => Promise<{ path: string; name: string; recentProjects: string[] } | null>;
   getRecentProjects: () => Promise<string[]>;
+  pickChatFolder: () => Promise<string | null>;
   listProjectFiles: (dir?: string, maxDepth?: number) => Promise<any[]>;
   readProjectFile: (filePath: string) => Promise<{ content?: string; size?: number; error?: string }>;
   getProjectConversations: () => Promise<any[]>;
@@ -269,6 +307,13 @@ const api: WarpApi = {
     ipcRenderer.on('claudechat:exit', handler);
     return () => ipcRenderer.removeListener('claudechat:exit', handler);
   },
+  runTeamChat: (options) => ipcRenderer.invoke('teamchat:run', options),
+  stopTeamChat: () => ipcRenderer.invoke('teamchat:stop'),
+  onTeamChatEvent: (callback) => {
+    const handler = (_: any, payload: { id: string; event: any }) => callback(payload);
+    ipcRenderer.on('teamchat:event', handler);
+    return () => ipcRenderer.removeListener('teamchat:event', handler);
+  },
 
   getDoctorStatus: () => ipcRenderer.invoke('system:doctor'),
   getGitDiff: (cwd?: string) => ipcRenderer.invoke('git:diff', { cwd }),
@@ -317,6 +362,7 @@ const api: WarpApi = {
     return () => ipcRenderer.removeListener('orchestra:event', handler);
   },
   getAvailableAgents: () => ipcRenderer.invoke('agents:available'),
+  getAgentModels: (forceRefresh?: boolean) => ipcRenderer.invoke('agents:models', forceRefresh),
   getAgentStatus: () => ipcRenderer.invoke('agents:status'),
   installAgent: (id) => ipcRenderer.invoke('agents:install', id),
   cancelAgentInstall: (id) => ipcRenderer.invoke('agents:cancel-install', id),
@@ -398,6 +444,7 @@ const api: WarpApi = {
   openProjectFolder: () => ipcRenderer.invoke('workspace:open-folder'),
   setProjectFolder: (dir) => ipcRenderer.invoke('workspace:set-cwd', dir),
   getRecentProjects: () => ipcRenderer.invoke('workspace:get-recent-projects'),
+  pickChatFolder: () => ipcRenderer.invoke('chat:pick-folder'),
   listProjectFiles: (dir, maxDepth) => ipcRenderer.invoke('workspace:list-files', { dir, maxDepth }),
   readProjectFile: (filePath) => ipcRenderer.invoke('workspace:read-file', filePath),
   getProjectConversations: () => ipcRenderer.invoke('workspace:get-conversations'),

@@ -1,12 +1,12 @@
 import 'dotenv/config';
-import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, Notification, safeStorage } from 'electron';
 
 app.name = 'Vulgr';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, basename, extname } from 'node:path';
+import { dirname, join, basename, extname, resolve, sep } from 'node:path';
 import { get as httpGet } from 'node:http';
-import { execSync, exec } from 'node:child_process';
-import { existsSync, writeFileSync, readdirSync, statSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
+import { execFileSync, execFile } from 'node:child_process';
+import { existsSync, writeFileSync, readdirSync, statSync, readFileSync, mkdirSync, rmSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import { PtyManager } from './ptyManager.js';
 import { ClaudeChatManager } from './claudeChatManager.js';
@@ -17,6 +17,8 @@ import { ClaudeAdapter } from '../src/adapters/claude.js';
 import { GeminiAdapter } from '../src/adapters/gemini.js';
 import { AgentMesh } from '../src/engine/agentMesh.js';
 import { Orchestra } from '../src/engine/orchestra.js';
+import { TeamChatCoordinator } from '../src/engine/teamChat.js';
+import { discoverAgentModels } from '../src/engine/modelDiscovery.js';
 import { toEngineLang } from '../src/engine/engineLang.js';
 import { RunHistoryStore } from '../src/engine/runHistory.js';
 import { UsageLedger } from '../src/engine/usageLedger.js';
@@ -183,6 +185,38 @@ export interface FileTreeNode {
   children?: FileTreeNode[];
 }
 
+/**
+ * Resolves `targetPath` relative to `baseDir` and verifies that it stays strictly
+ * inside `baseDir` (resolving symlinks on existing path segments). Returns null
+ * if `targetPath` escapes `baseDir`.
+ */
+function resolveSafeWorkspacePath(baseDir: string, targetPath: string): string | null {
+  if (!targetPath || typeof targetPath !== 'string' || targetPath.includes('\0')) return null;
+  try {
+    const realBase = existsSync(baseDir) ? realpathSync(baseDir) : resolve(baseDir);
+    const candidate = resolve(realBase, targetPath);
+
+    // Find the deepest existing ancestor to resolve any symlinks along the path
+    let checkPath = candidate;
+    const trailingParts: string[] = [];
+    while (!existsSync(checkPath)) {
+      const parent = dirname(checkPath);
+      if (parent === checkPath) break;
+      trailingParts.unshift(basename(checkPath));
+      checkPath = parent;
+    }
+    const realExisting = existsSync(checkPath) ? realpathSync(checkPath) : checkPath;
+    const finalPath = trailingParts.length > 0 ? resolve(realExisting, ...trailingParts) : realExisting;
+
+    if (finalPath === realBase || finalPath.startsWith(realBase + sep)) {
+      return finalPath;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function scanProjectDirectory(baseDir: string, currentPath: string, maxDepth = 3, currentDepth = 0): FileTreeNode[] {
   if (currentDepth >= maxDepth) return [];
   try {
@@ -240,6 +274,13 @@ async function createWindow() {
   const isMac = process.platform === 'darwin';
   const iconPath = resolveAppIcon();
   const iconImage = iconPath ? nativeImage.createFromPath(iconPath) : undefined;
+  const preloadFile = join(__dirname, 'preload.js');
+  try {
+    const rawPreload = readFileSync(preloadFile, 'utf-8');
+    if (/^export\s*\{\s*\};?\s*$/m.test(rawPreload)) {
+      writeFileSync(preloadFile, rawPreload.replace(/^export\s*\{\s*\};?\r?\n?/gm, ''), 'utf-8');
+    }
+  } catch {}
 
   mainWindow = new BrowserWindow({
     icon: iconImage,
@@ -258,7 +299,7 @@ async function createWindow() {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -272,6 +313,18 @@ async function createWindow() {
       shell.openExternal(url);
     }
     return { action: 'deny' };
+  });
+
+  // Prevent arbitrary in-window navigation away from the app UI.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowedDev = !app.isPackaged && url.startsWith('http://localhost:5173');
+    const allowedFile = url.startsWith('file://');
+    if (!allowedDev && !allowedFile) {
+      event.preventDefault();
+      if (/^https?:\/\//i.test(url)) {
+        shell.openExternal(url);
+      }
+    }
   });
 
   const broadcastMaximizedState = () => {
@@ -390,11 +443,13 @@ function setupIpcHandlers() {
 
   // Run the local TypeScript compiler for the System 1 Auto-Fix loop.
   ipcMain.handle('system1:typecheck', async (_, { cwd } = {}) => {
-    const targetCwd = cwd || currentCwd;
+    const targetCwd = (cwd && resolveSafeWorkspacePath(currentCwd, cwd)) || currentCwd;
+    const npxBin = process.platform === 'win32' ? 'npx.cmd' : 'npx';
     return new Promise((resolve) => {
-      exec(
-        'npx tsc --noEmit',
-        { cwd: targetCwd, env: process.env, maxBuffer: 10 * 1024 * 1024, timeout: 180_000 },
+      execFile(
+        npxBin,
+        ['tsc', '--noEmit'],
+        { cwd: targetCwd, env: process.env, maxBuffer: 10 * 1024 * 1024, timeout: 180_000, shell: process.platform === 'win32', windowsHide: true },
         (err: any, stdout, stderr) => {
           const output = `${stdout || ''}${stderr || ''}`.trim();
           if (!err) {
@@ -414,13 +469,14 @@ function setupIpcHandlers() {
   // Write file to disk (used to apply a System 1 compilation result)
   ipcMain.handle('workspace:write-file', async (_, { filePath, content }) => {
     try {
-      if (!filePath) return { success: false, error: 'No file path' };
-      const abs = filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)
-        ? filePath
-        : join(currentCwd, filePath);
+      if (!filePath || typeof filePath !== 'string') return { success: false, error: 'No file path' };
+      const abs = resolveSafeWorkspacePath(currentCwd, filePath);
+      if (!abs) {
+        return { success: false, error: 'Access denied: file path must stay within the active project workspace' };
+      }
       const dir = dirname(abs);
       if (!existsSync(dir)) {
-        (await import('node:fs')).mkdirSync(dir, { recursive: true });
+        mkdirSync(dir, { recursive: true });
       }
       writeFileSync(abs, content ?? '', 'utf-8');
       return { success: true, filePath: abs };
@@ -631,10 +687,57 @@ function setupIpcHandlers() {
   });
   ipcMain.handle('orchestra:restart-task', (_, taskId: string) => orchestra?.restartTask(taskId) ?? false);
 
+  // Unified Solo & Multi-Agent Team Chat (with 7-day quota load-balancing)
+  let activeTeamChat: TeamChatCoordinator | null = null;
+  ipcMain.handle('teamchat:run', async (_, payload) => {
+    activeTeamChat?.stop();
+    const coordinator = new TeamChatCoordinator();
+    activeTeamChat = coordinator;
+    const sevenDaysAgo = Date.now() - 7 * 86_400_000;
+    const weeklyUsage = usageLedger.summary(sevenDaysAgo);
+    try {
+      await coordinator.run({
+        id: payload.id || `tc-${Date.now()}`,
+        prompt: String(payload.prompt || ''),
+        cwd: payload.cwd || currentCwd,
+        mode: payload.mode === 'team' ? 'team' : 'solo',
+        soloAgent: payload.soloAgent || 'claude',
+        soloModel: payload.soloModel || 'default',
+        soloEffort: typeof payload.soloEffort === 'string' ? payload.soloEffort : undefined,
+        teamAgents: Array.isArray(payload.teamAgents) ? payload.teamAgents : undefined,
+        history: Array.isArray(payload.history) ? payload.history : [],
+        weeklyUsage,
+        lang: payload.lang || 'tr',
+        onEvent: (event) => {
+          mainWindow?.webContents.send('teamchat:event', { id: payload.id, event });
+        },
+      });
+      return { ok: true };
+    } catch (err: any) {
+      mainWindow?.webContents.send('teamchat:event', {
+        id: payload.id,
+        event: { type: 'error', message: err?.message || String(err) },
+      });
+      return { ok: false, error: err?.message || String(err) };
+    } finally {
+      if (activeTeamChat === coordinator) activeTeamChat = null;
+    }
+  });
+  ipcMain.handle('teamchat:stop', () => {
+    activeTeamChat?.stop();
+    activeTeamChat = null;
+    return true;
+  });
+
   // Which agent CLIs are installed, so the UI only offers ones that can run.
   ipcMain.handle('agents:available', async () => {
     const [agents, gemini] = await Promise.all([listAgentStatus(), AdapterFactory.getAdapter('gemini').isAvailable()]);
     return { ...Object.fromEntries(agents.map((a) => [a.id, a.installed])), gemini };
+  });
+
+  // Live model discovery from installed CLIs (cursor-agent --list-models, opencode models, etc.) + 2026 catalog
+  ipcMain.handle('agents:models', async (_, forceRefresh?: boolean) => {
+    return discoverAgentModels(!!forceRefresh);
   });
 
   // Agent setup: which CLIs are installed, and installing them from inside the app.
@@ -871,7 +974,7 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('workspace:set-cwd', async (_, targetDir: string) => {
-    if (existsSync(targetDir)) {
+    if (typeof targetDir === 'string' && existsSync(targetDir) && statSync(targetDir).isDirectory()) {
       currentCwd = targetDir;
       memoryStore = new MemoryStore(targetDir);
       autoSuggestEngine = new AutoSuggestEngine(targetDir, memoryStore, skillsRegistry);
@@ -887,20 +990,41 @@ function setupIpcHandlers() {
 
   ipcMain.handle('workspace:get-recent-projects', () => getRecentProjects());
 
+  // Folder picker for the chat view: picks a directory without switching the
+  // app's workspace, so a chat can run in a different project than the terminals.
+  ipcMain.handle('chat:pick-folder', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      title: 'Select Chat Folder',
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    addRecentProject(result.filePaths[0]);
+    return result.filePaths[0];
+  });
+
   ipcMain.handle('workspace:list-files', (_, { dir, maxDepth = 3 } = {}) => {
-    const targetDir = dir || currentCwd;
-    if (!existsSync(targetDir)) return [];
-    return scanProjectDirectory(targetDir, targetDir, maxDepth, 0);
+    const safeDir = dir ? resolveSafeWorkspacePath(currentCwd, dir) : currentCwd;
+    if (!safeDir || !existsSync(safeDir)) return [];
+    const clampedDepth = Math.max(1, Math.min(Number(maxDepth) || 3, 6));
+    return scanProjectDirectory(currentCwd, safeDir, clampedDepth, 0);
   });
 
   ipcMain.handle('workspace:read-file', (_, filePath: string) => {
     try {
-      if (existsSync(filePath)) {
-        const stats = statSync(filePath);
+      const safePath = resolveSafeWorkspacePath(currentCwd, filePath);
+      if (!safePath) {
+        return { error: 'Access denied: file path must stay within the active project workspace' };
+      }
+      if (existsSync(safePath)) {
+        const stats = statSync(safePath);
+        if (!stats.isFile()) {
+          return { error: 'Not a regular file' };
+        }
         if (stats.size > 500 * 1024) {
           return { error: 'File is too large to preview (>500KB)' };
         }
-        const content = readFileSync(filePath, 'utf-8');
+        const content = readFileSync(safePath, 'utf-8');
         return { content, size: stats.size };
       }
       return { error: 'File does not exist' };
@@ -920,7 +1044,7 @@ function setupIpcHandlers() {
   ipcMain.handle('system:hostname', () => {
     if (process.platform === 'darwin') {
       try {
-        return execSync('scutil --get ComputerName', { encoding: 'utf-8', timeout: 2000 }).trim();
+        return execFileSync('/usr/sbin/scutil', ['--get', 'ComputerName'], { encoding: 'utf-8', timeout: 2000 }).trim();
       } catch {}
     }
     return os.hostname().replace(/\.local$/, '');
@@ -928,6 +1052,13 @@ function setupIpcHandlers() {
 }
 
 app.whenReady().then(async () => {
+  if (safeStorage.isEncryptionAvailable()) {
+    configManager.setSecretCodec({
+      encrypt: (plain) => safeStorage.encryptString(plain).toString('base64'),
+      decrypt: (cipher) => safeStorage.decryptString(Buffer.from(cipher, 'base64')),
+    });
+  }
+
   if (process.platform === 'darwin' && app.dock) {
     const iconPath = resolveAppIcon();
     if (iconPath) {
