@@ -1,10 +1,15 @@
-import { spawn, execSync } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import type { ICliAdapter, CliExecutionOptions, CliExecutionResult, CliAdapterConfig } from '../types/index.js';
 import { terminateChildProcessSafely } from '../utils/processTree.js';
 import type { OutputParser } from './outputParsers.js';
 import { reportAgentUsage } from './usageEvents.js';
+
+export interface StdinSession {
+  initial: string;
+  onLine: (line: string, io: { write: (text: string) => void; end: () => void }) => void;
+}
 
 export abstract class BaseCliAdapter implements ICliAdapter {
   abstract readonly name: string;
@@ -39,6 +44,16 @@ export abstract class BaseCliAdapter implements ICliAdapter {
   }
 
   /**
+   * For CLIs that talk back over stdin while running (e.g. to ask for a tool
+   * approval): what to write first, and a handler for each stdout line that
+   * can answer or close stdin. None by default: the prompt is written and
+   * stdin closed.
+   */
+  protected createStdinSession(_prompt: string, _options?: CliExecutionOptions): StdinSession | null {
+    return null;
+  }
+
+  /**
    * Default binary name for the CLI (e.g., 'claude' or 'gemini')
    */
   protected abstract getDefaultBinary(): string;
@@ -69,12 +84,13 @@ export abstract class BaseCliAdapter implements ICliAdapter {
   /** Absolute path of the executable, or null when it isn't installed. */
   resolveBinary(): string | null {
     try {
-      const cmd = process.platform === 'win32' ? `where.exe ${this.binaryPath}` : `which ${this.binaryPath}`;
-      const out = execSync(cmd, {
+      const locator = process.platform === 'win32' ? 'where.exe' : 'which';
+      const out = execFileSync(locator, [this.binaryPath], {
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'ignore'],
         env: { ...process.env, PATH: this.buildPath(), Path: this.buildPath() },
         timeout: 5000,
+        windowsHide: true,
       });
       return out.split(/\r?\n/).map((l) => l.trim()).find(Boolean) || null;
     } catch {
@@ -94,10 +110,12 @@ export abstract class BaseCliAdapter implements ICliAdapter {
    */
   async getVersion(): Promise<string | null> {
     try {
-      const output = execSync(`${this.binaryPath} --version`, {
+      const bin = this.resolveBinary() || this.binaryPath;
+      const output = execFileSync(bin, ['--version'], {
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'ignore'],
         timeout: 5000,
+        windowsHide: true,
       });
       return output.trim();
     } catch {
@@ -126,6 +144,7 @@ export abstract class BaseCliAdapter implements ICliAdapter {
 
     const args = [...this.buildArgs(prompt, options), ...(options.extraArgs ?? [])];
     const stdinInput = options.stdinInput ?? (this.promptVia === 'stdin' ? prompt : undefined);
+    const session = options.stdinInput === undefined ? this.createStdinSession(prompt, options) : null;
 
     // Real executables are spawned directly so Node quotes every argument
     // correctly. Only Windows .cmd/.bat shims (npm-installed CLIs) need a
@@ -149,6 +168,7 @@ export abstract class BaseCliAdapter implements ICliAdapter {
       let timedOut = false;
       let totalBytesAccumulated = 0;
       let isSettled = false;
+      let sessionBuffer = '';
 
       // Spawn process safely
       const child = spawn(command, args, {
@@ -158,6 +178,12 @@ export abstract class BaseCliAdapter implements ICliAdapter {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
+      const sessionIo = {
+        write: (text: string) => {
+          if (child.stdin && child.stdin.writable) child.stdin.write(text);
+        },
+        end: () => child.stdin?.end(),
+      };
 
       // Stream handling for stdout
       child.stdout?.on('data', (data: Buffer) => {
@@ -170,6 +196,15 @@ export abstract class BaseCliAdapter implements ICliAdapter {
 
         const chunk = data.toString('utf-8');
         stdout += chunk;
+        if (session) {
+          sessionBuffer += chunk;
+          let nl: number;
+          while ((nl = sessionBuffer.indexOf('\n')) !== -1) {
+            const line = sessionBuffer.slice(0, nl).trim();
+            sessionBuffer = sessionBuffer.slice(nl + 1);
+            if (line) session.onLine(line, sessionIo);
+          }
+        }
         const shown = parser ? parser.push(chunk) : chunk;
         if (options.onStdout && shown) {
           options.onStdout(shown);
@@ -186,7 +221,10 @@ export abstract class BaseCliAdapter implements ICliAdapter {
       });
 
       // Pass stdin input if supplied
-      if (stdinInput && child.stdin) {
+      if (session && child.stdin) {
+        child.stdin.on('error', () => {});
+        child.stdin.write(session.initial);
+      } else if (stdinInput && child.stdin) {
         child.stdin.write(stdinInput);
         child.stdin.end();
       } else {

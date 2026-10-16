@@ -51,7 +51,12 @@ interface WarpApi {
   onTerminalExit: (callback: (event: { id: string; exitCode: number; signal?: number }) => void) => () => void;
 
   // Structured Claude Code Chat (stream-json) & Unified Solo/Team Multi-Agent Chat
-  startClaudeChat: (options: { id: string; prompt: string; cwd?: string; model?: string; effort?: string; images?: Array<{ mediaType: string; data: string }>; resumeSessionId?: string }) => Promise<{ id: string; pid: number; error?: string }>;
+  startClaudeChat: (options: { id: string; prompt: string; cwd?: string; model?: string; effort?: string; images?: Array<{ mediaType: string; data: string }>; resumeSessionId?: string; approvals?: 'ask' | 'auto' | 'deny'; lang?: string }) => Promise<{ id: string; pid: number; error?: string }>;
+  /** A tool an agent wants to use that needs the user's yes. */
+  onToolApproval: (callback: (req: { requestId: string; chatId: string; agent: string; tool: string; input: string; description?: string }) => void) => () => void;
+  /** Requests that no longer need an answer (their chat stopped or finished). */
+  onToolApprovalCancelled: (callback: (payload: { requestIds: string[] }) => void) => () => void;
+  respondToolApproval: (requestId: string, allow: boolean) => void;
   sendClaudeChat: (id: string, text: string, images?: Array<{ mediaType: string; data: string }>) => void;
   stopClaudeChat: (id: string) => void;
   onClaudeChatEvent: (callback: (payload: { id: string; event: any }) => void) => () => void;
@@ -65,6 +70,8 @@ interface WarpApi {
     soloModel?: string;
     soloEffort?: string;
     teamAgents?: string[];
+    teamModels?: Record<string, { model?: string; effort?: string }>;
+    approvals?: 'ask' | 'auto' | 'deny';
     history?: Array<{ role: 'user' | 'agent'; agent?: string; text: string }>;
     lang?: string;
   }) => Promise<{ ok: boolean; error?: string }>;
@@ -298,6 +305,17 @@ const api: WarpApi = {
   startClaudeChat: (options) => ipcRenderer.invoke('claudechat:start', options),
   sendClaudeChat: (id, text, images) => ipcRenderer.send('claudechat:send', { id, text, images }),
   stopClaudeChat: (id) => ipcRenderer.send('claudechat:stop', { id }),
+  onToolApproval: (callback) => {
+    const handler = (_: any, req: any) => callback(req);
+    ipcRenderer.on('approval:request', handler);
+    return () => ipcRenderer.removeListener('approval:request', handler);
+  },
+  onToolApprovalCancelled: (callback) => {
+    const handler = (_: any, payload: { requestIds: string[] }) => callback(payload);
+    ipcRenderer.on('approval:cancelled', handler);
+    return () => ipcRenderer.removeListener('approval:cancelled', handler);
+  },
+  respondToolApproval: (requestId, allow) => ipcRenderer.send('approval:respond', { requestId, allow }),
   runSystemOne: (options) => ipcRenderer.invoke('system1:run', options),
   writeProjectFile: (filePath, content) => ipcRenderer.invoke('workspace:write-file', { filePath, content }),
   typecheckProject: (cwd) => ipcRenderer.invoke('system1:typecheck', { cwd }),

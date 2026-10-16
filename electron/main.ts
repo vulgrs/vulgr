@@ -10,6 +10,8 @@ import { existsSync, writeFileSync, readdirSync, statSync, readFileSync, mkdirSy
 import os from 'node:os';
 import { PtyManager } from './ptyManager.js';
 import { ClaudeChatManager } from './claudeChatManager.js';
+import { ApprovalBroker } from './approvalBroker.js';
+import { parseApprovalMode } from '../src/engine/toolApproval.js';
 import { SystemOneCompiler } from './systemOneCompiler.js';
 import { GitHubAuth } from './githubAuth.js';
 import { GitUtils } from '../src/git/gitUtils.js';
@@ -88,6 +90,8 @@ const ptyManager = new PtyManager();
 ptyManager.setConfigManager(configManager);
 const claudeChatManager = new ClaudeChatManager();
 claudeChatManager.setConfigManager(configManager);
+const approvalBroker = new ApprovalBroker();
+claudeChatManager.setApprovalBroker(approvalBroker);
 const systemOneCompiler = new SystemOneCompiler();
 systemOneCompiler.setConfigManager(configManager);
 // Custom skills live with the user (~/.vulgr), not in whatever folder the app started in.
@@ -307,6 +311,7 @@ async function createWindow() {
 
   ptyManager.setWindow(mainWindow);
   claudeChatManager.setWindow(mainWindow);
+  approvalBroker.setWindow(mainWindow);
   githubAuth.setWindow(mainWindow);
 
   // Open external links (markdown link clicks) in the OS browser, never in-app.
@@ -422,7 +427,14 @@ function setupIpcHandlers() {
 
   // Structured Claude Code Chat (stream-json headless session)
   ipcMain.handle('claudechat:start', async (_, options) => {
-    return claudeChatManager.start({ ...options, cwd: options?.cwd || currentCwd });
+    return claudeChatManager.start({
+      ...options,
+      cwd: options?.cwd || currentCwd,
+      approvals: parseApprovalMode(options?.approvals),
+    });
+  });
+  ipcMain.on('approval:respond', (_, { requestId, allow }) => {
+    if (typeof requestId === 'string') approvalBroker.respond(requestId, allow === true);
   });
   ipcMain.on('claudechat:send', (_, { id, text, images }) => {
     claudeChatManager.send(id, text, images);
@@ -697,9 +709,11 @@ function setupIpcHandlers() {
     activeTeamChat = coordinator;
     const sevenDaysAgo = Date.now() - 7 * 86_400_000;
     const weeklyUsage = usageLedger.summary(sevenDaysAgo);
+    const runId = String(payload.id || `tc-${Date.now()}`);
+    const approvals = parseApprovalMode(payload.approvals);
     try {
       await coordinator.run({
-        id: payload.id || `tc-${Date.now()}`,
+        id: runId,
         prompt: String(payload.prompt || ''),
         cwd: payload.cwd || currentCwd,
         mode: payload.mode === 'team' ? 'team' : 'solo',
@@ -707,9 +721,16 @@ function setupIpcHandlers() {
         soloModel: payload.soloModel || 'default',
         soloEffort: typeof payload.soloEffort === 'string' ? payload.soloEffort : undefined,
         teamAgents: Array.isArray(payload.teamAgents) ? payload.teamAgents : undefined,
+        teamModels: payload.teamModels && typeof payload.teamModels === 'object' ? payload.teamModels : undefined,
         history: Array.isArray(payload.history) ? payload.history : [],
         weeklyUsage,
         lang: payload.lang || 'tr',
+        onToolApproval:
+          approvals === 'deny'
+            ? undefined
+            : approvals === 'auto'
+            ? async () => true
+            : (req) => approvalBroker.request(runId, req),
         onEvent: (event) => {
           mainWindow?.webContents.send('teamchat:event', { id: payload.id, event });
         },
@@ -722,6 +743,7 @@ function setupIpcHandlers() {
       });
       return { ok: false, error: err?.message || String(err) };
     } finally {
+      approvalBroker.cancelChat(runId);
       if (activeTeamChat === coordinator) activeTeamChat = null;
     }
   });

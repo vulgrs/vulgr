@@ -6,7 +6,7 @@ import { MemoryStore } from './memoryStore.js';
 import { GitUtils } from '../git/gitUtils.js';
 import { detectTestCommand, parseTestCommand } from './testPlan.js';
 import type { UsageSummary } from './usageLedger.js';
-import type { AgentActivity } from '../types/index.js';
+import type { AgentActivity, ToolApprovalRequest } from '../types/index.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -16,6 +16,11 @@ export interface TeamChatTurn {
   role: 'user' | 'agent';
   agent?: ChatAgentId;
   text: string;
+}
+
+export interface AgentModelChoice {
+  model?: string;
+  effort?: string;
 }
 
 export interface TeamChatOptions {
@@ -31,12 +36,16 @@ export interface TeamChatOptions {
   soloEffort?: string;
   /** For team mode: which agents the user allowed to collaborate. Empty = auto-pick from installed. */
   teamAgents?: ChatAgentId[];
+  /** For team mode: the model + effort the user picked for each agent. Missing = the CLI's default. */
+  teamModels?: Partial<Record<ChatAgentId, AgentModelChoice>>;
   /** Previous compact conversation turns for continuity (automatically trimmed to save tokens). */
   history?: TeamChatTurn[];
   /** Optional weekly usage summary from UsageLedger to balance load across subscriptions. */
   weeklyUsage?: UsageSummary;
   /** UI language ('tr' | 'en' | ...). */
   lang?: string;
+  /** Asks the user about a tool an agent's permission mode doesn't allow. Unset = refused. */
+  onToolApproval?: (request: ToolApprovalRequest & { agent: ChatAgentId }) => Promise<boolean>;
   onEvent: (event: TeamChatEvent) => void;
 }
 
@@ -107,6 +116,9 @@ export type TeamChatEvent =
       type: 'error';
       message: string;
     };
+
+/** A chat turn may read, edit and test a whole feature; the adapters' 3-minute default cut real work off. */
+const CHAT_TURN_TIMEOUT_MS = 15 * 60_000;
 
 /** CLIs whose JSON output already reports each step; the rest show their stderr as a log. */
 const REPORTS_STEPS = new Set<ChatAgentId>(['claude', 'codex', 'cursor']);
@@ -295,35 +307,63 @@ export function buildConversationPrompt(p: {
     .join('\n\n');
 }
 
+const MENTION_ALIASES: Record<string, ChatAgentId> = {
+  claude: 'claude',
+  claudecode: 'claude',
+  codex: 'codex',
+  agy: 'agy',
+  antigravity: 'agy',
+  cursor: 'cursor',
+  opencode: 'opencode',
+  gemini: 'gemini',
+};
+
+/**
+ * Reads every `@agent` in a prompt, in order and without repeats. Leading
+ * mentions (`@claude @cursor …`) are cut from the prompt and returned in
+ * `leading`; ones inside the sentence stay, since they are part of the ask.
+ */
+export function extractMentionedAgents(
+  prompt: string,
+  allowedAgents?: ChatAgentId[]
+): { agents: ChatAgentId[]; leading: ChatAgentId[]; cleanPrompt: string } {
+  const known = (raw: string): ChatAgentId | undefined => {
+    const target = MENTION_ALIASES[raw.toLowerCase()];
+    return target && (!allowedAgents || allowedAgents.includes(target)) ? target : undefined;
+  };
+  const agents: ChatAgentId[] = [];
+  const add = (a?: ChatAgentId) => {
+    if (a && !agents.includes(a)) agents.push(a);
+  };
+
+  let rest = prompt;
+  for (;;) {
+    const m = rest.match(/^\s*@([a-zA-Z0-9_-]+)(?:\s*[:,&+]|\s+(?:ve|and|ile)\b)?\s*/i);
+    const target = m ? known(m[1]) : undefined;
+    if (!m || !target) break;
+    add(target);
+    rest = rest.slice(m[0].length);
+  }
+  const leading = [...agents];
+  for (const m of rest.matchAll(/(?:^|\s)@([a-zA-Z0-9_-]+)/g)) add(known(m[1]));
+
+  const cleanPrompt = rest.trim();
+  return { agents, leading, cleanPrompt: leading.length && cleanPrompt ? cleanPrompt : prompt };
+}
+
 /** Detects `@agent` mention at the start of a prompt to route tasks directly. */
 export function extractMentionedAgent(
   prompt: string,
   allowedAgents?: ChatAgentId[]
 ): { agent?: ChatAgentId; cleanPrompt: string } {
-  const match = prompt.match(/^\s*@([a-zA-Z0-9_-]+)[:,\s]?\s*/);
-  if (!match) return { agent: undefined, cleanPrompt: prompt };
-  const raw = match[1].toLowerCase();
-  const aliasMap: Record<string, ChatAgentId> = {
-    claude: 'claude',
-    claudecode: 'claude',
-    codex: 'codex',
-    agy: 'agy',
-    antigravity: 'agy',
-    cursor: 'cursor',
-    opencode: 'opencode',
-    gemini: 'gemini',
-  };
-  const target = aliasMap[raw];
-  if (target && (!allowedAgents || allowedAgents.includes(target))) {
-    const cleanPrompt = prompt.slice(match[0].length).trim();
-    return { agent: target, cleanPrompt: cleanPrompt || prompt };
-  }
-  return { agent: undefined, cleanPrompt: prompt };
+  const { leading, cleanPrompt } = extractMentionedAgents(prompt, allowedAgents);
+  return { agent: leading[0], cleanPrompt };
 }
 
 export class TeamChatCoordinator {
   private aborted = false;
   private abortController = new AbortController();
+  private approve?: TeamChatOptions['onToolApproval'];
 
   stop(): void {
     this.aborted = true;
@@ -333,14 +373,18 @@ export class TeamChatCoordinator {
   async run(opts: TeamChatOptions): Promise<void> {
     this.aborted = false;
     this.abortController = new AbortController();
+    this.approve = opts.onToolApproval;
     const isTr = (opts.lang ?? 'tr').startsWith('tr');
     const memory = new MemoryStore(opts.cwd);
     const memorySnippet = memory.toPromptSnippet().slice(0, 500);
     const gitUtils = new GitUtils(opts.cwd);
 
-    // Check for @agent mention at prompt start
-    const mentioned = extractMentionedAgent(opts.prompt);
-    const effectivePrompt = mentioned.cleanPrompt;
+    // `@agent` mentions: one routes the task, two or more make those agents the team.
+    const mentions = extractMentionedAgents(opts.prompt);
+    const mentioned = { agent: mentions.leading[0] };
+    const effectivePrompt = mentions.cleanPrompt;
+    const mentionedTeam = mentions.agents.length >= 2 ? mentions.agents : undefined;
+    const modelFor = (a: ChatAgentId): AgentModelChoice => opts.teamModels?.[a] ?? {};
 
     // Compact recent history (last 4 turns, max 160 chars each) so context never explodes
     const compactHistory = (opts.history ?? [])
@@ -348,7 +392,7 @@ export class TeamChatCoordinator {
       .map((h) => `${h.role === 'user' ? 'User' : (h.agent || 'Agent').toUpperCase()}: ${h.text.slice(0, 180)}`)
       .join('\n');
 
-    if (opts.mode === 'solo') {
+    if (opts.mode === 'solo' && !mentionedTeam) {
       const agent: ChatAgentId = mentioned.agent || opts.soloAgent || 'claude';
       if (mentioned.agent && mentioned.agent !== opts.soloAgent) {
         opts.onEvent({
@@ -382,8 +426,18 @@ export class TeamChatCoordinator {
     }
 
     // ---- TEAM MODE (Quota-Aware Autonomous Collaboration) ----
-    const balancedAgents = await pickQuotaBalancedAgents(opts.teamAgents, opts.weeklyUsage);
-    if (mentioned.agent) {
+    const balancedAgents = mentionedTeam
+      ? [...mentionedTeam]
+      : await pickQuotaBalancedAgents(opts.teamAgents, opts.weeklyUsage);
+    if (mentionedTeam) {
+      opts.onEvent({
+        type: 'system_note',
+        badge: mentionedTeam.map((a) => `@${a.toUpperCase()}`).join(' '),
+        text: isTr
+          ? `Etiketlenen ajanlar birlikte çalışacak: ${mentionedTeam.map((a) => a.toUpperCase()).join(' · ')}.`
+          : `The tagged agents will work together: ${mentionedTeam.map((a) => a.toUpperCase()).join(' · ')}.`,
+      });
+    } else if (mentioned.agent) {
       const idx = balancedAgents.indexOf(mentioned.agent);
       if (idx > -1) {
         balancedAgents.splice(idx, 1);
@@ -416,29 +470,34 @@ export class TeamChatCoordinator {
         : `${complexity === 'simple' || balancedAgents.length === 1 ? 'Single-step task' : 'Multi-step task'} · weekly usage: ${quotaBreakdown}`,
     });
 
-    // Shield 1: If the prompt is simple or only 1 agent is selected, use Fast Economy Path (1 agent)
-    if (complexity === 'simple' || balancedAgents.length === 1) {
+    // Shield 1: If the prompt is simple or only 1 agent is selected, use Fast Economy Path (1 agent).
+    // Tagging two or more agents asks for a discussion, so it always goes to the team.
+    if (!mentionedTeam && (complexity === 'simple' || balancedAgents.length === 1)) {
       const chosen = balancedAgents[0];
-      const economyModel =
-        chosen === 'claude'
-          ? 'haiku'
-          : chosen === 'agy' || chosen === 'gemini'
-          ? 'gemini-3.8-flash-high'
-          : chosen === 'codex'
-          ? 'gpt-5.4-mini'
-          : undefined;
+      const picked = modelFor(chosen);
+      const userPicked = !!picked.model && picked.model !== 'default';
+      const economyModel = userPicked
+        ? picked.model
+        : chosen === 'claude'
+        ? 'haiku'
+        : chosen === 'agy' || chosen === 'gemini'
+        ? 'gemini-3.8-flash-high'
+        : chosen === 'codex'
+        ? 'gpt-5.4-mini'
+        : undefined;
 
       opts.onEvent({
         type: 'system_note',
         badge: isTr ? '⚡ Kota Koruma Modu' : '⚡ Smart Quota Saver',
         text: isTr
-          ? `Görev tek adımda çözülebilecek boyutta olduğu için gereksiz tartışma başlatılmadı; en uygun ajan (${chosen.toUpperCase()}) seçildi.`
-          : `Handled in a single step by ${chosen.toUpperCase()} to preserve your weekly agent quotas.`,
+          ? `Görev tek adımda çözülebilecek boyutta olduğu için gereksiz tartışma başlatılmadı; en uygun ajan (${chosen.toUpperCase()}) seçildi. Tartışma istersen birden fazla ajanı @ ile etiketle.`
+          : `Handled in a single step by ${chosen.toUpperCase()} to preserve your weekly agent quotas. Tag two or more agents with @ to make them discuss it.`,
       });
 
       await this.runSingleAgentTurn({
         agent: chosen,
         model: economyModel,
+        effort: picked.effort,
         roleLabel: isTr ? 'Hızlı Çözüm Ajanı' : 'Fast Resolver',
         prompt: [
           memorySnippet ? `[Workspace Rules]\n${memorySnippet}` : '',
@@ -492,6 +551,8 @@ export class TeamChatCoordinator {
       const filesBefore = new Set(await gitUtils.getChangedFilesAsync());
       const reply = await this.runSingleAgentTurn({
         agent: speaker,
+        model: modelFor(speaker).model,
+        effort: modelFor(speaker).effort,
         roleLabel: previous
           ? isTr
             ? `${previous.agent.toUpperCase()}'a yanıt`
@@ -565,6 +626,8 @@ export class TeamChatCoordinator {
             : `After team changes, "${testCmd}" failed with:\n${compressedErr}\n\nApply the minimal fix and explain in 2 sentences.`;
           await this.runSingleAgentTurn({
             agent: thirdAgent,
+            model: modelFor(thirdAgent).model,
+            effort: modelFor(thirdAgent).effort,
             roleLabel: isTr ? 'Onarım & Doğrulama' : 'Surgical Fixer',
             prompt: fixPrompt,
             cwd: opts.cwd,
@@ -652,7 +715,11 @@ export class TeamChatCoordinator {
     const res = await adapter.execute(params.prompt, {
       cwd: params.cwd,
       allowEdits: params.allowEdits,
+      timeoutMs: CHAT_TURN_TIMEOUT_MS,
       usageTag: 'chat',
+      onToolApproval: this.approve
+        ? (req: ToolApprovalRequest) => this.approve!({ ...req, agent: params.agent })
+        : undefined,
       signal: this.abortController.signal,
       onActivity: activity,
       onStderr,
@@ -677,6 +744,16 @@ export class TeamChatCoordinator {
     });
 
     if (log) activity({ id: logId, tool: 'Log', status: res.exitCode === 0 ? 'done' : 'error', output: log });
+    if (res.timedOut) {
+      params.onEvent({
+        type: 'tool_card',
+        agent: params.agent,
+        title: params.isTr
+          ? `${params.agent.toUpperCase()} ${CHAT_TURN_TIMEOUT_MS / 60_000} dakikada bitiremedi, turu kesildi`
+          : `${params.agent.toUpperCase()} hit the ${CHAT_TURN_TIMEOUT_MS / 60_000}-minute limit; its turn was cut off`,
+        isError: true,
+      });
+    }
 
     const rawFull = (res.stdout || res.stderr || '').trim();
     const { thinking: rawThinking, clean: cleanText } = extractThinkingAndClean(rawFull);

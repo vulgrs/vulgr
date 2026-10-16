@@ -4,6 +4,7 @@ import {
   buildModelExtraArgs,
   classifyPromptComplexity,
   extractMentionedAgent,
+  extractMentionedAgents,
   parseTurnControl,
   stripTurnControl,
   pickQuotaBalancedAgents,
@@ -203,6 +204,58 @@ describe('TeamChatCoordinator Suite', () => {
       agent: undefined,
       cleanPrompt: 'just a normal message without mention',
     });
+  });
+
+  it('reads every @agent so two or more tags form a team', () => {
+    assert.deepStrictEqual(extractMentionedAgents('@claude @cursor rate limiter yaz'), {
+      agents: ['claude', 'cursor'],
+      leading: ['claude', 'cursor'],
+      cleanPrompt: 'rate limiter yaz',
+    });
+    assert.deepStrictEqual(extractMentionedAgents('@claude ve @cursor: birlikte tasarlayın'), {
+      agents: ['claude', 'cursor'],
+      leading: ['claude', 'cursor'],
+      cleanPrompt: 'birlikte tasarlayın',
+    });
+    assert.deepStrictEqual(extractMentionedAgents('@codex write it, then @claude reviews it'), {
+      agents: ['codex', 'claude'],
+      leading: ['codex'],
+      cleanPrompt: 'write it, then @claude reviews it',
+    });
+    assert.deepStrictEqual(extractMentionedAgents('mail me at a@b.com @unknown hi').agents, []);
+  });
+
+  it('runs tagged agents as a discussion with the models picked for each, even in solo mode', async () => {
+    const calls: Array<{ agent: string; extraArgs: string[] }> = [];
+    for (const id of ['claude', 'cursor'] as const) {
+      AdapterFactory.registerAdapter(id, (opts?: any) => {
+        const mock = new MockCliAdapter(id);
+        const original = mock.execute.bind(mock);
+        mock.execute = async (prompt: string, o: any) => {
+          calls.push({ agent: id, extraArgs: opts?.extraArgs ?? [] });
+          const res = await original(prompt, o);
+          return { ...res, stdout: `${id} reply\nDONE` };
+        };
+        return mock;
+      });
+    }
+    const events: TeamChatEvent[] = [];
+    await new TeamChatCoordinator().run({
+      id: 't-multi',
+      prompt: '@claude @cursor fix it',
+      cwd: process.cwd(),
+      mode: 'solo',
+      soloAgent: 'claude',
+      teamModels: { claude: { model: 'opus', effort: 'high' }, cursor: { model: 'gpt-5.3-codex' } },
+      onEvent: (e) => events.push(e),
+    });
+    assert.deepStrictEqual(
+      calls.slice(0, 2).map((c) => c.agent),
+      ['claude', 'cursor']
+    );
+    assert.deepStrictEqual(calls[0].extraArgs, ['--model', 'opus', '--effort', 'high']);
+    assert.deepStrictEqual(calls[1].extraArgs, ['--model', 'gpt-5.3-codex']);
+    assert.ok(!events.some((e) => e.type === 'system_note' && /Kota Koruma/.test(e.badge ?? '')));
   });
 });
 

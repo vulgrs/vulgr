@@ -1,8 +1,17 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, execFileSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { BrowserWindow } from 'electron';
 import os from 'node:os';
 import path from 'node:path';
 import type { ConfigManager } from '../src/engine/configManager.js';
+import {
+  approvalArgs,
+  approvalResponseLine,
+  readApprovalRequest,
+  type ApprovalMode,
+} from '../src/engine/toolApproval.js';
+import type { ApprovalBroker } from './approvalBroker.js';
+
+const SAFE_TOKEN_RE = /^[a-zA-Z0-9._:/-]+$/;
 
 /** A base64-encoded image attachment for a user turn. */
 export interface ImageAttachment {
@@ -28,6 +37,10 @@ export interface ClaudeChatStartOptions {
   images?: ImageAttachment[];
   /** Resume a prior Claude Code session id (multi-turn continuation across restarts). */
   resumeSessionId?: string;
+  /** How tools outside acceptEdits (shell commands...) are approved. Default 'ask'. */
+  approvals?: ApprovalMode;
+  /** UI language, for the message Claude gets when the user refuses. */
+  lang?: string;
 }
 
 /**
@@ -50,6 +63,8 @@ export class ClaudeChatManager {
   private buffers = new Map<string, string>();
   private window: BrowserWindow | null = null;
   private configManager: ConfigManager | null = null;
+  private approvals: ApprovalBroker | null = null;
+  private modes = new Map<string, { approvals: ApprovalMode; isTr: boolean }>();
 
   setWindow(win: BrowserWindow) {
     this.window = win;
@@ -57,6 +72,10 @@ export class ClaudeChatManager {
 
   setConfigManager(cm: ConfigManager) {
     this.configManager = cm;
+  }
+
+  setApprovalBroker(broker: ApprovalBroker) {
+    this.approvals = broker;
   }
 
   private buildEnv(): NodeJS.ProcessEnv {
@@ -101,27 +120,49 @@ export class ClaudeChatManager {
       args.push('--dangerously-skip-permissions');
     } else {
       args.push('--permission-mode', 'acceptEdits');
+      // Other tools are asked about over stdio and answered by the user (or automatically).
+      if (this.approvals) args.push(...approvalArgs(options.approvals ?? 'ask'));
     }
 
     const model = options.model || this.configManager?.getConfig?.()?.claude?.model;
-    if (model && model !== 'default') {
+    if (model && model !== 'default' && SAFE_TOKEN_RE.test(model)) {
       args.push('--model', model);
     }
 
-    if (options.effort) {
+    if (options.effort && SAFE_TOKEN_RE.test(options.effort)) {
       args.push('--effort', options.effort);
     }
 
-    if (options.resumeSessionId) {
+    if (options.resumeSessionId && SAFE_TOKEN_RE.test(options.resumeSessionId)) {
       args.push('--resume', options.resumeSessionId);
     }
 
     const extra = this.configManager?.getConfig?.()?.claude?.additionalFlags ?? [];
     if (Array.isArray(extra) && extra.length > 0) {
-      args.push(...extra);
+      for (const flag of extra) {
+        if (typeof flag === 'string' && SAFE_TOKEN_RE.test(flag)) {
+          args.push(flag);
+        }
+      }
     }
 
     return args;
+  }
+
+  private resolveClaudeBinary(env: NodeJS.ProcessEnv): string {
+    try {
+      const locator = process.platform === 'win32' ? 'where.exe' : 'which';
+      const out = execFileSync(locator, ['claude'], {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        env,
+        timeout: 5000,
+        windowsHide: true,
+      });
+      return out.split(/\r?\n/).map((l) => l.trim()).find(Boolean) || 'claude';
+    } catch {
+      return 'claude';
+    }
   }
 
   /** Encode a user turn (text + optional images) as a stream-json line. */
@@ -156,17 +197,25 @@ export class ClaudeChatManager {
 
     const cwd = options.cwd || process.cwd();
     const args = this.buildArgs(options);
+    const env = this.buildEnv();
+    const resolvedBin = this.resolveClaudeBinary(env);
+    const needsShell = process.platform === 'win32' && /\.(cmd|bat)$/i.test(resolvedBin);
 
     try {
-      const child = spawn('claude', args, {
+      const child = spawn(resolvedBin, args, {
         cwd,
-        env: this.buildEnv(),
+        env,
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: process.platform === 'win32',
+        shell: needsShell,
+        windowsHide: true,
       });
 
       this.sessions.set(options.id, child);
       this.buffers.set(options.id, '');
+      this.modes.set(options.id, {
+        approvals: options.approvals ?? 'ask',
+        isTr: (options.lang ?? 'tr').startsWith('tr'),
+      });
 
       child.stdout.setEncoding('utf-8');
       child.stdout.on('data', (chunk: string) => this.ingest(options.id, chunk));
@@ -226,11 +275,32 @@ export class ClaudeChatManager {
   private parseLine(id: string, line: string) {
     try {
       const parsed = JSON.parse(line) as ClaudeChatEvent;
+      const req = readApprovalRequest(parsed);
+      if (req) {
+        this.answerApproval(id, req);
+        return;
+      }
       this.emit(id, parsed);
     } catch {
       // Non-JSON output (rare in stream-json mode) is surfaced as raw text.
       this.emit(id, { type: 'raw', text: line });
     }
+  }
+
+  private answerApproval(id: string, req: NonNullable<ReturnType<typeof readApprovalRequest>>) {
+    const mode = this.modes.get(id) ?? { approvals: 'ask' as ApprovalMode, isTr: true };
+    const decision =
+      mode.approvals === 'auto'
+        ? Promise.resolve(true)
+        : mode.approvals === 'deny' || !this.approvals
+        ? Promise.resolve(false)
+        : this.approvals.request(id, { agent: 'claude', tool: req.tool, input: req.input, description: req.description });
+    void decision.then((allow) => {
+      const child = this.sessions.get(id);
+      if (child && !child.killed && child.stdin.writable) {
+        child.stdin.write(approvalResponseLine(req.requestId, allow, req.rawInput, mode.isTr));
+      }
+    });
   }
 
   /** Send a follow-up user turn (text + optional images) to a live session. */
@@ -261,6 +331,8 @@ export class ClaudeChatManager {
   private cleanup(id: string) {
     this.sessions.delete(id);
     this.buffers.delete(id);
+    this.modes.delete(id);
+    this.approvals?.cancelChat(id);
   }
 
   killAll() {

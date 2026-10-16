@@ -25,6 +25,9 @@ import {
   History,
   Trash2,
   MessageSquare,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldOff,
 } from 'lucide-react';
 import { DiffViewer } from './DiffViewer.js';
 import { AgentLogo } from './AgentLogo.js';
@@ -106,6 +109,36 @@ const FALLBACK_MODELS: Record<ChatAgentId, RawModel[]> = {
 
 function agentLabel(id?: string): string {
   return AGENTS.find((a) => a.id === id)?.label ?? 'Claude Code';
+}
+
+const MENTION_ALIASES: Record<string, ChatAgentId> = {
+  claude: 'claude',
+  claudecode: 'claude',
+  codex: 'codex',
+  agy: 'agy',
+  antigravity: 'agy',
+  cursor: 'cursor',
+  opencode: 'opencode',
+  gemini: 'gemini',
+};
+
+/** Same reading as the engine's extractMentionedAgents: every @agent, and the leading ones cut off. */
+function readMentions(text: string): { agents: ChatAgentId[]; leading: ChatAgentId[]; cleanPrompt: string } {
+  const agents: ChatAgentId[] = [];
+  const add = (a?: ChatAgentId) => {
+    if (a && !agents.includes(a)) agents.push(a);
+  };
+  let rest = text;
+  for (;;) {
+    const m = rest.match(/^\s*@([a-zA-Z0-9_-]+)(?:\s*[:,&+]|\s+(?:ve|and|ile)\b)?\s*/i);
+    const target = m ? MENTION_ALIASES[m[1].toLowerCase()] : undefined;
+    if (!m || !target) break;
+    add(target);
+    rest = rest.slice(m[0].length);
+  }
+  const leading = [...agents];
+  for (const m of rest.matchAll(/(?:^|\s)@([a-zA-Z0-9_-]+)/g)) add(MENTION_ALIASES[m[1].toLowerCase()]);
+  return { agents, leading, cleanPrompt: rest.trim() || text };
 }
 
 function readLocal<T>(key: string, fallback: T, parse: (raw: string) => T = (r) => r as unknown as T): T {
@@ -562,9 +595,12 @@ const AgentModelMenu: React.FC<AgentModelMenuProps> = ({
 const TeamMenu: React.FC<{
   team: ChatAgentId[];
   available: Record<string, boolean>;
+  families: Record<ChatAgentId, ModelFamily[]>;
+  modelByAgent: Record<string, string>;
   onToggle: (a: ChatAgentId) => void;
+  onSelectModel: (a: ChatAgentId, familyId: string) => void;
   isTr: boolean;
-}> = ({ team, available, onToggle, isTr }) => {
+}> = ({ team, available, families, modelByAgent, onToggle, onSelectModel, isTr }) => {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
@@ -587,31 +623,48 @@ const TeamMenu: React.FC<{
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 left-0 bottom-full mb-2 w-64 rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] p-1.5">
+          <div className="absolute z-50 left-0 bottom-full mb-2 w-80 max-w-[calc(100vw-48px)] rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] p-1.5">
             <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
               {isTr ? 'Takım' : 'Team'}
             </div>
             {AGENTS.map((a) => {
               const on = team.includes(a.id);
               const missing = available[a.id] === false;
+              const list = families[a.id] ?? [];
               return (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => onToggle(a.id)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12.5px] text-zinc-200 hover:bg-white/[0.06] transition-colors"
-                >
-                  <AgentLogo id={a.id} name={a.label} size={16} dim={missing} />
-                  <span className={missing ? 'text-zinc-600' : ''}>{a.label}</span>
-                  {missing && <span className="text-[10px] text-zinc-600">{isTr ? 'kurulu değil' : 'not installed'}</span>}
-                  {on && <Check size={13} className="ml-auto text-emerald-400" />}
-                </button>
+                <div key={a.id} className="flex items-center gap-1 rounded-md hover:bg-white/[0.06] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => onToggle(a.id)}
+                    className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 text-[12.5px] text-zinc-200 text-left"
+                  >
+                    <AgentLogo id={a.id} name={a.label} size={16} dim={missing} />
+                    <span className={`truncate ${missing ? 'text-zinc-600' : ''}`}>{a.label}</span>
+                    {missing && <span className="text-[10px] text-zinc-600">{isTr ? 'kurulu değil' : 'not installed'}</span>}
+                    {on && <Check size={13} className="ml-auto flex-shrink-0 text-emerald-400" />}
+                  </button>
+                  {on && (
+                    <select
+                      value={modelByAgent[a.id] || 'default'}
+                      onChange={(e) => onSelectModel(a.id, e.target.value)}
+                      className="mr-1 max-w-[130px] truncate rounded bg-white/[0.06] border border-white/[0.08] px-1 py-0.5 text-[11px] text-zinc-300 outline-none"
+                      title={isTr ? `${a.label} hangi modelle çalışsın` : `Model ${a.label} uses`}
+                    >
+                      <option value="default">{isTr ? 'Varsayılan' : 'Default'}</option>
+                      {list.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               );
             })}
             <div className="px-2 pt-1.5 pb-1 text-[10.5px] leading-snug text-zinc-600">
               {isTr
-                ? 'Basit isteklerde tek ajan çalışır; büyük işlerde lider ajan işi bölüştürür.'
-                : 'Simple asks use one agent; bigger jobs are split by a lead agent.'}
+                ? 'Basit isteklerde tek ajan çalışır. Tartışma için mesajda iki ajanı etiketle: @claude @cursor …'
+                : 'Simple asks use one agent. To make them discuss, tag two agents: @claude @cursor …'}
             </div>
           </div>
         </>
@@ -619,6 +672,146 @@ const TeamMenu: React.FC<{
     </div>
   );
 };
+
+type ApprovalMode = 'ask' | 'auto' | 'deny';
+
+interface PendingApproval {
+  requestId: string;
+  chatId: string;
+  agent: string;
+  tool: string;
+  input: string;
+  description?: string;
+}
+
+const APPROVAL_OPTIONS: Array<{ id: ApprovalMode; tr: [string, string]; en: [string, string] }> = [
+  {
+    id: 'ask',
+    tr: ['Bana sor', 'Komut çalıştırmadan önce onayını ister.'],
+    en: ['Ask me', 'Asks before running a command.'],
+  },
+  {
+    id: 'auto',
+    tr: ['Hep izin ver', 'Komutlar sormadan çalışır.'],
+    en: ['Always allow', 'Commands run without asking.'],
+  },
+  {
+    id: 'deny',
+    tr: ['Reddet', 'Komutlar çalışmaz; yalnızca dosya düzenlenir.'],
+    en: ['Refuse', 'No commands; files can still be edited.'],
+  },
+];
+
+const ApprovalIcon: React.FC<{ mode: ApprovalMode; size?: number }> = ({ mode, size = 14 }) =>
+  mode === 'auto' ? <ShieldAlert size={size} /> : mode === 'deny' ? <ShieldOff size={size} /> : <ShieldCheck size={size} />;
+
+/** Header setting: how commands an agent wants to run get approved. */
+const ApprovalMenu: React.FC<{ mode: ApprovalMode; onChange: (m: ApprovalMode) => void; isTr: boolean }> = ({
+  mode,
+  onChange,
+  isTr,
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`p-1.5 rounded-md transition-colors hover:bg-white/[0.05] ${
+          mode === 'auto' ? 'text-amber-300' : mode === 'deny' ? 'text-zinc-500' : 'text-emerald-300'
+        }`}
+        title={isTr ? 'Komut onayı' : 'Command approval'}
+      >
+        <ApprovalIcon mode={mode} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute z-50 right-0 top-full mt-2 w-72 rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] p-1.5">
+            <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+              {isTr ? 'Komut onayı' : 'Command approval'}
+            </div>
+            {APPROVAL_OPTIONS.map((o) => {
+              const [label, hint] = isTr ? o.tr : o.en;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(o.id);
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-left hover:bg-white/[0.06] transition-colors"
+                >
+                  <span className="mt-0.5 text-zinc-400">
+                    <ApprovalIcon mode={o.id} size={13} />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[12.5px] text-zinc-200">{label}</span>
+                    <span className="block text-[11px] text-zinc-500">{hint}</span>
+                  </span>
+                  {o.id === mode && <Check size={13} className="mt-0.5 text-emerald-400" />}
+                </button>
+              );
+            })}
+            <div className="px-2 pt-1.5 pb-1 text-[10.5px] leading-snug text-zinc-600">
+              {isTr
+                ? 'Onay sorabilen ajan şimdilik Claude. Cursor ve Codex kendi izin ayarlarıyla çalışır.'
+                : 'Claude is the agent that can ask for now. Cursor and Codex follow their own permission settings.'}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+/** A command waiting for the user's yes, shown above the composer. */
+const ApprovalCard: React.FC<{
+  req: PendingApproval;
+  onAnswer: (allow: boolean, always?: boolean) => void;
+  isTr: boolean;
+}> = ({ req, onAnswer, isTr }) => (
+  <div className="mb-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2.5">
+    <div className="flex items-center gap-2 text-[12px] text-zinc-300">
+      <AgentLogo id={req.agent} name={agentLabel(req.agent)} size={15} />
+      <span className="font-semibold text-zinc-100">{agentLabel(req.agent)}</span>
+      <span>
+        {isTr ? `${req.tool} kullanmak istiyor` : `wants to use ${req.tool}`}
+        {req.description ? ` · ${req.description}` : ''}
+      </span>
+    </div>
+    {req.input && (
+      <pre className="mt-1.5 max-h-28 overflow-auto whitespace-pre-wrap break-all rounded-md bg-black/30 px-2 py-1.5 font-mono text-[11.5px] text-zinc-200">
+        {req.input}
+      </pre>
+    )}
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => onAnswer(true)}
+        className="px-2.5 py-1 rounded-md bg-zinc-200 hover:bg-white text-black text-[12px] font-medium"
+      >
+        {isTr ? 'İzin ver' : 'Allow'}
+      </button>
+      <button
+        type="button"
+        onClick={() => onAnswer(true, true)}
+        className="px-2.5 py-1 rounded-md bg-white/[0.08] hover:bg-white/[0.14] text-zinc-200 text-[12px]"
+        title={isTr ? `Bu sohbette ${req.tool} için bir daha sorma` : `Don't ask again about ${req.tool} in this chat`}
+      >
+        {isTr ? `Bu sohbette hep izin ver (${req.tool})` : `Always allow ${req.tool} in this chat`}
+      </button>
+      <button
+        type="button"
+        onClick={() => onAnswer(false)}
+        className="px-2.5 py-1 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] text-[12px]"
+      >
+        {isTr ? 'Reddet' : 'Deny'}
+      </button>
+    </div>
+  </div>
+);
 
 const HistoryMenu: React.FC<{
   chats: ChatSummary[];
@@ -795,6 +988,12 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   );
   /** Bumped by the header toggle so every block follows it, even ones folded by hand. */
   const [thinkingVersion, setThinkingVersion] = useState(0);
+  const [approvalMode, setApprovalMode] = useState<ApprovalMode>(() =>
+    readLocal('vulgr.chatApprovals', 'ask' as ApprovalMode, (r) => (r === 'auto' || r === 'deny' ? r : 'ask'))
+  );
+  const [approvals, setApprovals] = useState<PendingApproval[]>([]);
+  /** Tools the user said "always allow" for in this chat. */
+  const alwaysAllowRef = useRef<Set<string>>(new Set());
   const [changesOpen, setChangesOpen] = useState<boolean>(() =>
     readLocal('vulgr.chatChangesOpen', true, (r) => r !== '0')
   );
@@ -840,7 +1039,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       const nextText = replacedBefore + textAfter;
       setInput(nextText);
       setMentionQuery(null);
-      if (mode === 'solo') {
+      if (mode === 'solo' && readMentions(nextText).agents.length < 2) {
         setAgent(targetAgent.id);
       }
       setTimeout(() => {
@@ -864,8 +1063,9 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       localStorage.setItem('vulgr.teamAgents', JSON.stringify(team));
       localStorage.setItem('vulgr.chatChangesOpen', changesOpen ? '1' : '0');
       localStorage.setItem('vulgr.chatThinkingOpen', thinkingOpen ? '1' : '0');
+      localStorage.setItem('vulgr.chatApprovals', approvalMode);
     } catch {}
-  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen, thinkingOpen]);
+  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen, thinkingOpen, approvalMode]);
 
   const families = useMemo(() => {
     const out = {} as Record<ChatAgentId, ModelFamily[]>;
@@ -1052,7 +1252,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   const sendToClaude = useCallback(
     (text: string, images: Array<{ mediaType: string; data: string }>) => {
       const { model, effort: eff } = resolveModel('claude', family, effort, flags);
-      const key = `${chatCwd}|${model}|${eff ?? ''}`;
+      const key = `${chatCwd}|${model}|${eff ?? ''}|${approvalMode}`;
       const foreign = foreignTurnsRef.current;
       foreignTurnsRef.current = [];
       const prompt =
@@ -1084,9 +1284,11 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         effort: eff,
         images: imgs,
         resumeSessionId: resume || undefined,
+        approvals: approvalMode,
+        lang,
       });
     },
-    [api, chatCwd, effort, family, flags, isTr]
+    [api, chatCwd, effort, family, flags, isTr, approvalMode, lang]
   );
 
   const sendPrompt = useCallback(
@@ -1101,27 +1303,19 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       setState((prev) => appendUserMessage(prev, text, previews));
       setRunning(true);
 
-      const mentionMatch = text.match(/^\s*@([a-zA-Z0-9_-]+)[:,\s]?\s*/i);
-      const mentionedRaw = mentionMatch?.[1]?.toLowerCase();
-      const aliasMap: Record<string, ChatAgentId> = {
-        claude: 'claude',
-        claudecode: 'claude',
-        codex: 'codex',
-        agy: 'agy',
-        antigravity: 'agy',
-        cursor: 'cursor',
-        opencode: 'opencode',
-        gemini: 'gemini',
-      };
-      const mentionedAgent = mentionedRaw ? aliasMap[mentionedRaw] : undefined;
+      const { agents: mentionedAgents, leading, cleanPrompt } = readMentions(text);
+      const mentionedAgent = leading[0];
+      // Tagging two or more agents makes them discuss it together, whatever the mode.
+      const mentionedTeam = mentionedAgents.length >= 2 ? mentionedAgents : undefined;
+      const runMode = mentionedTeam ? 'team' : mode;
+      if (mentionedTeam && mode !== 'team') setMode('team');
       const effectiveAgent = (mode === 'solo' && mentionedAgent) ? mentionedAgent : agent;
-      if (mentionedAgent && mode === 'solo' && mentionedAgent !== agent) {
+      if (mentionedAgent && mode === 'solo' && !mentionedTeam && mentionedAgent !== agent) {
         setAgent(mentionedAgent);
       }
 
-      if (mode === 'solo' && effectiveAgent === 'claude') {
-        const promptWithoutMention = text.replace(mentionMatch?.[0] || '', '').trim() || text;
-        sendToClaude(promptWithoutMention, images);
+      if (runMode === 'solo' && effectiveAgent === 'claude') {
+        sendToClaude(cleanPrompt, images);
         return;
       }
 
@@ -1133,22 +1327,29 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
 
       const targetFamily = families[effectiveAgent]?.find((f) => f.id === (modelByAgent[effectiveAgent] || 'default'));
       const { model, effort: eff } = resolveModel(effectiveAgent, targetFamily, effort, flags);
+      const teamModels: Record<string, { model: string; effort?: string }> = {};
+      for (const a of mentionedTeam ?? team) {
+        const fam = families[a]?.find((f) => f.id === (modelByAgent[a] || 'default'));
+        teamModels[a] = resolveModel(a, fam, effort, flags);
+      }
       const id = `tc-${Date.now()}`;
       teamRunIdRef.current = id;
       void api?.runTeamChat?.({
         id,
         prompt: text,
         cwd: chatCwd,
-        mode,
+        mode: runMode,
         soloAgent: effectiveAgent,
         soloModel: model,
         soloEffort: eff,
-        teamAgents: team,
+        teamAgents: mentionedTeam ?? team,
+        teamModels,
+        approvals: approvalMode,
         history,
         lang,
       });
     },
-    [attachments, running, mode, agent, sendToClaude, isTr, families, modelByAgent, effort, flags, api, chatCwd, team, lang]
+    [attachments, running, mode, agent, sendToClaude, isTr, families, modelByAgent, effort, flags, api, chatCwd, team, lang, approvalMode]
   );
 
   useEffect(() => {
@@ -1208,6 +1409,41 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
     if (isOpen) void loadChats();
   }, [isOpen, loadChats]);
 
+  // Approval requests from this chat's Claude process or team run.
+  useEffect(() => {
+    if (!api?.onToolApproval) return;
+    const offReq = api.onToolApproval((req: PendingApproval) => {
+      const ours = req.chatId === claudeRef.current?.id || req.chatId === teamRunIdRef.current;
+      if (!ours || alwaysAllowRef.current.has(req.tool)) {
+        api.respondToolApproval?.(req.requestId, ours);
+        return;
+      }
+      setApprovals((prev) => [...prev, req]);
+    });
+    const offCancel = api.onToolApprovalCancelled?.(({ requestIds }: { requestIds: string[] }) =>
+      setApprovals((prev) => prev.filter((a) => !requestIds.includes(a.requestId)))
+    );
+    return () => {
+      offReq?.();
+      offCancel?.();
+    };
+  }, [api]);
+
+  const answerApproval = useCallback(
+    (req: PendingApproval, allow: boolean, always?: boolean) => {
+      api?.respondToolApproval?.(req.requestId, allow);
+      if (always) alwaysAllowRef.current.add(req.tool);
+      setApprovals((prev) => {
+        const rest = prev.filter((a) => a.requestId !== req.requestId);
+        if (!always) return rest;
+        // Others already waiting for the same tool get the same answer.
+        for (const a of rest) if (a.tool === req.tool) api?.respondToolApproval?.(a.requestId, true);
+        return rest.filter((a) => a.tool !== req.tool);
+      });
+    },
+    [api]
+  );
+
   const handleStop = useCallback(() => {
     const cur = claudeRef.current;
     if (cur?.alive) {
@@ -1227,6 +1463,8 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
     foreignTurnsRef.current = [];
     chatIdRef.current = null;
     savedSigRef.current = '';
+    alwaysAllowRef.current = new Set();
+    setApprovals([]);
     setRunning(false);
     setState(initialChatState());
     void loadChats();
@@ -1242,6 +1480,8 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       stopClaude();
       if (teamRunIdRef.current) void api?.stopTeamChat?.();
       teamRunIdRef.current = '';
+      alwaysAllowRef.current = new Set();
+      setApprovals([]);
       setRunning(false);
 
       const messages: ChatMessage[] = rec.messages.map((m: ChatMessage) => ({ ...m, streaming: false }));
@@ -1355,203 +1595,216 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
     : 'Type a message or use @ to assign (@claude, @cursor, @agy...)';
 
   const composer = (
-    <div className="relative rounded-2xl border border-white/10 bg-[#151517] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_40px_-12px_rgba(0,0,0,0.7)] focus-within:border-white/20 transition-colors">
-      {mentionQuery !== null && filteredMentionAgents.length > 0 && (
-        <div className="absolute bottom-full left-3 mb-2 z-50 min-w-[240px] max-w-[320px] rounded-xl border border-white/10 bg-[#18181b] p-1.5 shadow-2xl backdrop-blur-md">
-          <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 border-b border-white/[0.06] mb-1 flex items-center justify-between">
-            <span>{isTr ? 'Ajan Ata' : 'Assign Agent'}</span>
-            <span className="text-[10px] text-zinc-500 font-normal">↑↓ Gezin · ↵ Seç</span>
-          </div>
-          <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto">
-            {filteredMentionAgents.map((a, idx) => {
-              const active = idx === mentionIndex;
-              const isMissing = available[a.id] === false;
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    insertMention(a);
-                  }}
-                  className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors text-left ${
-                    active ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.05]'
-                  } ${isMissing ? 'opacity-60' : ''}`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <AgentLogo id={a.id} name={a.label} size={16} />
-                    <span className="font-semibold text-emerald-400">@{a.id}</span>
-                    <span className="text-zinc-400 text-[12px] truncate">{a.label}</span>
-                  </div>
-                  {isMissing && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 flex-shrink-0">
-                      {isTr ? 'Yüklü Değil' : 'Not Installed'}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-3 pt-3">
-          {attachments.map((a) => (
-            <div key={a.id} className="relative w-14 h-14 rounded-lg overflow-hidden border border-white/10 group">
-              <img src={a.previewUrl} alt={a.name} className="w-full h-full object-cover" />
-              <button
-                onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
-                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-zinc-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X size={10} />
-              </button>
+    <div>
+      {approvals.map((req) => (
+        <ApprovalCard key={req.requestId} req={req} onAnswer={(allow, always) => answerApproval(req, allow, always)} isTr={isTr} />
+      ))}
+      <div className="relative rounded-2xl border border-white/10 bg-[#151517] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_18px_40px_-12px_rgba(0,0,0,0.7)] focus-within:border-white/20 transition-colors">
+        {mentionQuery !== null && filteredMentionAgents.length > 0 && (
+          <div className="absolute bottom-full left-3 mb-2 z-50 min-w-[240px] max-w-[320px] rounded-xl border border-white/10 bg-[#18181b] p-1.5 shadow-2xl backdrop-blur-md">
+            <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 border-b border-white/[0.06] mb-1 flex items-center justify-between">
+              <span>{isTr ? 'Ajan Ata' : 'Assign Agent'}</span>
+              <span className="text-[10px] text-zinc-500 font-normal">↑↓ Gezin · ↵ Seç</span>
             </div>
-          ))}
-        </div>
-      )}
-      <textarea
-        ref={textareaRef}
-        autoFocus
-        value={input}
-        onChange={(e) => {
-          const val = e.target.value;
-          setInput(val);
-          const cursor = e.target.selectionStart ?? val.length;
-          const textBefore = val.slice(0, cursor);
-          const match = textBefore.match(/(?:^|\s)@([a-zA-Z0-9_-]*)$/);
-          if (match) {
-            setMentionQuery(match[1].toLowerCase());
-            setMentionIndex(0);
-          } else {
-            setMentionQuery(null);
-          }
-        }}
-        onKeyDown={(e) => {
-          if (mentionQuery !== null && filteredMentionAgents.length > 0) {
-            if (e.key === 'ArrowDown') {
-              e.preventDefault();
-              setMentionIndex((i) => (i + 1) % filteredMentionAgents.length);
-              return;
-            }
-            if (e.key === 'ArrowUp') {
-              e.preventDefault();
-              setMentionIndex((i) => (i - 1 + filteredMentionAgents.length) % filteredMentionAgents.length);
-              return;
-            }
-            if (e.key === 'Enter' || e.key === 'Tab') {
-              e.preventDefault();
-              const target = filteredMentionAgents[mentionIndex] ?? filteredMentionAgents[0];
-              if (target) insertMention(target);
-              return;
-            }
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              setMentionQuery(null);
-              return;
-            }
-          }
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendPrompt(input);
-          }
-        }}
-        onPaste={(e) => {
-          const files = e.clipboardData?.files;
-          if (canAttach && files && Array.from(files).some((f) => f.type.startsWith('image/'))) addFiles(files);
-        }}
-        rows={2}
-        placeholder={placeholder}
-        className="w-full resize-none bg-transparent outline-none px-4 pt-3.5 pb-1 text-[14px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 max-h-56 min-h-[52px]"
-      />
-      <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
-        <div className="flex items-center gap-3 text-[12px] select-none min-w-0">
-          {canAttach && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  addFiles(e.target.files);
-                  if (fileInputRef.current) fileInputRef.current.value = '';
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors"
-                title={isTr ? 'Görsel ekle' : 'Attach images'}
-              >
-                <Paperclip size={15} />
-              </button>
-            </>
-          )}
-          <div className="inline-flex items-center rounded-lg bg-white/[0.04] p-0.5 border border-white/[0.06]">
-            {(['solo', 'team'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11.5px] transition-colors ${
-                  mode === m ? 'bg-white/[0.1] text-white' : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-                title={
-                  m === 'solo'
-                    ? isTr
-                      ? 'Tek ajanla çalış'
-                      : 'Work with one agent'
-                    : isTr
-                    ? 'Seçili ajanlar işi birlikte yapar'
-                    : 'Selected agents work together'
-                }
-              >
-                {m === 'solo' ? <Bot size={12} /> : <Users size={12} />}
-                {m === 'solo' ? (isTr ? 'Tekli' : 'Solo') : isTr ? 'Ortak' : 'Team'}
-              </button>
+            <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto">
+              {filteredMentionAgents.map((a, idx) => {
+                const active = idx === mentionIndex;
+                const isMissing = available[a.id] === false;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      insertMention(a);
+                    }}
+                    className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors text-left ${
+                      active ? 'bg-white/10 text-white' : 'text-zinc-300 hover:bg-white/[0.05]'
+                    } ${isMissing ? 'opacity-60' : ''}`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <AgentLogo id={a.id} name={a.label} size={16} />
+                      <span className="font-semibold text-emerald-400">@{a.id}</span>
+                      <span className="text-zinc-400 text-[12px] truncate">{a.label}</span>
+                    </div>
+                    {isMissing && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 flex-shrink-0">
+                        {isTr ? 'Yüklü Değil' : 'Not Installed'}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-3 pt-3">
+            {attachments.map((a) => (
+              <div key={a.id} className="relative w-14 h-14 rounded-lg overflow-hidden border border-white/10 group">
+                <img src={a.previewUrl} alt={a.name} className="w-full h-full object-cover" />
+                <button
+                  onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
+                  className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-zinc-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={10} />
+                </button>
+              </div>
             ))}
           </div>
-          {mode === 'solo' ? (
-            <AgentModelMenu
-              agent={agent}
-              familyId={familyId}
-              effort={effort}
-              flags={flags}
-              families={families}
-              available={available}
-              onSelectAgent={setAgent}
-              onSelectModel={(id) => setModelByAgent((prev) => ({ ...prev, [agent]: id }))}
-              onSelectEffort={setEffort}
-              onChangeFlags={setFlags}
-              onRefresh={() => void loadModels(true)}
-              refreshing={refreshingModels}
-              isTr={isTr}
-            />
+        )}
+        <textarea
+          ref={textareaRef}
+          autoFocus
+          value={input}
+          onChange={(e) => {
+            const val = e.target.value;
+            setInput(val);
+            const cursor = e.target.selectionStart ?? val.length;
+            const textBefore = val.slice(0, cursor);
+            const match = textBefore.match(/(?:^|\s)@([a-zA-Z0-9_-]*)$/);
+            if (match) {
+              setMentionQuery(match[1].toLowerCase());
+              setMentionIndex(0);
+            } else {
+              setMentionQuery(null);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (mentionQuery !== null && filteredMentionAgents.length > 0) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setMentionIndex((i) => (i + 1) % filteredMentionAgents.length);
+                return;
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setMentionIndex((i) => (i - 1 + filteredMentionAgents.length) % filteredMentionAgents.length);
+                return;
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                const target = filteredMentionAgents[mentionIndex] ?? filteredMentionAgents[0];
+                if (target) insertMention(target);
+                return;
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setMentionQuery(null);
+                return;
+              }
+            }
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendPrompt(input);
+            }
+          }}
+          onPaste={(e) => {
+            const files = e.clipboardData?.files;
+            if (canAttach && files && Array.from(files).some((f) => f.type.startsWith('image/'))) addFiles(files);
+          }}
+          rows={2}
+          placeholder={placeholder}
+          className="w-full resize-none bg-transparent outline-none px-4 pt-3.5 pb-1 text-[14px] leading-relaxed text-zinc-100 placeholder:text-zinc-500 max-h-56 min-h-[52px]"
+        />
+        <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
+          <div className="flex items-center gap-3 text-[12px] select-none min-w-0">
+            {canAttach && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    addFiles(e.target.files);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                  title={isTr ? 'Görsel ekle' : 'Attach images'}
+                >
+                  <Paperclip size={15} />
+                </button>
+              </>
+            )}
+            <div className="inline-flex items-center rounded-lg bg-white/[0.04] p-0.5 border border-white/[0.06]">
+              {(['solo', 'team'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11.5px] transition-colors ${
+                    mode === m ? 'bg-white/[0.1] text-white' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                  title={
+                    m === 'solo'
+                      ? isTr
+                        ? 'Tek ajanla çalış'
+                        : 'Work with one agent'
+                      : isTr
+                      ? 'Seçili ajanlar işi birlikte yapar'
+                      : 'Selected agents work together'
+                  }
+                >
+                  {m === 'solo' ? <Bot size={12} /> : <Users size={12} />}
+                  {m === 'solo' ? (isTr ? 'Tekli' : 'Solo') : isTr ? 'Ortak' : 'Team'}
+                </button>
+              ))}
+            </div>
+            {mode === 'solo' ? (
+              <AgentModelMenu
+                agent={agent}
+                familyId={familyId}
+                effort={effort}
+                flags={flags}
+                families={families}
+                available={available}
+                onSelectAgent={setAgent}
+                onSelectModel={(id) => setModelByAgent((prev) => ({ ...prev, [agent]: id }))}
+                onSelectEffort={setEffort}
+                onChangeFlags={setFlags}
+                onRefresh={() => void loadModels(true)}
+                refreshing={refreshingModels}
+                isTr={isTr}
+              />
+            ) : (
+              <TeamMenu
+                team={team}
+                available={available}
+                families={families}
+                modelByAgent={modelByAgent}
+                onToggle={toggleTeamAgent}
+                onSelectModel={(a, id) => setModelByAgent((prev) => ({ ...prev, [a]: id }))}
+                isTr={isTr}
+              />
+            )}
+          </div>
+          {running ? (
+            <button
+              type="button"
+              onClick={handleStop}
+              className="w-8 h-8 flex-shrink-0 rounded-full bg-zinc-200 hover:bg-white text-black flex items-center justify-center transition-colors"
+              title={t.terminal.stopHint}
+            >
+              <Square size={13} className="fill-black" />
+            </button>
           ) : (
-            <TeamMenu team={team} available={available} onToggle={toggleTeamAgent} isTr={isTr} />
+            <button
+              type="button"
+              onClick={() => sendPrompt(input)}
+              disabled={!input.trim() && attachments.length === 0}
+              className="w-8 h-8 flex-shrink-0 rounded-full bg-zinc-200 enabled:hover:bg-white disabled:bg-zinc-700 disabled:text-zinc-500 text-black flex items-center justify-center transition-colors"
+              title={t.terminal.send}
+            >
+              <ArrowUp size={16} strokeWidth={2.5} />
+            </button>
           )}
         </div>
-        {running ? (
-          <button
-            type="button"
-            onClick={handleStop}
-            className="w-8 h-8 flex-shrink-0 rounded-full bg-zinc-200 hover:bg-white text-black flex items-center justify-center transition-colors"
-            title={t.terminal.stopHint}
-          >
-            <Square size={13} className="fill-black" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => sendPrompt(input)}
-            disabled={!input.trim() && attachments.length === 0}
-            className="w-8 h-8 flex-shrink-0 rounded-full bg-zinc-200 enabled:hover:bg-white disabled:bg-zinc-700 disabled:text-zinc-500 text-black flex items-center justify-center transition-colors"
-            title={t.terminal.send}
-          >
-            <ArrowUp size={16} strokeWidth={2.5} />
-          </button>
-        )}
       </div>
     </div>
   );
@@ -1581,6 +1834,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
               </span>
             )}
             <div className="w-px h-4 bg-white/[0.08]" />
+            <ApprovalMenu mode={approvalMode} onChange={setApprovalMode} isTr={isTr} />
             <HistoryMenu
               chats={chats}
               currentId={chatIdRef.current}

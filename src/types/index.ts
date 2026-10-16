@@ -18,6 +18,19 @@ export interface CliExecutionOptions {
   extraArgs?: string[];
   /** What the run was for (e.g. 'orchestra'), kept with its usage. */
   usageTag?: string;
+  /**
+   * Asked when the agent wants a tool its permission mode doesn't allow (e.g. a
+   * shell command); resolves to whether it may. Only CLIs that can ask use it.
+   */
+  onToolApproval?: (request: ToolApprovalRequest) => Promise<boolean>;
+}
+
+/** A tool use waiting for the user's approval. */
+export interface ToolApprovalRequest {
+  tool: string;
+  /** The command, file or URL the tool acts on. */
+  input: string;
+  description?: string;
 }
 
 /**
