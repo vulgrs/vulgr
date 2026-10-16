@@ -42,6 +42,7 @@ import {
   resolveModel,
   type ChatEffort,
   type ModelFamily,
+  type ModelFlags,
   type RawModel,
 } from '../utils/modelFamilies.js';
 import type { ChatMessage } from '../types/warp.js';
@@ -293,11 +294,13 @@ interface AgentModelMenuProps {
   agent: ChatAgentId;
   familyId: string;
   effort: ChatEffort;
+  flags: ModelFlags;
   families: Record<ChatAgentId, ModelFamily[]>;
   available: Record<string, boolean>;
   onSelectAgent: (a: ChatAgentId) => void;
   onSelectModel: (familyId: string) => void;
   onSelectEffort: (e: ChatEffort) => void;
+  onChangeFlags: (f: ModelFlags) => void;
   onRefresh: () => void;
   refreshing: boolean;
   isTr: boolean;
@@ -308,11 +311,13 @@ const AgentModelMenu: React.FC<AgentModelMenuProps> = ({
   agent,
   familyId,
   effort,
+  flags,
   families,
   available,
   onSelectAgent,
   onSelectModel,
   onSelectEffort,
+  onChangeFlags,
   onRefresh,
   refreshing,
   isTr,
@@ -320,8 +325,14 @@ const AgentModelMenu: React.FC<AgentModelMenuProps> = ({
   const [open, setOpen] = useState(false);
   const list = families[agent] ?? [];
   const family = list.find((f) => f.id === familyId);
-  const efforts = effortsFor(agent, family);
-  const shownEffort = effectiveEffort(agent, family, effort);
+  const efforts = effortsFor(agent, family, flags);
+  const shownEffort = effectiveEffort(agent, family, effort, flags);
+  const thinkingOn = family?.thinkingToggle ? flags.thinking : !!family?.thinking;
+  const fastOn = family?.fastToggle ? flags.fast : !!family?.fast;
+  const chip = (on: boolean) =>
+    `px-2 py-0.5 rounded-md text-[11.5px] transition-colors ${
+      on ? 'bg-white/[0.12] text-white' : 'text-zinc-400 hover:bg-white/[0.06]'
+    }`;
 
   return (
     <div className="relative">
@@ -334,13 +345,15 @@ const AgentModelMenu: React.FC<AgentModelMenuProps> = ({
         <AgentLogo id={agent} name={agentLabel(agent)} size={16} />
         <span className="font-semibold text-zinc-200">{family?.label ?? agentLabel(agent)}</span>
         {shownEffort && <span className="text-zinc-500">{EFFORT_LABEL[shownEffort]}</span>}
+        {thinkingOn && agent !== 'claude' && <span className="text-zinc-500">Thinking</span>}
+        {fastOn && <span className="text-zinc-500">Fast</span>}
         <ChevronDown size={12} className="text-zinc-600" />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 left-0 bottom-full mb-2 w-[440px] max-w-[calc(100vw-48px)] rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] overflow-hidden">
+          <div className="absolute z-50 left-0 bottom-full mb-2 w-[520px] max-w-[calc(100vw-48px)] rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] overflow-hidden">
             <div className="flex max-h-[320px]">
               <div className="w-[150px] flex-shrink-0 border-r border-white/[0.06] p-1.5 overflow-y-auto">
                 <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
@@ -390,24 +403,38 @@ const AgentModelMenu: React.FC<AgentModelMenuProps> = ({
                 {isTr ? 'Efor' : 'Effort'}
               </span>
               {efforts.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex gap-0.5">
                   {efforts.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      onClick={() => onSelectEffort(e)}
-                      className={`px-2 py-0.5 rounded-md text-[11.5px] transition-colors ${
-                        e === shownEffort ? 'bg-white/[0.12] text-white' : 'text-zinc-400 hover:bg-white/[0.06]'
-                      }`}
-                    >
+                    <button key={e} type="button" onClick={() => onSelectEffort(e)} className={chip(e === shownEffort)}>
                       {EFFORT_LABEL[e]}
                     </button>
                   ))}
                 </div>
               ) : (
                 <span className="text-[11px] text-zinc-600">
-                  {isTr ? 'Bu model efor seçeneği sunmuyor' : 'No effort levels for this model'}
+                  {isTr ? 'Efor seçeneği yok' : 'No effort levels'}
                 </span>
+              )}
+              {(family?.thinkingToggle || family?.fastToggle) && <div className="w-px h-4 bg-white/[0.08]" />}
+              {family?.thinkingToggle && (
+                <button
+                  type="button"
+                  onClick={() => onChangeFlags({ ...flags, thinking: !flags.thinking })}
+                  className={chip(flags.thinking)}
+                  title={isTr ? 'Düşünen (thinking) sürümü kullan' : 'Use the thinking variant'}
+                >
+                  Thinking
+                </button>
+              )}
+              {family?.fastToggle && (
+                <button
+                  type="button"
+                  onClick={() => onChangeFlags({ ...flags, fast: !flags.fast })}
+                  className={chip(flags.fast)}
+                  title={isTr ? 'Hızlı (fast) sürümü kullan' : 'Use the fast variant'}
+                >
+                  Fast
+                </button>
               )}
               <button
                 type="button"
@@ -537,6 +564,9 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   const [effort, setEffort] = useState<ChatEffort>(() =>
     readLocal('vulgr.chatEffort', 'high' as ChatEffort, (r) => r as ChatEffort)
   );
+  const [flags, setFlags] = useState<ModelFlags>(() =>
+    readLocal('vulgr.chatModelFlags', { thinking: true, fast: false }, (r) => JSON.parse(r))
+  );
   const [team, setTeam] = useState<ChatAgentId[]>(() =>
     readLocal('vulgr.teamAgents', ['claude', 'codex'] as ChatAgentId[], (r) => {
       const parsed = JSON.parse(r);
@@ -566,10 +596,11 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       localStorage.setItem('vulgr.soloAgent', agent);
       localStorage.setItem('vulgr.chatModelByAgent', JSON.stringify(modelByAgent));
       localStorage.setItem('vulgr.chatEffort', effort);
+      localStorage.setItem('vulgr.chatModelFlags', JSON.stringify(flags));
       localStorage.setItem('vulgr.teamAgents', JSON.stringify(team));
       localStorage.setItem('vulgr.chatChangesOpen', changesOpen ? '1' : '0');
     } catch {}
-  }, [mode, agent, modelByAgent, effort, team, changesOpen]);
+  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen]);
 
   const families = useMemo(() => {
     const out = {} as Record<ChatAgentId, ModelFamily[]>;
@@ -746,7 +777,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   /** Sends one turn to Claude Code, reusing the live process while model/effort/folder stay the same. */
   const sendToClaude = useCallback(
     (text: string, images: Array<{ mediaType: string; data: string }>) => {
-      const { model, effort: eff } = resolveModel('claude', family, effort);
+      const { model, effort: eff } = resolveModel('claude', family, effort, flags);
       const key = `${chatCwd}|${model}|${eff ?? ''}`;
       const foreign = foreignTurnsRef.current;
       foreignTurnsRef.current = [];
@@ -779,7 +810,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         resumeSessionId: resume || undefined,
       });
     },
-    [api, chatCwd, effort, family, isTr]
+    [api, chatCwd, effort, family, flags, isTr]
   );
 
   const sendPrompt = useCallback(
@@ -804,7 +835,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         .map((m) => ({ role: (m.kind === 'user' ? 'user' : 'agent') as 'user' | 'agent', agent: m.agent, text: m.text }));
       foreignTurnsRef.current.push(`${isTr ? 'Kullanıcı' : 'User'}: ${text}`);
 
-      const { model, effort: eff } = resolveModel(agent, family, effort);
+      const { model, effort: eff } = resolveModel(agent, family, effort, flags);
       const id = `tc-${Date.now()}`;
       teamRunIdRef.current = id;
       void api?.runTeamChat?.({
@@ -820,7 +851,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
         lang,
       });
     },
-    [attachments, running, mode, agent, sendToClaude, isTr, family, effort, api, chatCwd, team, lang]
+    [attachments, running, mode, agent, sendToClaude, isTr, family, effort, flags, api, chatCwd, team, lang]
   );
 
   useEffect(() => {
@@ -1015,11 +1046,13 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
               agent={agent}
               familyId={familyId}
               effort={effort}
+              flags={flags}
               families={families}
               available={available}
               onSelectAgent={setAgent}
               onSelectModel={(id) => setModelByAgent((prev) => ({ ...prev, [agent]: id }))}
               onSelectEffort={setEffort}
+              onChangeFlags={setFlags}
               onRefresh={() => void loadModels(true)}
               refreshing={refreshingModels}
               isTr={isTr}

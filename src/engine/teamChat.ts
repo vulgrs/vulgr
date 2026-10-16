@@ -189,6 +189,14 @@ async function runZeroTokenVerify(cmd: string, cwd: string): Promise<{ ok: boole
   }
 }
 
+/** Removes the plan's `TASK: agent | title | instruction` lines (also when several share one line). */
+export function stripTaskLines(text: string): string {
+  return text
+    .replace(/\s*TASK:[^\n]*/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export class TeamChatCoordinator {
   private aborted = false;
   private abortController = new AbortController();
@@ -339,6 +347,8 @@ export class TeamChatCoordinator {
       agent: leadAgent,
       roleLabel: isTr ? 'Mimar & Planlayıcı' : 'Lead Architect',
       prompt: planPrompt,
+      // The TASK lines become the task-split card; the reply keeps only the approach.
+      display: stripTaskLines,
       cwd: opts.cwd,
       allowEdits: false,
       onEvent: opts.onEvent,
@@ -557,7 +567,9 @@ export class TeamChatCoordinator {
     allowEdits: boolean;
     onEvent: (event: TeamChatEvent) => void;
     isTr: boolean;
+    display?: (text: string) => string;
   }): Promise<string> {
+    const shown = params.display ?? ((t: string) => t);
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const thinkingId = `think-${messageId}`;
     const resolvedModel = params.model && params.model !== 'default' ? params.model : undefined;
@@ -626,7 +638,7 @@ export class TeamChatCoordinator {
           });
         }
         if (clean) {
-          params.onEvent({ type: 'agent_chunk', messageId, agent: params.agent, text: clean });
+          params.onEvent({ type: 'agent_chunk', messageId, agent: params.agent, text: shown(clean) });
         }
       },
     });
@@ -653,7 +665,7 @@ export class TeamChatCoordinator {
       messageId,
       agent: params.agent,
       roleLabel: params.roleLabel,
-      text,
+      text: shown(text) || text,
       model: modelLabel,
       tokensUsed,
       costUsd: res.usage?.costUsd,

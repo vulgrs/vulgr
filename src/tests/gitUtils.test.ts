@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { GitUtils, excludeFromGit } from '../git/gitUtils.js';
+import { GitUtils, excludeFromGit, parseStatus } from '../git/gitUtils.js';
 
 describe('GitUtils diff', () => {
   let repo: string;
@@ -115,5 +115,16 @@ describe('GitUtils diff', () => {
   test('nothing to discard returns null', () => {
     execSync('git add -A && git -c user.email=t@t -c user.name=t commit -q -m base', { cwd: repo });
     assert.equal(new GitUtils(repo).revertAllChanges(), null);
+  });
+});
+
+describe('parseStatus', () => {
+  test('keeps the first letter of paths whose status column starts with a space', () => {
+    assert.deepEqual(parseStatus(' M package.json\nM  src/a.ts\n?? README.md\nR  old.ts -> new.ts\n'), [
+      'package.json',
+      'src/a.ts',
+      'README.md',
+      'new.ts',
+    ]);
   });
 });

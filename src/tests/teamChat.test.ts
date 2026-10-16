@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildModelExtraArgs,
   classifyPromptComplexity,
+  stripTaskLines,
   pickQuotaBalancedAgents,
   TeamChatCoordinator,
   type TeamChatEvent,
@@ -166,5 +167,10 @@ describe('TeamChatCoordinator Suite', () => {
     ]);
     assert.deepStrictEqual(buildModelExtraArgs('cursor', 'gpt-5.3-codex-high', 'high'), ['--model', 'gpt-5.3-codex-high']);
     assert.deepStrictEqual(buildModelExtraArgs('claude', 'default', 'bogus; rm'), []);
+  });
+
+  it('keeps the plan text but drops the TASK lines shown in the task card', () => {
+    const plan = 'Approach: split it.\n\nTASK: cursor | ESM | add type module\nTASK: claude | math | write src/math.js';
+    assert.strictEqual(stripTaskLines(plan), 'Approach: split it.');
   });
 });

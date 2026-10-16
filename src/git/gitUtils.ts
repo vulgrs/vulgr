@@ -1,4 +1,4 @@
-import { execSync, execFile, execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, statSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join, dirname, isAbsolute } from 'node:path';
@@ -18,10 +18,17 @@ export interface GitDiffResult {
 }
 
 /** File paths from `git status --porcelain` output. */
-function parseStatus(raw: string): string[] {
+export function parseStatus(raw: string): string[] {
+  // Porcelain lines are "XY path"; X is often a space, so trimming first would eat the path's first letter.
   return raw
     .split('\n')
-    .map((l) => l.trim().substring(3).trim())
+    .map((l) => l.replace(/\r$/, ''))
+    .filter((l) => l.length > 3)
+    .map((l) => {
+      const path = l.substring(3).trim();
+      const arrow = path.indexOf(' -> ');
+      return arrow >= 0 ? path.slice(arrow + 4) : path;
+    })
     .filter(Boolean);
 }
 
@@ -62,10 +69,11 @@ function untrackedAsDiff(cwd: string, list: string): string {
  */
 export function excludeFromGit(cwd: string, pattern: string): void {
   try {
-    let gitDir = execSync('git rev-parse --git-common-dir', {
+    let gitDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
       cwd,
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
     }).trim();
     if (!isAbsolute(gitDir)) gitDir = join(cwd, gitDir);
     const excludePath = join(gitDir, 'info', 'exclude');
@@ -90,10 +98,11 @@ export class GitUtils {
    */
   isGitRepo(): boolean {
     try {
-      const res = execSync('git rev-parse --is-inside-work-tree', {
+      const res = execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
         cwd: this.cwd,
         stdio: ['ignore', 'pipe', 'ignore'],
         encoding: 'utf-8',
+        windowsHide: true,
       });
       return res.trim() === 'true';
     } catch {
@@ -165,7 +174,7 @@ export class GitUtils {
    * Initialize a git repository if one doesn't exist.
    */
   initRepo(): void {
-    execSync('git init', { cwd: this.cwd, stdio: 'ignore' });
+    execFileSync('git', ['init'], { cwd: this.cwd, stdio: 'ignore', windowsHide: true });
   }
 
   /**
@@ -178,21 +187,24 @@ export class GitUtils {
 
     try {
       // Get unstaged and staged diff
-      const unstaged = execSync('git diff', {
+      const unstaged = execFileSync('git', ['diff'], {
         cwd: this.cwd,
         encoding: 'utf-8',
         maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true,
       });
 
-      const staged = execSync('git diff --cached', {
+      const staged = execFileSync('git', ['diff', '--cached'], {
         cwd: this.cwd,
         encoding: 'utf-8',
         maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true,
       });
 
-      const untracked = execSync('git ls-files --others --exclude-standard', {
+      const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
         cwd: this.cwd,
         encoding: 'utf-8',
+        windowsHide: true,
       }).trim();
 
       let combinedDiff = [staged, unstaged].filter(Boolean).join('\n');
@@ -203,9 +215,10 @@ export class GitUtils {
       }
 
       // Get files changed list
-      const filesRaw = execSync('git status --porcelain', {
+      const filesRaw = execFileSync('git', ['status', '--porcelain'], {
         cwd: this.cwd,
         encoding: 'utf-8',
+        windowsHide: true,
       });
       const filesChanged = parseStatus(filesRaw);
 
@@ -229,13 +242,14 @@ export class GitUtils {
     if (!this.isGitRepo()) return null;
     try {
       const label = `vulgr: discarded ${new Date().toISOString()}`;
-      const out = execSync(`git stash push --include-untracked -m "${label}"`, {
+      const out = execFileSync('git', ['stash', 'push', '--include-untracked', '-m', label], {
         cwd: this.cwd,
         encoding: 'utf-8',
         stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
       });
       if (/No local changes/i.test(out)) return null;
-      return execSync('git rev-parse stash@{0}', { cwd: this.cwd, encoding: 'utf-8' }).trim();
+      return execFileSync('git', ['rev-parse', 'stash@{0}'], { cwd: this.cwd, encoding: 'utf-8', windowsHide: true }).trim();
     } catch {
       return null;
     }
@@ -246,13 +260,18 @@ export class GitUtils {
     if (!this.isGitRepo()) return null;
     try {
       const label = `vulgr: discarded ${file} ${new Date().toISOString()}`;
-      execSync(`git stash push --include-untracked -m "${label.replace(/"/g, '')}" -- "${file.replace(/"/g, '')}"`, {
+      execFileSync('git', ['stash', 'push', '--include-untracked', '-m', label, '--', file], {
         cwd: this.cwd,
         stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
       });
-      const top = execSync('git stash list -1 --format=%H%x09%s', { cwd: this.cwd, encoding: 'utf-8' }).trim();
+      const top = execFileSync('git', ['stash', 'list', '-1', '--format=%H%x09%s'], {
+        cwd: this.cwd,
+        encoding: 'utf-8',
+        windowsHide: true,
+      }).trim();
       const [sha, subject] = top.split('\t');
-      return subject?.includes(label.replace(/"/g, '')) ? sha : null;
+      return subject?.includes(label) ? sha : null;
     } catch {
       return null;
     }
@@ -261,10 +280,14 @@ export class GitUtils {
   /** Brings back changes discarded by revertAllChanges() or revertFile(). */
   restoreDiscarded(stashCommit: string): boolean {
     try {
-      const list = execSync('git stash list --format=%H', { cwd: this.cwd, encoding: 'utf-8' }).split('\n');
+      const list = execFileSync('git', ['stash', 'list', '--format=%H'], {
+        cwd: this.cwd,
+        encoding: 'utf-8',
+        windowsHide: true,
+      }).split('\n');
       const index = list.indexOf(stashCommit);
       if (index < 0) return false;
-      execSync(`git stash pop "stash@{${index}}"`, { cwd: this.cwd, stdio: 'ignore' });
+      execFileSync('git', ['stash', 'pop', `stash@{${index}}`], { cwd: this.cwd, stdio: 'ignore', windowsHide: true });
       return true;
     } catch {
       return false;
@@ -278,10 +301,11 @@ export class GitUtils {
     if (!this.isGitRepo()) return null;
 
     try {
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+      const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
         cwd: this.cwd,
         stdio: ['ignore', 'pipe', 'ignore'],
         encoding: 'utf-8',
+        windowsHide: true,
       }).trim();
       return branch === 'HEAD' ? null : branch;
     } catch {
