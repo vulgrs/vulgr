@@ -20,9 +20,11 @@ import {
   Wrench,
   PanelRightClose,
   PanelRightOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  SquarePen,
   Info,
   CornerDownRight,
-  History,
   Trash2,
   MessageSquare,
   ShieldCheck,
@@ -888,70 +890,97 @@ const ApprovalCard: React.FC<{
   </div>
 );
 
-const HistoryMenu: React.FC<{
+/** "Today", "Yesterday", "Last 7 days" or "Older" for a chat's last update. */
+function chatGroup(at: number, isTr: boolean): string {
+  const day = new Date();
+  day.setHours(0, 0, 0, 0);
+  const today = day.getTime();
+  if (at >= today) return isTr ? 'Bugün' : 'Today';
+  if (at >= today - 86_400_000) return isTr ? 'Dün' : 'Yesterday';
+  if (at >= today - 7 * 86_400_000) return isTr ? 'Son 7 gün' : 'Last 7 days';
+  return isTr ? 'Daha eski' : 'Older';
+}
+
+/** Past chats down the left side, newest first, grouped by day. */
+const ChatSidebar: React.FC<{
   chats: ChatSummary[];
   currentId: string | null;
-  onOpen: () => void;
+  onNew: () => void;
+  onClose: () => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   isTr: boolean;
-}> = ({ chats, currentId, onOpen, onSelect, onDelete, isTr }) => {
-  const [open, setOpen] = useState(false);
+}> = ({ chats, currentId, onNew, onClose, onSelect, onDelete, isTr }) => {
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const shown = q ? chats.filter((c) => `${c.title} ${baseName(c.cwd)}`.toLowerCase().includes(q)) : chats;
+  const groups = useMemo(() => {
+    const shown = [...(q ? chats.filter((c) => `${c.title} ${baseName(c.cwd)}`.toLowerCase().includes(q)) : chats)].sort(
+      (a, b) => b.updatedAt - a.updatedAt
+    );
+    const out: { label: string; chats: ChatSummary[] }[] = [];
+    for (const c of shown) {
+      const label = chatGroup(c.updatedAt, isTr);
+      if (out[out.length - 1]?.label !== label) out.push({ label, chats: [] });
+      out[out.length - 1].chats.push(c);
+    }
+    return out;
+  }, [chats, q, isTr]);
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => {
-          if (!open) onOpen();
-          setOpen((v) => !v);
-        }}
-        className={`p-1.5 rounded-md transition-colors ${
-          open ? 'text-zinc-200 bg-white/[0.06]' : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05]'
-        }`}
-        title={isTr ? 'Geçmiş sohbetler' : 'Past chats'}
-      >
-        <History size={14} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-32px)] rounded-xl border border-white/10 bg-[#141416] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] overflow-hidden">
-            <div className="p-2 border-b border-white/[0.06]">
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={isTr ? 'Sohbet ara…' : 'Search chats…'}
-                className="w-full bg-white/[0.04] border border-white/[0.06] rounded-md px-2 py-1 text-[12.5px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/20"
-              />
-            </div>
-            <div className="max-h-[380px] overflow-y-auto p-1.5">
-              {shown.length === 0 ? (
-                <div className="px-2 py-6 text-center text-[12px] text-zinc-600">
-                  {isTr ? 'Kayıtlı sohbet yok' : 'No saved chats'}
-                </div>
-              ) : (
-                shown.map((c) => (
-                  <ChatHistoryRow
-                    key={c.id}
-                    chat={c}
-                    active={c.id === currentId}
-                    onSelect={() => {
-                      onSelect(c.id);
-                      setOpen(false);
-                    }}
-                    onDelete={() => onDelete(c.id)}
-                    isTr={isTr}
-                  />
-                ))
-              )}
-            </div>
+    <div className="w-[260px] flex-shrink-0 border-r border-white/[0.06] bg-black/20 flex flex-col">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.06]">
+        <span className="text-[12px] font-medium text-zinc-300">{isTr ? 'Sohbetler' : 'Chats'}</span>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onNew}
+            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05]"
+            title={isTr ? 'Yeni sohbet' : 'New chat'}
+          >
+            <SquarePen size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05]"
+            title={isTr ? 'Kenar çubuğunu gizle' : 'Hide sidebar'}
+          >
+            <PanelLeftClose size={13} />
+          </button>
+        </div>
+      </div>
+      <div className="p-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={isTr ? 'Sohbet ara…' : 'Search chats…'}
+          className="w-full bg-white/[0.04] border border-white/[0.06] rounded-md px-2 py-1 text-[12.5px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-white/20"
+        />
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-1.5 pb-2">
+        {groups.length === 0 ? (
+          <div className="px-2 py-6 text-center text-[12px] text-zinc-600">
+            {q ? (isTr ? 'Eşleşen sohbet yok' : 'No matching chats') : isTr ? 'Kayıtlı sohbet yok' : 'No saved chats'}
           </div>
-        </>
-      )}
+        ) : (
+          groups.map((g) => (
+            <div key={g.label} className="mb-2">
+              <div className="px-2 pt-1 pb-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-zinc-600">
+                {g.label}
+              </div>
+              {g.chats.map((c) => (
+                <ChatHistoryRow
+                  key={c.id}
+                  chat={c}
+                  active={c.id === currentId}
+                  onSelect={() => onSelect(c.id)}
+                  onDelete={() => onDelete(c.id)}
+                  isTr={isTr}
+                />
+              ))}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
@@ -1073,6 +1102,9 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
   const [changesOpen, setChangesOpen] = useState<boolean>(() =>
     readLocal('vulgr.chatChangesOpen', true, (r) => r !== '0')
   );
+  const [historyOpen, setHistoryOpen] = useState<boolean>(() =>
+    readLocal('vulgr.chatHistoryOpen', true, (r) => r !== '0')
+  );
 
   const chatCwd = folder || cwd;
   const familyId = modelByAgent[agent] || 'default';
@@ -1138,11 +1170,12 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
       localStorage.setItem('vulgr.chatModelFlags', JSON.stringify(flags));
       localStorage.setItem('vulgr.teamAgents', JSON.stringify(team));
       localStorage.setItem('vulgr.chatChangesOpen', changesOpen ? '1' : '0');
+      localStorage.setItem('vulgr.chatHistoryOpen', historyOpen ? '1' : '0');
       localStorage.setItem('vulgr.chatThinkingOpen', thinkingOpen ? '1' : '0');
       localStorage.setItem('vulgr.chatApprovals', approvalMode);
       localStorage.setItem('vulgr.teamFast', teamFast ? '1' : '0');
     } catch {}
-  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen, thinkingOpen, approvalMode, teamFast]);
+  }, [mode, agent, modelByAgent, effort, flags, team, changesOpen, historyOpen, thinkingOpen, approvalMode, teamFast]);
 
   const families = useMemo(() => {
     const out = {} as Record<ChatAgentId, ModelFamily[]>;
@@ -1462,19 +1495,24 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
     savedSigRef.current = sig;
     const meta = stateRef.current.meta;
     const agents = Array.from(new Set(messages.map((m) => m.agent).filter((a): a is string => !!a)));
+    const summary: ChatSummary = {
+      id: chatIdRef.current,
+      title: titleFromPrompt(firstUser.text || ''),
+      cwd: chatCwd,
+      mode,
+      agents,
+      createdAt: createdAtRef.current,
+      updatedAt: Date.now(),
+      messageCount: messages.length,
+    };
     void api
       .saveChat({
-        id: chatIdRef.current,
-        title: titleFromPrompt(firstUser.text || ''),
-        cwd: chatCwd,
-        mode,
-        agents,
-        createdAt: createdAtRef.current,
-        updatedAt: Date.now(),
+        ...summary,
         claudeSessionId: meta.claudeSessionId,
         claudeCwd: claudeRef.current?.cwd ?? meta.cwd,
         messages,
       })
+      .then(() => setChats((prev) => [summary, ...prev.filter((c) => c.id !== summary.id)]))
       .catch(() => {});
   };
 
@@ -1938,10 +1976,33 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
 
   return (
     <div className="absolute inset-0 z-30 flex bg-base-app">
+      {historyOpen && (
+        <ChatSidebar
+          chats={chats}
+          currentId={chatIdRef.current}
+          onNew={handleNewChat}
+          onClose={() => setHistoryOpen(false)}
+          onSelect={(id) => void openChat(id)}
+          onDelete={(id) => void deleteChat(id)}
+          isTr={isTr}
+        />
+      )}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/[0.06]">
-          <span className="text-[13px] font-medium text-zinc-200 truncate">{title}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            {!historyOpen && (
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(true)}
+                className="p-1.5 -ml-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05] flex-shrink-0"
+                title={isTr ? 'Geçmiş sohbetleri göster' : 'Show past chats'}
+              >
+                <PanelLeftOpen size={14} />
+              </button>
+            )}
+            <span className="text-[13px] font-medium text-zinc-200 truncate">{title}</span>
+          </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             {!empty && folderMenu}
             {!empty && branch && (
@@ -1951,14 +2012,6 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
             )}
             <div className="w-px h-4 bg-white/[0.08]" />
             <ApprovalMenu mode={approvalMode} onChange={setApprovalMode} isTr={isTr} />
-            <HistoryMenu
-              chats={chats}
-              currentId={chatIdRef.current}
-              onOpen={() => void loadChats()}
-              onSelect={(id) => void openChat(id)}
-              onDelete={(id) => void deleteChat(id)}
-              isTr={isTr}
-            />
             <button
               onClick={() => {
                 setThinkingOpen((v) => !v);
@@ -2036,7 +2089,7 @@ export const ClaudeChatView: React.FC<ClaudeChatViewProps> = ({
                 )}
               </div>
               {composer}
-              {recentChats.length > 0 && (
+              {!historyOpen && recentChats.length > 0 && (
                 <div className="mt-6">
                   <div className="px-2 mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-zinc-600">
                     {isTr ? 'Son sohbetler' : 'Recent chats'}
