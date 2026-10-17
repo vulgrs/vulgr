@@ -190,12 +190,6 @@
   background: transparent;
 }
 
-/* The logo mark is white; show it dark on light surfaces. */
-.light .logo-mark,
-.light img[src*='logo-mark'] {
-  filter: invert(1);
-}
-
 .light .modal-overlay {
   background: rgba(24, 24, 27, 0.25);
 }
