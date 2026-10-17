@@ -64,17 +64,16 @@ export class GitHubAuth {
   }
 
   /**
-   * Returns the signed-in user and refreshes the profile. An expiring token is
-   * renewed first; the user is signed out only when GitHub turns down both the
-   * token and its refresh token, never because of a network error.
+   * Returns the signed-in user and refreshes the profile when the token allows.
+   * Like Zed, the session lasts until the user signs out: a token that is
+   * expired, rejected or unreadable (macOS keychain refusing an unsigned
+   * update) only stops profile refreshes, and the cached profile stays.
    */
   async getUser(): Promise<GitHubUser | null> {
-    if (!this.tokens) return null;
+    if (!this.user) return null;
+    if (!this.tokens) return this.user;
     try {
-      if (needsRefresh(this.tokens) && !(await this.refresh())) {
-        this.logout();
-        return null;
-      }
+      if (needsRefresh(this.tokens) && !(await this.refresh())) return this.user;
       let fresh = await this.fetchUser(this.tokens!.accessToken);
       if (!fresh && this.tokens?.refreshToken && (await this.refresh())) {
         fresh = await this.fetchUser(this.tokens!.accessToken);
@@ -82,8 +81,6 @@ export class GitHubAuth {
       if (fresh) {
         this.user = fresh;
         this.save();
-      } else {
-        this.logout();
       }
     } catch {
       // Offline: keep showing the cached profile.
@@ -221,6 +218,7 @@ export class GitHubAuth {
     try {
       if (!existsSync(this.storePath)) return;
       const stored: StoredAuth = JSON.parse(readFileSync(this.storePath, 'utf-8'));
+      this.user = stored.user ?? null;
       const open = (v: string) => (stored.encrypted ? safeStorage.decryptString(Buffer.from(v, 'base64')) : v);
       this.tokens = {
         accessToken: open(stored.token),
@@ -228,25 +226,28 @@ export class GitHubAuth {
         expiresAt: stored.expiresAt,
         refreshExpiresAt: stored.refreshExpiresAt,
       };
-      this.user = stored.user;
     } catch {
+      // Unreadable token (bad file, or a keychain that turned the app down): stay signed in on the cached profile.
       this.tokens = null;
-      this.user = null;
     }
   }
 
   private save() {
     if (!this.tokens || !this.user) return;
-    const encrypted = safeStorage.isEncryptionAvailable();
-    const seal = (v: string) => (encrypted ? safeStorage.encryptString(v).toString('base64') : v);
-    const stored: StoredAuth = {
-      token: seal(this.tokens.accessToken),
-      encrypted,
-      user: this.user,
-      refreshToken: this.tokens.refreshToken ? seal(this.tokens.refreshToken) : undefined,
-      expiresAt: this.tokens.expiresAt,
-      refreshExpiresAt: this.tokens.refreshExpiresAt,
-    };
-    writeFileSync(this.storePath, JSON.stringify(stored), { mode: 0o600 });
+    try {
+      const encrypted = safeStorage.isEncryptionAvailable();
+      const seal = (v: string) => (encrypted ? safeStorage.encryptString(v).toString('base64') : v);
+      const stored: StoredAuth = {
+        token: seal(this.tokens.accessToken),
+        encrypted,
+        user: this.user,
+        refreshToken: this.tokens.refreshToken ? seal(this.tokens.refreshToken) : undefined,
+        expiresAt: this.tokens.expiresAt,
+        refreshExpiresAt: this.tokens.refreshExpiresAt,
+      };
+      writeFileSync(this.storePath, JSON.stringify(stored), { mode: 0o600 });
+    } catch {
+      // Keychain refused: the session lives on in memory and in the file already on disk.
+    }
   }
 }
