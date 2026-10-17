@@ -1,8 +1,7 @@
 ## Fixes
 
-- **Windows: team chats no longer end with an extra repair turn.** The local test check after a team chat couldn't start `npm` on Windows, so it counted as a failure and an agent was woken up to "fix" it, spending quota for nothing. It now runs the project's tests as it does on macOS and Linux.
-
-New in 0.3.0-beta: team chat with `@claude @cursor …`, the same agent twice (`@claude @claude`), a model per agent and ⚡ Fast mode, and command approvals. See the [0.3.0-beta notes](https://github.com/vulgrs/vulgr/releases/tag/v0.3.0-beta).
+- **You stay signed in to GitHub.** Sign-in tokens last 8 hours, and the app was signing you out when one ran out. It now renews them in the background; you're only signed out if GitHub withdraws access, never for being offline. After this update, sign in once more and it sticks.
+- **Windows: Open folder… opens the folder picker again.** The window is brought forward before the dialog, the dialog opens on its own if it can't attach to the window, and any error now shows in the chat instead of nothing happening.
 
 **Updating:** if you have 0.2.1-beta or newer, the gift icon at the bottom left installs this one. From 0.2.0-beta or older, download it below once.
 
