@@ -1,7 +1,11 @@
+## New
+
+- **A new logo.** Vulgr has a new red mark: in the app, on the Dock and taskbar, and in the installers.
+- **Past chats on the left.** Chat mode now lists your saved chats in a sidebar, newest first and grouped by day, with search, a new chat button and delete. Hide it with the button at its top and bring it back from the chat header.
+
 ## Fixes
 
-- **You stay signed in to GitHub.** Sign-in tokens last 8 hours, and the app was signing you out when one ran out. It now renews them in the background; you're only signed out if GitHub withdraws access, never for being offline. After this update, sign in once more and it sticks.
-- **Windows: Open folder… opens the folder picker again.** The window is brought forward before the dialog, the dialog opens on its own if it can't attach to the window, and any error now shows in the chat instead of nothing happening.
+- **GitHub keeps you signed in until you sign out.** An expired or unreadable sign-in (for example after an update on macOS) no longer signs you out; your profile stays and refreshes once GitHub accepts the token again.
 
 **Updating:** if you have 0.2.1-beta or newer, the gift icon at the bottom left installs this one. From 0.2.0-beta or older, download it below once.
 
